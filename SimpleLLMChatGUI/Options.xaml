@@ -1,0 +1,61 @@
+﻿<Window x:Class="SimpleLLMChatGUI.Options"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Options" Height="375" Width="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Loaded="Window_Loaded"
+        Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Options Form -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <!-- Host -->
+            <Label Content="Host:"/>
+            <TextBox x:Name="HostTextBox"
+                     Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
+                     Height="23"/>
+
+            <!-- Port -->
+            <Label Content="Port:"/>
+            <TextBox x:Name="PortTextBox"
+                     Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
+                     Height="23"/>
+
+            <!-- API Key -->
+            <Label Content="API Key:"/>
+            <PasswordBox x:Name="ApiKeyPasswordBox" Height="23"/>
+
+            <!-- Model -->
+            <Label Content="Model:"/>
+            <TextBox x:Name="ModelTextBox"
+                     Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
+                     Height="23"/>
+
+            <!-- System Prompt -->
+            <Label Content="System Prompt:"/>
+            <TextBox x:Name="SysPromptTextBox"
+                     Text="{Binding SysPrompt, UpdateSourceTrigger=PropertyChanged}"
+                     Height="23"/>
+
+            <!-- Assistant Name -->
+            <Label Content="Assistant Name:"/>
+            <TextBox x:Name="AssistantNameTextBox"
+                     Text="{Binding AssistantName, UpdateSourceTrigger=PropertyChanged}"
+                     Height="23"/>
+        </StackPanel>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="SaveButton" Content="OK" Width="75" Height="23"
+                    Margin="0,0,8,0" Click="SaveButton_Click" IsDefault="True"/>
+            <Button x:Name="CancelButton" Content="Cancel" Width="75" Height="23"
+                    Click="CancelButton_Click" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
