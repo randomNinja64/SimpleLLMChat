@@ -24,7 +24,7 @@ Requirements
 Configuration
 ------------------------------------------------------------
 
-config.ini is explained below.
+LLMSettings.ini is explained below.
 
 host= x.x.x.x (IP address or domain)
 port= 1234 (port)
