@@ -1,7 +1,7 @@
 SimpleLLMChat
 ================
 
-A lightweight C++ command-line client for interacting with OpenAI-compatible LLM endpoints. The software can be ran in interactive mode (with contextual awareness) or be called directly from the CLI (GUI coming in a future release).
+A lightweight C++ command-line client for interacting with OpenAI-compatible LLM endpoints. The software can be ran in interactive mode (with contextual awareness), called directly from the CLI, or used via the GUI wrapper.
 
 ------------------------------------------------------------
 Features
@@ -24,7 +24,7 @@ Requirements
 Configuration
 ------------------------------------------------------------
 
-config.ini is explained below.
+LLMSettings.ini is explained below.
 
 host= x.x.x.x (IP address or domain)
 port= 1234 (port)
