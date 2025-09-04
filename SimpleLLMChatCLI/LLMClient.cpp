@@ -46,18 +46,18 @@ std::string LLMClient::sendPrompt(const std::string& prompt, const std::vector<s
 
     // Add images (as data URLs)
     for (size_t i = 0; i < images.size(); ++i) {
-    if (!first) body << ",";
-    const std::string& img_b64 = images[i];
+        if (!first) body << ",";
+        const std::string& img_b64 = images[i];
 
-    body << "{"
-         << "\"type\":\"image_url\","
-         << "\"image_url\":{"
-         << "\"url\":\"data:image/png;base64," << jsonEscape(img_b64) << "\""
-         << "}"
-         << "}";
+        body << "{"
+             << "\"type\":\"image_url\","
+             << "\"image_url\":{"
+             << "\"url\":\"data:image/png;base64," << jsonEscape(img_b64) << "\""
+             << "}"
+             << "}";
 
-    first = false;
-}
+        first = false;
+    }
 
     body << "]"
          << "}";  // end user message
@@ -94,9 +94,25 @@ std::string LLMClient::sendPrompt(const std::string& prompt, const std::vector<s
             size_t pos = jsonPart.find("\"content\":\"");
             if (pos != std::string::npos) {
                 pos += 11;
-                size_t end = jsonPart.find("\"", pos);
-                if (end != std::string::npos) {
-                    std::string chunk = jsonUnescape(jsonPart.substr(pos, end - pos));
+
+                // scan for real closing quote (handle escapes)
+                size_t end = pos;
+                bool escape = false;
+                while (end < jsonPart.size()) {
+                    char c = jsonPart[end];
+                    if (escape) {
+                        escape = false;
+                    } else if (c == '\\') {
+                        escape = true;
+                    } else if (c == '"') {
+                        break; // found unescaped closing quote
+                    }
+                    ++end;
+                }
+
+                if (end > pos && end <= jsonPart.size()) {
+                    std::string rawChunk = jsonPart.substr(pos, end - pos);
+                    std::string chunk = jsonUnescape(rawChunk);
                     std::cout << chunk << std::flush;
                     output += chunk;
                 }

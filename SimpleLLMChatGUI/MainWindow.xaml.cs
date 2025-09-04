@@ -298,6 +298,9 @@ namespace SimpleLLMChatGUI
 
                     // Unset suppressed flag after image is attached
                     suppressAttachDialog = false;
+
+                    // Focus the chat textbox
+                    chatInput.Focus();
                 }));
             };
             hotkeyHandler.ErrorOccurred += (err) =>
