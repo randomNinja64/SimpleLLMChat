@@ -329,6 +329,31 @@ public class LLMClient
                     tool["function"] = func;
                     toolsArray.Add(tool);
                 }
+                else if (toolName == "read_website")
+                {
+                    JObject tool = new JObject();
+                    tool["type"] = "function";
+
+                    JObject func = new JObject();
+                    func["name"] = "read_website";
+                    func["description"] = "Browse to a specific URL/web page and return its HTML content";
+
+                    JObject parameters = new JObject();
+                    parameters["type"] = "object";
+
+                    JObject properties = new JObject();
+                    JObject urlProp = new JObject();
+                    urlProp["type"] = "string";
+                    urlProp["description"] = "The URL of the web page to get the content of.";
+                    properties["URL"] = urlProp;
+
+                    parameters["properties"] = properties;
+                    parameters["required"] = new JArray("URL");
+
+                    func["parameters"] = parameters;
+                    tool["function"] = func;
+                    toolsArray.Add(tool);
+                }
             }
 
             if (toolsArray.Count > 0)

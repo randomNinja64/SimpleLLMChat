@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
@@ -41,6 +42,29 @@ public static class ToolHandler
             {
                 string output = RunShellCommand(command, out exitCode);
                 toolContent = FormatCommandResult(command, output, exitCode);
+            }
+            catch (Exception e)
+            {
+                toolContent = "error: " + e.Message;
+            }
+
+            return true;
+        }
+
+        if (call.Name == "read_website")
+        {
+            // Expected arguments payload should contain {"URL": "..."} as JSON.
+            string URL = Trim(JsonExtractString(call.Arguments, "URL"));
+            if (string.IsNullOrEmpty(URL))
+            {
+                toolContent = "error: missing 'URL' argument for read_website.";
+                return true;
+            }
+
+            try
+            {
+                string output = ReadWebsite(URL, out exitCode);
+                toolContent = FormatCommandResult("read website: " + URL, output, exitCode);
             }
             catch (Exception e)
             {
@@ -125,6 +149,7 @@ public static class ToolHandler
         return "";
     }
 
+    // Runs shell commands on the OS
     private static string RunShellCommand(string command, out int exitCode)
     {
         var output = new StringBuilder();
@@ -237,6 +262,61 @@ public static class ToolHandler
         }
 
         return results.ToString();
+    }
+
+    private static string ReadWebsite(string URL, out int exitCode)
+    {
+        exitCode = 0;
+        string html = "";
+
+        try
+        {
+            // Build curl command arguments
+            string arguments = "-s -L \"" + URL + "\" " +
+                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = "curl.exe",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8
+            };
+
+            using (Process process = Process.Start(psi))
+            using (StreamReader reader = process.StandardOutput)
+            {
+                html = reader.ReadToEnd();
+                process.WaitForExit();
+                exitCode = process.ExitCode;
+            }
+
+            // Strip out <script> and <style> blocks
+            html = Regex.Replace(html, @"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<path\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<img\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<meta\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<link\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            // Optionally remove inline JS/CSS in attributes like onclick, style etc.
+            html = Regex.Replace(html, @"\s(on\w+|style|class|id|method|role)\s*=\s*(['""]).*?\2", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<!--.*?-->", "", RegexOptions.Singleline);
+            html = Regex.Replace(html, @"^\s*$[\r\n]*", "", RegexOptions.Multiline);
+
+            // Truncate to 4000 characters
+            if (html.Length > 4000)
+                html = html.Substring(0, 4000);
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error running curl.exe: " + ex.Message;
+        }
+
+        return html+"\n";
     }
 
     private static string FormatCommandResult(string command, string output, int exitCode)
