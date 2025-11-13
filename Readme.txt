@@ -34,16 +34,16 @@ apiKey= test (API key if required by your endpoint)
 model= modelname (model to load (if supported by your endpoint))
 sysprompt = "" (custom system prompt)
 assistantname = LLM (Display name for the assistant in the UI)
-tools=run_shell_command,run_web_search (list of tools the AI is allowed to use)
+tools= (a comma separated list of tools the AI is allowed to use)
 showtooloutput=0/1 (controls whether or not the full output of tool calls is shown)
 
 ------------------------------------------------------------
 Tools (Available Tools/Requirements)
 ------------------------------------------------------------
 download_video: Downloads a video from the internet using YT-DLP (Requires a yt-dlp.exe in the same folder as the exe)
-read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and prefereably a ca-bundle.crt in the same folder as the exe)
+read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 run_shell_command: Runs a shell command (Enable with caution)
-run_web_search: Searches the web using DuckDuckGo (Requires a curl.exe and prefereably a ca-bundle.crt in the same folder as the exe)
+run_web_search: Searches the web using DuckDuckGo (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 
 ------------------------------------------------------------
 Usage
