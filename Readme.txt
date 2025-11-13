@@ -28,14 +28,13 @@ Configuration
 
 LLMSettings.ini is explained below.
 
-host= x.x.x.x (IP address or domain)
-port= 1234 (port)
+llmserver= (OpenAI-compatible endpoint in the format http://ip:port)
 apiKey= test (API key if required by your endpoint)
 model= modelname (model to load (if supported by your endpoint))
-sysprompt = "" (custom system prompt)
-assistantname = LLM (Display name for the assistant in the UI)
+sysprompt= "" (custom system prompt)
+assistantname= LLM (Display name for the assistant in the UI)
 tools= (a comma separated list of tools the AI is allowed to use)
-showtooloutput=0/1 (controls whether or not the full output of tool calls is shown)
+showtooloutput= 0/1 (controls whether or not the full output of tool calls is shown)
 
 ------------------------------------------------------------
 Tools (Available Tools/Requirements)
