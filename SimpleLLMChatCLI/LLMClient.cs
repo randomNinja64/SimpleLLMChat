@@ -61,7 +61,8 @@ public class LLMClient
         string image,
         string assistantName,
         List<string> enabledTools,
-        bool outputOnly)
+        bool outputOnly,
+        bool showToolOutput)
     {
         // Add user message
         ChatMessage userMsg = new ChatMessage
@@ -103,6 +104,7 @@ public class LLMClient
                     }
 
                     bool handled = false;
+                    int exitCode = 0;
 
                     string toolContent;
                     if (!enabledTools.Contains(call.Name))
@@ -113,7 +115,7 @@ public class LLMClient
                     else
                     {
                         // Execute the requested tool and capture its output
-                        handled = ToolHandler.ExecuteToolCall(call, out toolContent);
+                        handled = ToolHandler.ExecuteToolCall(call, out toolContent, out exitCode);
                     }
 
                     ChatMessage toolMsg = new ChatMessage
@@ -126,8 +128,17 @@ public class LLMClient
 
                     if (!outputOnly)
                     {
-                        Console.WriteLine("[tool output]");
-                        Console.Write(toolContent);
+                        if (showToolOutput)
+                        {
+                            Console.WriteLine("[tool output]");
+                            Console.Write(toolContent);
+                        }
+                        else
+                        {
+                            // Show only the exit code
+                            Console.WriteLine("[tool output]");
+                            Console.WriteLine("Exit Code: " + exitCode);
+                        }
                     }
 
                     if (!handled && !outputOnly)

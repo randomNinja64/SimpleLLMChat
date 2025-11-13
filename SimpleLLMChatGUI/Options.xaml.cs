@@ -13,6 +13,7 @@ namespace SimpleLLMChatGUI
         private string _model;
         private string _sysPrompt;
         private string _assistantName;
+        private bool _showToolOutput;
         private ProcessHandler _processHandler;
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -54,6 +55,12 @@ namespace SimpleLLMChatGUI
             set { _assistantName = value; OnPropertyChanged("AssistantName"); }
         }
 
+        public bool ShowToolOutput
+        {
+            get { return _showToolOutput; }
+            set { _showToolOutput = value; OnPropertyChanged("ShowToolOutput"); }
+        }
+
         public Options(ProcessHandler processHandler)
         {
             InitializeComponent();
@@ -67,6 +74,7 @@ namespace SimpleLLMChatGUI
             Model = "";
             SysPrompt = "";
             AssistantName = "";
+            ShowToolOutput = true; // Default to showing tool outputs
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -107,6 +115,10 @@ namespace SimpleLLMChatGUI
                 if (settings.TryGetValue("tools", out value))
                 {
                     ApplyToolSelection(value);
+                }
+                if (settings.TryGetValue("showtooloutput", out value))
+                {
+                    ShowToolOutput = (value == "1");
                 }
 
                 // Sync password box manually (not bound)
@@ -167,7 +179,8 @@ namespace SimpleLLMChatGUI
                 "model=" + Model,
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
                 "assistantname=" + AssistantName,
-                "tools=" + string.Join(",", selectedTools)
+                "tools=" + string.Join(",", selectedTools),
+                "showtooloutput=" + (ShowToolOutput ? "1" : "0")
             };
 
             File.WriteAllLines(path, lines.ToArray());

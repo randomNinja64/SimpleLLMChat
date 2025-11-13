@@ -82,4 +82,15 @@ public class ConfigHandler
 
         return tools;
     }
+
+    public bool GetShowToolOutput()
+    {
+        if (configMap.ContainsKey("showtooloutput"))
+        {
+            string value = configMap["showtooloutput"];
+            if (int.TryParse(value, out int result))
+                return result == 1;
+        }
+        return false; // Default to false if not specified or invalid
+    }
 }

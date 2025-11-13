@@ -22,9 +22,10 @@ public static class ToolHandler
         }
     }
 
-    public static bool ExecuteToolCall(ToolCall call, out string toolContent)
+    public static bool ExecuteToolCall(ToolCall call, out string toolContent, out int exitCode)
     {
         toolContent = "";
+        exitCode = 0;
 
         if (call.Name == "run_shell_command")
         {
@@ -38,7 +39,6 @@ public static class ToolHandler
 
             try
             {
-                int exitCode = 0;
                 string output = RunShellCommand(command, out exitCode);
                 toolContent = FormatCommandResult(command, output, exitCode);
             }
@@ -62,7 +62,7 @@ public static class ToolHandler
 
             try
             {
-                string output = RunWebSearch(query, out int exitCode);
+                string output = RunWebSearch(query, out exitCode);
                 toolContent = FormatCommandResult("web search: " + query, output, exitCode);
             }
             catch (Exception e)

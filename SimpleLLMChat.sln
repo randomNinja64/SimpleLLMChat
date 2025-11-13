@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36705.20
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatGUI", "SimpleLLMChatGUI\SimpleLLMChatGUI.csproj", "{68F62A1E-2C17-48A8-8136-EF1A16EC29EF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatCLISharp", "SimpleLLMChatCLI\SimpleLLMChatCLISharp.csproj", "{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatCLI", "SimpleLLMChatCLI\SimpleLLMChatCLI.csproj", "{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

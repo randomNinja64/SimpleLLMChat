@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using static LLMClient;
 
-namespace SimpleLLMChatCLISharp
+namespace SimpleLLMChatCLI
 {
     internal class Program
     {
@@ -39,6 +39,9 @@ namespace SimpleLLMChatCLISharp
 
             // Get enabled tools
             List<string> enabledTools = config.getEnabledTools();
+
+            // Get show tool output setting
+            bool showToolOutput = config.GetShowToolOutput();
 
             // Conversation storage
             List<ChatMessage> conversation = new List<ChatMessage>();
@@ -115,7 +118,8 @@ namespace SimpleLLMChatCLISharp
                         base64Image,
                         config.GetAssistantName(),
                         enabledTools,
-                        outputOnly);
+                        outputOnly,
+                        showToolOutput);
                     return;
                 }
             }
@@ -194,7 +198,8 @@ namespace SimpleLLMChatCLISharp
                                 imageBase64,
                                 config.GetAssistantName(),
                                 enabledTools,
-                                false);
+                                false,
+                                showToolOutput);
 
                 Console.WriteLine();
                 Console.WriteLine();
