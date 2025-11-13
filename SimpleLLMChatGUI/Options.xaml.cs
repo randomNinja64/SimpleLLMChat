@@ -18,6 +18,13 @@ namespace SimpleLLMChatGUI
 
         public event PropertyChangedEventHandler PropertyChanged;
 
+        private readonly List<string> _availableTools = new List<string> { "run_shell_command", "run_web_search" };
+
+        public List<string> AvailableTools
+        {
+            get { return _availableTools; }
+        }
+
         public string Host
         {
             get { return _host; }
@@ -106,6 +113,10 @@ namespace SimpleLLMChatGUI
                 if (settings.TryGetValue("model", out value)) Model = value;
                 if (settings.TryGetValue("sysprompt", out value)) SysPrompt = value.Trim('"');
                 if (settings.TryGetValue("assistantname", out value)) AssistantName = value;
+                if (settings.TryGetValue("tools", out value))
+                {
+                    ApplyToolSelection(value);
+                }
 
                 // Sync password box manually (not bound)
                 ApiKeyPasswordBox.Password = ApiKey;
@@ -147,6 +158,17 @@ namespace SimpleLLMChatGUI
 
         private void SaveIni(string path)
         {
+            var selectedTools = new List<string>();
+
+            foreach (var item in ToolsListBox.SelectedItems)
+            {
+                var toolName = item as string;
+                if (!string.IsNullOrWhiteSpace(toolName))
+                {
+                    selectedTools.Add(toolName);
+                }
+            }
+
             var lines = new List<string>
             {
                 "host=" + Host,
@@ -154,10 +176,37 @@ namespace SimpleLLMChatGUI
                 "apikey=" + ApiKey,
                 "model=" + Model,
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
-                "assistantname=" + AssistantName
+                "assistantname=" + AssistantName,
+                "tools=" + string.Join(",", selectedTools)
             };
 
             File.WriteAllLines(path, lines.ToArray());
+        }
+
+        private void ApplyToolSelection(string toolsValue)
+        {
+            if (ToolsListBox == null || string.IsNullOrWhiteSpace(toolsValue))
+                return;
+
+            var requestedTools = toolsValue.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var requestedTool in requestedTools)
+            {
+                var trimmed = requestedTool.Trim();
+                if (trimmed.Length == 0)
+                    continue;
+
+                foreach (var item in ToolsListBox.Items)
+                {
+                    var toolName = item as string;
+                    if (toolName != null &&
+                        string.Equals(toolName, trimmed, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ToolsListBox.SelectedItems.Add(item);
+                        break;
+                    }
+                }
+            }
         }
     }
 }

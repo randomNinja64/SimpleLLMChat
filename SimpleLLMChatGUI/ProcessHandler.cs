@@ -10,10 +10,7 @@ namespace SimpleLLMChatGUI
     public class ProcessHandler : IDisposable
     {
         private Process llmProcess;
-        private const int skipInitialLines = 4; // CLI banner lines
         private StringBuilder textBuffer = new StringBuilder(); // Buffer for incomplete text
-        private bool initialLinesSkipped = false;
-        private bool suppressOutput = false; // Flag to suppress output after clear command
 
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
@@ -37,7 +34,8 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.RedirectStandardOutput = true;
                 llmProcess.StartInfo.RedirectStandardInput = true;
                 llmProcess.StartInfo.CreateNoWindow = true;
-
+                llmProcess.StartInfo.Arguments = "--no-banners";
+                textBuffer.Clear();
                 llmProcess.Start();
 
                 // 256 byte async buffer
@@ -63,12 +61,6 @@ namespace SimpleLLMChatGUI
             {
                 try
                 {
-                    // Check if this is a clear command
-                    if (input.Trim().ToLower() == "clear")
-                    {
-                        suppressOutput = true;
-                    }
-
                     llmProcess.StandardInput.WriteLine(input);
                     llmProcess.StandardInput.Flush();
                     return true;
@@ -158,59 +150,15 @@ namespace SimpleLLMChatGUI
 
         private void ProcessStreamingText(string newText)
         {
-            // Skip initial banner lines if we haven't already
-            if (!initialLinesSkipped)
+            if (!string.IsNullOrEmpty(newText))
             {
-                textBuffer.Append(newText);
-                string bufferedText = textBuffer.ToString();
-
-                // Count lines in the buffer
-                int newlineCount = 0;
-                foreach (char c in bufferedText)
+                if (textBuffer.Length > 0)
                 {
-                    if (c == '\n') newlineCount++;
-                }
-
-                if (newlineCount >= skipInitialLines)
-                {
-                    // Find where to start after skipping initial lines
-                    int skipIndex = 0;
-                    int linesSkipped = 0;
-
-                    for (int i = 0; i < bufferedText.Length && linesSkipped < skipInitialLines; i++)
-                    {
-                        if (bufferedText[i] == '\n')
-                        {
-                            linesSkipped++;
-                            if (linesSkipped == skipInitialLines)
-                            {
-                                skipIndex = i + 1;
-                                break;
-                            }
-                        }
-                    }
-
-                    string remainingText = bufferedText.Substring(skipIndex);
-                    // Clean up any leading whitespace/newlines after skipping banner
-                    remainingText = remainingText.TrimStart('\r', '\n', ' ', '\t');
-                    initialLinesSkipped = true;
+                    textBuffer.Append(newText);
+                    newText = textBuffer.ToString();
                     textBuffer.Clear();
+                }
 
-                    // Process any remaining text after banner
-                    if (!string.IsNullOrEmpty(remainingText))
-                    {
-                        ProcessTextChunk(remainingText);
-                    }
-                }
-                else
-                {
-                    // Still accumulating initial lines to skip
-                    return;
-                }
-            }
-            else
-            {
-                // Banner already skipped, process text immediately
                 ProcessTextChunk(newText);
             }
         }
@@ -284,13 +232,6 @@ namespace SimpleLLMChatGUI
         {
             if (!string.IsNullOrEmpty(text))
             {
-                // If we're suppressing output after a clear command, don't output anything
-                if (suppressOutput)
-                {
-                    suppressOutput = false; // Reset the flag after first output
-                    return;
-                }
-
                 // Remove any "You:" prompts from the middle of the text
                 string filteredText = Regex.Replace(
                     text,
