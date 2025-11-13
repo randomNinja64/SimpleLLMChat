@@ -100,7 +100,7 @@ public class LLMClient
 
                     if (!outputOnly)
                     {
-                        Console.WriteLine("\n[tool request] " + call.Name);
+                        Console.WriteLine("\n[tool request] " + call.Name + " with arguments: " + call.Arguments);
                     }
 
                     bool handled = false;
@@ -345,6 +345,31 @@ public class LLMClient
                     JObject urlProp = new JObject();
                     urlProp["type"] = "string";
                     urlProp["description"] = "The URL of the web page to get the content of.";
+                    properties["URL"] = urlProp;
+
+                    parameters["properties"] = properties;
+                    parameters["required"] = new JArray("URL");
+
+                    func["parameters"] = parameters;
+                    tool["function"] = func;
+                    toolsArray.Add(tool);
+                }
+                else if (toolName == "download_video")
+                {
+                    JObject tool = new JObject();
+                    tool["type"] = "function";
+
+                    JObject func = new JObject();
+                    func["name"] = "download_video";
+                    func["description"] = "Download an online video using YT-DLP to the user's desktop, returning YT-DLP's output";
+
+                    JObject parameters = new JObject();
+                    parameters["type"] = "object";
+
+                    JObject properties = new JObject();
+                    JObject urlProp = new JObject();
+                    urlProp["type"] = "string";
+                    urlProp["description"] = "The URL of the video to download.";
                     properties["URL"] = urlProp;
 
                     parameters["properties"] = properties;

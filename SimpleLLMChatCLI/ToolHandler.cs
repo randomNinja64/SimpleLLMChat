@@ -97,6 +97,29 @@ public static class ToolHandler
             return true;
         }
 
+        if (call.Name == "download_video")
+        {
+            // Expected arguments payload should contain {"URL": "..."} as JSON.
+            string URL = Trim(JsonExtractString(call.Arguments, "URL"));
+            if (string.IsNullOrEmpty(URL))
+            {
+                toolContent = "error: missing 'URL' argument for download_video.";
+                return true;
+            }
+
+            try
+            {
+                string output = DownloadVideo(URL, out exitCode);
+                toolContent = FormatCommandResult("download video: " + URL, output, exitCode);
+            }
+            catch (Exception e)
+            {
+                toolContent = "error: " + e.Message;
+            }
+
+            return true;
+        }
+
         toolContent = $"error: unknown tool '{call.Name}'.";
         return false;
     }
@@ -317,6 +340,52 @@ public static class ToolHandler
         }
 
         return html+"\n";
+    }
+
+    private static string DownloadVideo(string URL, out int exitCode)
+    {
+        exitCode = 0;
+
+        try
+        {
+            // Get the user's desktop path
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+            // Use an explicit output template in the desktop folder so yt-dlp handles the file naming
+            string outputTemplate = Path.Combine(desktopPath, "%(title)s.%(ext)s");
+
+            // Build arguments: no progress, output template, then the URL (each argument quoted)
+            string arguments = $"--no-progress -o \"{outputTemplate}\" \"{URL}\"";
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = "yt-dlp.exe",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8
+            };
+
+            using (Process process = Process.Start(psi))
+            {
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                exitCode = process.ExitCode;
+
+                if (exitCode != 0)
+                    return $"yt-dlp exited with code {exitCode}:\n{error}";
+
+                return output;
+            }
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error running yt-dlp.exe: " + ex.Message;
+        }
     }
 
     private static string FormatCommandResult(string command, string output, int exitCode)
