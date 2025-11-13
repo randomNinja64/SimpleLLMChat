@@ -38,15 +38,9 @@ public class ConfigHandler
             }
         }
     }
-
-    public string GetHost()
+    public string GetLLMEndpoint()
     {
-        return configMap.ContainsKey("host") ? configMap["host"] : "127.0.0.1";
-    }
-
-    public string GetPort()
-    {
-        return configMap.ContainsKey("port") ? configMap["port"] : "80";
+        return configMap.ContainsKey("llmserver") ? configMap["llmserver"] : "http://127.0.0.1";
     }
 
     public string GetApiKey()

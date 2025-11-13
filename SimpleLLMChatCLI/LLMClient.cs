@@ -9,16 +9,14 @@ using static System.Net.WebRequestMethods;
 
 public class LLMClient
 {
-    private readonly string host;
-    private readonly string port;
+    private readonly string llmEndpoint;
     private readonly string apiKey;
     private readonly string model;
     private readonly string systemPrompt;
 
-    public LLMClient(string host, string port, string key, string mdl, string sysprompt)
+    public LLMClient(string llmEndpoint, string key, string mdl, string sysprompt)
     {
-        this.host = host;
-        this.port = port;
+        this.llmEndpoint = llmEndpoint;
         this.apiKey = key;
         this.model = mdl;
         this.systemPrompt = sysprompt;
@@ -158,7 +156,7 @@ public class LLMClient
         // See if we're up!
         try
         {
-            var request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create($"http://{host}:{port}/");
+            var request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(llmEndpoint);
             request.Method = "HEAD"; // lightweight request just to test connection
             request.Timeout = 5000; // 5 seconds timeout
             using (var headResponse = (System.Net.HttpWebResponse)request.GetResponse())
@@ -331,7 +329,7 @@ public class LLMClient
         // Send HTTP request
         try
         {
-            var request = (HttpWebRequest)WebRequest.Create($"http://{host}:{port}/v1/chat/completions");
+            var request = (HttpWebRequest)WebRequest.Create($"{llmEndpoint}/v1/chat/completions");
             request.Method = "POST";
             request.ContentType = "application/json";
             request.Headers.Add("Authorization", "Bearer " + apiKey);

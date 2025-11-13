@@ -8,8 +8,7 @@ namespace SimpleLLMChatGUI
 {
     public partial class Options : Window, INotifyPropertyChanged
     {
-        private string _host;
-        private string _port;
+        private string _serverUrl;
         private string _apiKey;
         private string _model;
         private string _sysPrompt;
@@ -25,16 +24,10 @@ namespace SimpleLLMChatGUI
             get { return _availableTools; }
         }
 
-        public string Host
+        public string ServerURL
         {
-            get { return _host; }
-            set { _host = value; OnPropertyChanged("Host"); }
-        }
-
-        public string Port
-        {
-            get { return _port; }
-            set { _port = value; OnPropertyChanged("Port"); }
+            get { return _serverUrl; }
+            set { _serverUrl = value; OnPropertyChanged("ServerURL"); }
         }
 
         public string ApiKey
@@ -69,8 +62,7 @@ namespace SimpleLLMChatGUI
             _processHandler = processHandler;
 
             // Default values
-            Host = "";
-            Port = "";
+            ServerURL = "";
             ApiKey = "";
             Model = "";
             SysPrompt = "";
@@ -107,8 +99,7 @@ namespace SimpleLLMChatGUI
                 var settings = LoadIni(configFile);
 
                 string value;
-                if (settings.TryGetValue("host", out value)) Host = value;
-                if (settings.TryGetValue("port", out value)) Port = value;
+                if (settings.TryGetValue("llmserver", out value)) ServerURL = value;
                 if (settings.TryGetValue("apikey", out value)) ApiKey = value;
                 if (settings.TryGetValue("model", out value)) Model = value;
                 if (settings.TryGetValue("sysprompt", out value)) SysPrompt = value.Trim('"');
@@ -171,8 +162,7 @@ namespace SimpleLLMChatGUI
 
             var lines = new List<string>
             {
-                "host=" + Host,
-                "port=" + Port,
+                "llmserver=" + ServerURL,
                 "apikey=" + ApiKey,
                 "model=" + Model,
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt

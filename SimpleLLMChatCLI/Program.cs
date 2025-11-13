@@ -31,8 +31,7 @@ namespace SimpleLLMChatCLISharp
 
             // Initialize LLMClient
             LLMClient client = new LLMClient(
-                config.GetHost(),
-                config.GetPort(),
+                config.GetLLMEndpoint(),
                 config.GetApiKey(),
                 config.GetModel(),
                 config.GetSysPrompt()

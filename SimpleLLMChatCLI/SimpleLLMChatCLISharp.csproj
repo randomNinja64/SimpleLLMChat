@@ -7,7 +7,7 @@
     <ProjectGuid>{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>SimpleLLMChatCLISharp</RootNamespace>
-    <AssemblyName>SimpleLLMChatCLISharp</AssemblyName>
+    <AssemblyName>SimpleLLMChatCLI</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
