@@ -379,6 +379,63 @@ public class LLMClient
                     tool["function"] = func;
                     toolsArray.Add(tool);
                 }
+                else if (toolName == "read_file")
+                {
+                    JObject tool = new JObject();
+                    tool["type"] = "function";
+
+                    JObject func = new JObject();
+                    func["name"] = "read_file";
+                    func["description"] = "Read the contents of a local file and return it as a string.";
+
+                    JObject parameters = new JObject();
+                    parameters["type"] = "object";
+
+                    JObject properties = new JObject();
+                    JObject filenameProp = new JObject();
+                    filenameProp["type"] = "string";
+                    filenameProp["description"] = "The full path of the file to read.";
+                    properties["filename"] = filenameProp;
+
+                    parameters["properties"] = properties;
+                    parameters["required"] = new JArray("filename");
+
+                    func["parameters"] = parameters;
+                    tool["function"] = func;
+                    toolsArray.Add(tool);
+                }
+                else if (toolName == "write_file")
+                {
+                    JObject tool = new JObject();
+                    tool["type"] = "function";
+
+                    JObject func = new JObject();
+                    func["name"] = "write_file";
+                    func["description"] = "Write the given content to a local file, creating or overwriting it.";
+
+                    JObject parameters = new JObject();
+                    parameters["type"] = "object";
+
+                    JObject properties = new JObject();
+
+                    JObject filenameProp = new JObject();
+                    filenameProp["type"] = "string";
+                    filenameProp["description"] = "The full path of the file to write to.";
+                    properties["filename"] = filenameProp;
+
+                    JObject contentProp = new JObject();
+                    contentProp["type"] = "string";
+                    contentProp["description"] = "The content to write into the file.";
+                    properties["content"] = contentProp;
+
+                    parameters["properties"] = properties;
+                    parameters["required"] = new JArray("filename", "content");
+
+                    func["parameters"] = parameters;
+                    tool["function"] = func;
+                    toolsArray.Add(tool);
+                }
+
             }
 
             if (toolsArray.Count > 0)

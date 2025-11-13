@@ -388,6 +388,35 @@ public static class ToolHandler
         }
     }
 
+    private static string ReadFile(string filename, out int exitCode, int maxLength = 8000)
+    {
+        exitCode = 0;
+
+        try
+        {
+            if (!File.Exists(filename))
+            {
+                exitCode = 1;
+                return $"File not found: {filename}";
+            }
+
+            string content = File.ReadAllText(filename, Encoding.UTF8);
+
+            if (content.Length > maxLength)
+            {
+                content = content.Substring(0, maxLength) + "\n...[truncated]";
+            }
+
+            return content;
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error reading file: " + ex.Message;
+        }
+    }
+
+
     private static string FormatCommandResult(string command, string output, int exitCode)
     {
         return $"Command: {command}\nExit Code: {exitCode}\nOutput:\n{output}";
