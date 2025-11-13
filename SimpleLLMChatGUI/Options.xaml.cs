@@ -18,7 +18,7 @@ namespace SimpleLLMChatGUI
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private readonly List<string> _availableTools = new List<string> { "download_video", "read_website", "run_shell_command", "run_web_search" };
+        private readonly List<string> _availableTools = new List<string> { "download_video", "read_file", "read_website", "run_shell_command", "run_web_search", "write_file" };
 
         public List<string> AvailableTools
         {

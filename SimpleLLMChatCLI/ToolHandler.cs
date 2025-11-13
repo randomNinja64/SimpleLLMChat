@@ -120,6 +120,60 @@ public static class ToolHandler
             return true;
         }
 
+        if (call.Name == "read_file")
+        {
+            // Expected arguments payload should contain {"filename": "..."} as JSON.
+            string filename = Trim(JsonExtractString(call.Arguments, "filename"));
+            if (string.IsNullOrEmpty(filename))
+            {
+                toolContent = "error: missing 'filename' argument for read_file.";
+                return true;
+            }
+
+            try
+            {
+                string output = ReadFile(filename, out exitCode);
+                toolContent = FormatCommandResult("read file: " + filename, output, exitCode);
+            }
+            catch (Exception e)
+            {
+                toolContent = "error: " + e.Message;
+            }
+
+            return true;
+        }
+
+        if (call.Name == "write_file")
+        {
+            // Expected arguments payload should contain {"filename": "...", "content": "..."} as JSON.
+            string filename = Trim(JsonExtractString(call.Arguments, "filename"));
+            string content = Trim(JsonExtractString(call.Arguments, "content"));
+
+            if (string.IsNullOrEmpty(filename))
+            {
+                toolContent = "error: missing 'filename' argument for write_file.";
+                return true;
+            }
+
+            if (content == null)
+            {
+                toolContent = "error: missing 'content' argument for write_file.";
+                return true;
+            }
+
+            try
+            {
+                string output = WriteFile(filename, content, out exitCode);
+                toolContent = FormatCommandResult("write file: " + filename, output, exitCode);
+            }
+            catch (Exception e)
+            {
+                toolContent = "error: " + e.Message;
+            }
+
+            return true;
+        }
+
         toolContent = $"error: unknown tool '{call.Name}'.";
         return false;
     }
@@ -415,6 +469,30 @@ public static class ToolHandler
             return "Error reading file: " + ex.Message;
         }
     }
+
+    private static string WriteFile(string filename, string content, out int exitCode)
+    {
+        exitCode = 0;
+
+        try
+        {
+            // Ensure the directory exists
+            string directory = Path.GetDirectoryName(filename);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(filename, content, Encoding.UTF8);
+            return $"File written successfully: {filename}";
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error writing file: " + ex.Message;
+        }
+    }
+
 
 
     private static string FormatCommandResult(string command, string output, int exitCode)

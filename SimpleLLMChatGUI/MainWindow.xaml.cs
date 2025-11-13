@@ -62,12 +62,6 @@ namespace SimpleLLMChatGUI
 
         private void OnOutputReceived(string text)
         {
-            // Filter out banner/header text
-            if (IsBannerText(text))
-            {
-                return; // Don't display banner text
-            }
-
             // Display the text immediately on the UI thread
             Dispatcher.Invoke((Action)(() =>
             {
@@ -81,46 +75,12 @@ namespace SimpleLLMChatGUI
                 chatOutput.ScrollToEnd();
             }));
         }
-
-        private bool IsBannerText(string text)
-        {
-            // Common patterns that indicate banner/header text
-            string[] bannerPatterns = {
-                "SimpleLLMChatCLI",
-                "Welcome to",
-                "Type 'help' for",
-                "Available commands:",
-                "CLI Version",
-                "====",
-                "****",
-                "----"
-            };
-
-            foreach (string pattern in bannerPatterns)
-            {
-                if (text.Contains(pattern))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         private void OnErrorOccurred(string errorMessage)
         {
             Dispatcher.Invoke((Action)(() =>
             {
                 MessageBox.Show(errorMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }));
-        }
-
-        private string NormalizeLineEndings(string text)
-        {
-            // First normalize all line endings to \n
-            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
-            // Then convert to Windows standard \r\n
-            return text.Replace("\n", "\r\n");
         }
 
         private void sendButton_Click(object sender, RoutedEventArgs e)
