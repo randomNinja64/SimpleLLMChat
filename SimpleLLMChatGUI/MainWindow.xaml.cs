@@ -1,12 +1,13 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
-using System.Text.RegularExpressions;
-using System.Windows.Media;
-using Microsoft.Win32;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.IO;
+using System.Windows.Media;
 
 namespace SimpleLLMChatGUI
 {
@@ -52,6 +53,7 @@ namespace SimpleLLMChatGUI
             // Subscribe to events
             processHandler.OutputReceived += OnOutputReceived;
             processHandler.ErrorOccurred += OnErrorOccurred;
+            processHandler.GenerationComplete += OnGenerationComplete;
 
             // Start the process
             if (!processHandler.StartProcess("SimpleLLMChatCLI.exe"))
@@ -83,12 +85,31 @@ namespace SimpleLLMChatGUI
             }));
         }
 
+        private void OnGenerationComplete()
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                SetInputControlsEnabled(true);
+                chatInput.Focus();
+            }));
+        }
+
+        private void SetInputControlsEnabled(bool enabled)
+        {
+            attachButton.IsEnabled = enabled;
+            chatInput.IsEnabled = enabled;
+            sendButton.IsEnabled = enabled;
+        }
+
         private void sendButton_Click(object sender, RoutedEventArgs e)
         {
             string userInput = chatInput.Text;
 
             chatOutput.AppendText("You: " + userInput + "\r\n");
             chatOutput.ScrollToEnd();
+
+            // Disable input controls while LLM is generating
+            SetInputControlsEnabled(false);
 
             if (processHandler.IsProcessRunning)
             {
@@ -98,6 +119,8 @@ namespace SimpleLLMChatGUI
                     if (!processHandler.SendInputWithImage(imageHandler.AttachedImagePath, userInput))
                     {
                         MessageBox.Show("Failed to send input with image to the process.");
+                        SetInputControlsEnabled(true);
+                        return;
                     }
 
                     // Detach image after sending
@@ -110,6 +133,8 @@ namespace SimpleLLMChatGUI
                     if (!processHandler.SendInput(userInput))
                     {
                         MessageBox.Show("Failed to send input to the process.");
+                        SetInputControlsEnabled(true);
+                        return;
                     }
                 }
 
@@ -118,6 +143,7 @@ namespace SimpleLLMChatGUI
             else
             {
                 MessageBox.Show("Error: CLI is not running!");
+                SetInputControlsEnabled(true);
                 chatInput.Clear();
             }
         }
@@ -173,7 +199,7 @@ namespace SimpleLLMChatGUI
 
         private void chatInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Enter && sendButton.IsEnabled)
             {
                 e.Handled = true; // prevent the ding sound
                 sendButton_Click(sendButton, new RoutedEventArgs());
@@ -182,21 +208,18 @@ namespace SimpleLLMChatGUI
 
         private void clearButton_Click(object sender, RoutedEventArgs e)
         {
-            // Send clear command to CLI app
-            if (processHandler != null && processHandler.IsProcessRunning)
-            {
-                if (!processHandler.SendInput("clear"))
-                {
-                    MessageBox.Show("Failed to send clear command to the process.");
-                }
-            }
-            else
-            {
-                MessageBox.Show("Error: CLI is not running!");
-            }
-
-            // Clear the chat output rich text box immediately
+            //Clear output
             chatOutput.Document.Blocks.Clear();
+
+            // Kill running process (same as Options save button)
+            if (processHandler != null)
+                processHandler.Dispose();
+
+            // Start new process (same as Options save button)
+            StartLLMProcess();
+            
+            // Re-enable input controls
+            SetInputControlsEnabled(true);
         }
 
         private void optionsButton_Click(object sender, RoutedEventArgs e)
@@ -210,6 +233,9 @@ namespace SimpleLLMChatGUI
                 chatOutput.Document.Blocks.Clear();
 
                 StartLLMProcess();
+                
+                // Re-enable input controls
+                SetInputControlsEnabled(true);
             }
         }
 

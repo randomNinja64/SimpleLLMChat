@@ -336,7 +336,7 @@ public class LLMClient
 
                     JObject func = new JObject();
                     func["name"] = "read_website";
-                    func["description"] = "Browse to a specific URL/web page and return its HTML content";
+                    func["description"] = "Browse to a specific URL/web page and return its HTML content.";
 
                     JObject parameters = new JObject();
                     parameters["type"] = "object";
@@ -379,6 +379,37 @@ public class LLMClient
                     tool["function"] = func;
                     toolsArray.Add(tool);
                 }
+                else if (toolName == "download_file")
+                {
+                    JObject tool = new JObject();
+                    tool["type"] = "function";
+
+                    JObject func = new JObject();
+                    func["name"] = "download_file";
+                    func["description"] = "Downloads a file from the internet using cURL and saves it to the provided location.";
+
+                    JObject parameters = new JObject();
+                    parameters["type"] = "object";
+
+                    JObject properties = new JObject();
+
+                    JObject filenameProp = new JObject();
+                    filenameProp["type"] = "string";
+                    filenameProp["description"] = "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
+                    properties["filename"] = filenameProp;
+
+                    JObject urlProp = new JObject();
+                    urlProp["type"] = "string";
+                    urlProp["description"] = "The URL of the file to download.";
+                    properties["URL"] = urlProp;
+
+                    parameters["properties"] = properties;
+                    parameters["required"] = new JArray("filename", "URL");
+
+                    func["parameters"] = parameters;
+                    tool["function"] = func;
+                    toolsArray.Add(tool);
+                }
                 else if (toolName == "read_file")
                 {
                     JObject tool = new JObject();
@@ -394,7 +425,7 @@ public class LLMClient
                     JObject properties = new JObject();
                     JObject filenameProp = new JObject();
                     filenameProp["type"] = "string";
-                    filenameProp["description"] = "The full path of the file to read.";
+                    filenameProp["description"] = "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
                     properties["filename"] = filenameProp;
 
                     parameters["properties"] = properties;
@@ -420,7 +451,7 @@ public class LLMClient
 
                     JObject filenameProp = new JObject();
                     filenameProp["type"] = "string";
-                    filenameProp["description"] = "The full path of the file to write to.";
+                    filenameProp["description"] = "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
                     properties["filename"] = filenameProp;
 
                     JObject contentProp = new JObject();

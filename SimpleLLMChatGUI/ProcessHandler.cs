@@ -14,6 +14,7 @@ namespace SimpleLLMChatGUI
 
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
+        public event Action GenerationComplete;
 
         public bool IsProcessRunning
         {
@@ -193,6 +194,9 @@ namespace SimpleLLMChatGUI
                     {
                         OutputText(textBeforeYou);
                     }
+
+                    // Signal that generation is complete
+                    GenerationComplete?.Invoke();
 
                     // Don't output the "You:" pattern itself
                     // Keep any text after "You:" for next chunk

@@ -120,6 +120,31 @@ public static class ToolHandler
             return true;
         }
 
+        if (call.Name == "download_file")
+        {
+            // Expected arguments payload should contain {"filename": "...", "content": "..."} as JSON.
+            string filename = Trim(JsonExtractString(call.Arguments, "filename"));
+            string URL = Trim(JsonExtractString(call.Arguments, "URL"));
+
+            if (string.IsNullOrEmpty(URL))
+            {
+                toolContent = "error: missing 'URL' argument for download_file.";
+                return true;
+            }
+
+            try
+            {
+                string output = DownloadFile(filename, URL, out exitCode);
+                toolContent = FormatCommandResult("download file: " + URL, output, exitCode);
+            }
+            catch (Exception e)
+            {
+                toolContent = "error: " + e.Message;
+            }
+
+            return true;
+        }
+
         if (call.Name == "read_file")
         {
             // Expected arguments payload should contain {"filename": "..."} as JSON.
@@ -271,13 +296,13 @@ public static class ToolHandler
         return output.ToString();
     }
 
-    // Searches the web with DuckDuckGo
+    // Searches the web with DuckDuckGo, falls back to Wiby if DDG fails or returns no results
     private static string RunWebSearch(string query, out int exitCode)
     {
         exitCode = 0;
         string html = "";
 
-        // Run CURL
+        // Try DuckDuckGo first
         try
         {
             // Build curl command arguments
@@ -304,8 +329,8 @@ public static class ToolHandler
         }
         catch (Exception ex)
         {
-            exitCode = -1;
-            return "Error running curl.exe: " + ex.Message;
+            // DDG failed, try Wiby
+            return RunWibySearch(query, out exitCode);
         }
 
         // Parse result snippets
@@ -338,7 +363,87 @@ public static class ToolHandler
             }
         }
 
+        // If DDG returned no results, try Wiby
+        if (results.Length == 0)
+        {
+            return RunWibySearch(query, out exitCode);
+        }
+
         return results.ToString();
+    }
+
+    // Searches the web with Wiby using their JSON API
+    private static string RunWibySearch(string query, out int exitCode)
+    {
+        exitCode = 0;
+        string json = "";
+
+        // Run CURL to get JSON results from Wiby
+        try
+        {
+            // Build curl command arguments for JSON API
+            string arguments = "-s -L \"https://wiby.me/json/?q=" + HttpUtility.UrlEncode(query) + "\" " +
+                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = "curl.exe",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8
+            };
+
+            using (Process process = Process.Start(psi))
+            using (StreamReader reader = process.StandardOutput)
+            {
+                json = reader.ReadToEnd();
+                process.WaitForExit();
+                exitCode = process.ExitCode;
+            }
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error running curl.exe for search: " + ex.Message;
+        }
+
+        // Parse JSON response (Wiby returns an array at the root level)
+        try
+        {
+            JArray resultsArray = JArray.Parse(json);
+            
+            StringBuilder results = new StringBuilder();
+            if (resultsArray == null || resultsArray.Count == 0)
+            {
+                return "No results found.";
+            }
+
+            foreach (JToken result in resultsArray)
+            {
+                string url = result["URL"]?.ToString() ?? "";
+                string title = result["Title"]?.ToString() ?? "";
+                string snippet = result["Snippet"]?.ToString() ?? "";
+
+                if (!string.IsNullOrEmpty(url))
+                {
+                    results.AppendLine(url + " : " + title + " - " + snippet);
+                }
+            }
+
+            if (results.Length == 0)
+            {
+                return "No results found.";
+            }
+
+            return results.ToString();
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error parsing JSON: " + ex.Message;
+        }
     }
 
     private static string ReadWebsite(string URL, out int exitCode)
@@ -375,7 +480,6 @@ public static class ToolHandler
             html = Regex.Replace(html, @"<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<path\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<img\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<meta\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<link\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             // Optionally remove inline JS/CSS in attributes like onclick, style etc.
@@ -383,9 +487,9 @@ public static class ToolHandler
             html = Regex.Replace(html, @"<!--.*?-->", "", RegexOptions.Singleline);
             html = Regex.Replace(html, @"^\s*$[\r\n]*", "", RegexOptions.Multiline);
 
-            // Truncate to 4000 characters
-            if (html.Length > 4000)
-                html = html.Substring(0, 4000);
+            // Truncate to 6000 characters
+            if (html.Length > 6000)
+                html = html.Substring(0, 6000);
         }
         catch (Exception ex)
         {
@@ -395,7 +499,6 @@ public static class ToolHandler
 
         return html+"\n";
     }
-
     private static string DownloadVideo(string URL, out int exitCode)
     {
         exitCode = 0;
@@ -442,12 +545,76 @@ public static class ToolHandler
         }
     }
 
+    private static string DownloadFile(string filename, string URL, out int exitCode)
+    {
+        exitCode = 0;
+
+        try
+        {
+            // Expand environment variables in filename
+            filename = Environment.ExpandEnvironmentVariables(filename);
+            
+            // Ensure directory exists
+            string directory = Path.GetDirectoryName(filename);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            // Build curl arguments
+            string arguments =
+                "-L -s " +
+                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\" " +
+                "-o \"" + filename + "\" " +
+                "\"" + URL + "\"";
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = "curl.exe",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            string stdOut = "";
+            string stdErr = "";
+
+            using (Process process = Process.Start(psi))
+            {
+                stdOut = process.StandardOutput.ReadToEnd();
+                stdErr = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                exitCode = process.ExitCode;
+            }
+
+            if (exitCode != 0)
+            {
+                return $"curl exited with code {exitCode}: {stdErr}";
+            }
+
+            return $"File downloaded successfully: {filename}";
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error running curl.exe: " + ex.Message;
+        }
+    }
+
     private static string ReadFile(string filename, out int exitCode, int maxLength = 8000)
     {
         exitCode = 0;
 
         try
         {
+            // Expand environment variables in filename
+            filename = Environment.ExpandEnvironmentVariables(filename);
+            
             if (!File.Exists(filename))
             {
                 exitCode = 1;
@@ -476,6 +643,9 @@ public static class ToolHandler
 
         try
         {
+            // Expand environment variables in filename
+            filename = Environment.ExpandEnvironmentVariables(filename);
+            
             // Ensure the directory exists
             string directory = Path.GetDirectoryName(filename);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))

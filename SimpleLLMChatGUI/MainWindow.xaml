@@ -35,9 +35,9 @@
 
             <!-- Center: Desktop Assistant Mode ToggleButton -->
             <ToggleButton Name="desktopAssistantToggle"
-                          Content="Desktop Assistant Mode"
-                          ToolTip="Desktop Assistant Mode (Ctrl+Shift+D) (Model must support images)"
-                          Width="180"
+                          Content="Desktop Assistant (Ctrl+Shift+D)"
+                          ToolTip="Press Ctrl+Shift+D anywhere to take a screenshot and ask about it. Model must support images."
+                          Width="200"
                           Height="25"
                           VerticalAlignment="Center"
                           HorizontalAlignment="Center"
