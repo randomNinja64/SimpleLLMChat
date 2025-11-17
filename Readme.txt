@@ -42,6 +42,7 @@ Tools (Available Tools/Requirements)
 download_file: Downloads a file from the internet using cURL
 (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 download_video: Downloads a video from the internet using YT-DLP (Requires a yt-dlp.exe in the same folder as the exe)
+extract_file: Extracts an archive using 7-Zip (Requires a 7za.exe in the same folder as the exe)
 read_file: Reads a file from the user's PC.
 read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 run_shell_command: Runs a shell command (Enable with caution)

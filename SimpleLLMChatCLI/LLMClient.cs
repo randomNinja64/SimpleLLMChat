@@ -466,6 +466,37 @@ public class LLMClient
                     tool["function"] = func;
                     toolsArray.Add(tool);
                 }
+                else if (toolName == "extract_file")
+                {
+                    JObject tool = new JObject();
+                    tool["type"] = "function";
+
+                    JObject func = new JObject();
+                    func["name"] = "extract_file";
+                    func["description"] = "Extract an archive file using 7za.exe to a specified destination directory.";
+
+                    JObject parameters = new JObject();
+                    parameters["type"] = "object";
+
+                    JObject properties = new JObject();
+
+                    JObject archivePathProp = new JObject();
+                    archivePathProp["type"] = "string";
+                    archivePathProp["description"] = "The full path of the archive file to extract. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
+                    properties["archive_path"] = archivePathProp;
+
+                    JObject destinationPathProp = new JObject();
+                    destinationPathProp["type"] = "string";
+                    destinationPathProp["description"] = "The full path of the destination directory where files will be extracted. Directory will be created if it doesn't exist. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
+                    properties["destination_path"] = destinationPathProp;
+
+                    parameters["properties"] = properties;
+                    parameters["required"] = new JArray("archive_path", "destination_path");
+
+                    func["parameters"] = parameters;
+                    tool["function"] = func;
+                    toolsArray.Add(tool);
+                }
 
             }
 
