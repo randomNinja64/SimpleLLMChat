@@ -39,10 +39,15 @@ showtooloutput= 0/1 (controls whether or not the full output of tool calls is sh
 ------------------------------------------------------------
 Tools (Available Tools/Requirements)
 ------------------------------------------------------------
+
+copy_file: Copies a file on the user's PC.
+delete_file: Deletes a file from the user's PC.
 download_file: Downloads a file from the internet using cURL
 (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 download_video: Downloads a video from the internet using YT-DLP (Requires a yt-dlp.exe in the same folder as the exe)
 extract_file: Extracts an archive using 7-Zip (Requires a 7za.exe in the same folder as the exe)
+list_directory: Lists the files and folders in a given path.
+move_file: Moves a file on the user's PC.
 read_file: Reads a file from the user's PC.
 read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 run_shell_command: Runs a shell command (Enable with caution)

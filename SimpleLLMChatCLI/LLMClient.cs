@@ -4,11 +4,24 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using static System.Net.WebRequestMethods;
 
 public class LLMClient
 {
+    private struct PropertyInfo
+    {
+        public string Type;
+        public string Description;
+
+        public PropertyInfo(string type, string description)
+        {
+            Type = type;
+            Description = description;
+        }
+    }
+    
     private readonly string llmEndpoint;
     private readonly string apiKey;
     private readonly string model;
@@ -20,6 +33,21 @@ public class LLMClient
         this.apiKey = key;
         this.model = mdl;
         this.systemPrompt = sysprompt;
+
+        // Enable modern TLS protocols for HTTPS support
+        // Using numeric values for compatibility with .NET 3.5
+        // Tls = 192, Tls11 = 768, Tls12 = 3072
+        // We use |= to ADD to existing protocols rather than replacing them
+        // This ensures fallback to older protocols if newer ones aren't available
+        try
+        {
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)192 | (SecurityProtocolType)768 | (SecurityProtocolType)3072;
+        }
+        catch
+        {
+            // If setting TLS protocols fails, continue with system defaults
+            // This can happen on very old systems without TLS 1.2 support
+        }
     }
 
     // Struct for chat messages
@@ -103,10 +131,11 @@ public class LLMClient
                         Console.WriteLine("\n[tool request] " + call.Name + " with arguments: " + call.Arguments);
                     }
 
-                    bool handled = false;
                     int exitCode = 0;
 
                     string toolContent;
+
+                    bool handled;
                     if (!enabledTools.Contains(call.Name))
                     {
                         toolContent = "error: tool '" + call.Name + "' is disabled by configuration.";
@@ -162,29 +191,214 @@ public class LLMClient
         }
     }
 
-    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools)
+    private JObject CreateToolDefinition(string name, string description, Dictionary<string, PropertyInfo> properties, string[] required)
     {
-        // See if we're up!
-        try
+        JObject tool = new JObject
         {
-            var request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(llmEndpoint);
-            request.Method = "HEAD"; // lightweight request just to test connection
-            request.Timeout = 5000; // 5 seconds timeout
-            using (var headResponse = (System.Net.HttpWebResponse)request.GetResponse())
+            ["type"] = "function"
+        };
+
+        JObject func = new JObject
+        {
+            ["name"] = name,
+            ["description"] = description
+        };
+
+        JObject parameters = new JObject
+        {
+            ["type"] = "object"
+        };
+
+        JObject props = new JObject();
+        foreach (var prop in properties)
+        {
+            JObject propObj = new JObject
             {
-                if (headResponse.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    Console.Error.WriteLine("Connection failed: " + headResponse.StatusCode);
-                    return new LLMCompletionResponse("", null, "connection_failed");
-                }
+                ["type"] = prop.Value.Type,
+                ["description"] = prop.Value.Description
+            };
+            props[prop.Key] = propObj;
+        }
+        parameters["properties"] = props;
+        parameters["required"] = new JArray(required);
+
+        func["parameters"] = parameters;
+        tool["function"] = func;
+        return tool;
+    }
+
+    private JArray BuildToolsArray(List<string> enabledTools)
+    {
+        JArray toolsArray = new JArray();
+
+        foreach (var toolName in enabledTools)
+        {
+            JObject tool = null;
+
+            switch (toolName)
+            {
+                case "run_shell_command":
+                    tool = CreateToolDefinition(
+                        "run_shell_command",
+                        "Execute a shell command on the host system and return its output.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "command", new PropertyInfo("string", "Full command line to execute. Keep it short and avoid interactive programs.") }
+                        },
+                        new[] { "command" }
+                    );
+                    break;
+
+                case "run_web_search":
+                    tool = CreateToolDefinition(
+                        "run_web_search",
+                        "Search the web using DuckDuckGo and return a list of URLs with brief snippets. If more detail is needed, URLs can be read with read_website.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "query", new PropertyInfo("string", "The search query to look up on the web.") }
+                        },
+                        new[] { "query" }
+                    );
+                    break;
+
+                case "read_website":
+                    tool = CreateToolDefinition(
+                        "read_website",
+                        "Browse to a specific URL/web page and return its HTML content.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "URL", new PropertyInfo("string", "The URL of the web page to get the content of.") }
+                        },
+                        new[] { "URL" }
+                    );
+                    break;
+
+                case "download_video":
+                    tool = CreateToolDefinition(
+                        "download_video",
+                        "Download an online video using YT-DLP to the user's desktop, returning YT-DLP's output",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "URL", new PropertyInfo("string", "The URL of the video to download.") }
+                        },
+                        new[] { "URL" }
+                    );
+                    break;
+
+                case "download_file":
+                    tool = CreateToolDefinition(
+                        "download_file",
+                        "Downloads a file from the internet using cURL and saves it to the provided location.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "filename", new PropertyInfo("string", "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
+                            { "URL", new PropertyInfo("string", "The URL of the file to download.") }
+                        },
+                        new[] { "filename", "URL" }
+                    );
+                    break;
+
+                case "read_file":
+                    tool = CreateToolDefinition(
+                        "read_file",
+                        $"Read the contents of a local file and return it as a string. Always reads up to {FileHandler.MAX_CONTENT_LENGTH} characters. Use the offset parameter to read different parts of large files.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "filename", new PropertyInfo("string", "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
+                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {FileHandler.MAX_CONTENT_LENGTH} reads characters {FileHandler.MAX_CONTENT_LENGTH}-{FileHandler.MAX_CONTENT_LENGTH * 2}.") }
+                        },
+                        new[] { "filename" }
+                    );
+                    break;
+
+                case "write_file":
+                    tool = CreateToolDefinition(
+                        "write_file",
+                        "Write the given content to a local file, creating or overwriting it.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "filename", new PropertyInfo("string", "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
+                            { "content", new PropertyInfo("string", "The content to write into the file.") }
+                        },
+                        new[] { "filename", "content" }
+                    );
+                    break;
+
+                case "extract_file":
+                    tool = CreateToolDefinition(
+                        "extract_file",
+                        "Extract an archive file using 7za.exe to a specified destination directory.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "archive_path", new PropertyInfo("string", "The full path of the archive file to extract. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
+                            { "destination_path", new PropertyInfo("string", "The full path of the destination directory where files will be extracted. Directory will be created if it doesn't exist. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") }
+                        },
+                        new[] { "archive_path", "destination_path" }
+                    );
+                    break;
+
+                case "move_file":
+                    tool = CreateToolDefinition(
+                        "move_file",
+                        "Move or rename a file from one location to another. Destination directory will be created if it doesn't exist.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "source_path", new PropertyInfo("string", "The full path of the file to move. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
+                            { "destination_path", new PropertyInfo("string", "The full path where the file should be moved to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") }
+                        },
+                        new[] { "source_path", "destination_path" }
+                    );
+                    break;
+
+                case "copy_file":
+                    tool = CreateToolDefinition(
+                        "copy_file",
+                        "Copy a file from one location to another. Destination directory will be created if it doesn't exist.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "source_path", new PropertyInfo("string", "The full path of the file to copy. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
+                            { "destination_path", new PropertyInfo("string", "The full path where the file should be copied to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") }
+                        },
+                        new[] { "source_path", "destination_path" }
+                    );
+                    break;
+
+                case "delete_file":
+                    tool = CreateToolDefinition(
+                        "delete_file",
+                        "Delete a file from the file system. Use with caution as this operation cannot be undone.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "file_path", new PropertyInfo("string", "The full path of the file to delete. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") }
+                        },
+                        new[] { "file_path" }
+                    );
+                    break;
+
+                case "list_directory":
+                    tool = CreateToolDefinition(
+                        "list_directory",
+                        "List all files and subdirectories in a given directory.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "directory_path", new PropertyInfo("string", "The full path of the directory to list. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") }
+                        },
+                        new[] { "directory_path" }
+                    );
+                    break;
+            }
+
+            if (tool != null)
+            {
+                toolsArray.Add(tool);
             }
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine("Connection failed: " + ex.Message);
-            return new LLMCompletionResponse("", null, "connection_failed");
-        }
 
+        return toolsArray;
+    }
+
+    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools)
+    {
         LLMCompletionResponse completionResponse = new LLMCompletionResponse
         {
             Content = string.Empty,
@@ -193,16 +407,20 @@ public class LLMClient
         };
 
         // Build payload
-        JObject payload = new JObject();
-        payload["model"] = model;
+        JObject payload = new JObject
+        {
+            ["model"] = model
+        };
 
         // Messages
         JArray messages = new JArray();
 
         // System message
-        JObject systemMsg = new JObject();
-        systemMsg["role"] = "system";
-        systemMsg["content"] = systemPrompt;
+        JObject systemMsg = new JObject
+        {
+            ["role"] = "system",
+            ["content"] = systemPrompt
+        };
         messages.Add(systemMsg);
 
         // Process all user messages in the conversation list
@@ -210,8 +428,10 @@ public class LLMClient
         {
             foreach (var msg in conversation)
             {
-                JObject msgObj = new JObject();
-                msgObj["role"] = msg.Role;
+                JObject msgObj = new JObject
+                {
+                    ["role"] = msg.Role
+                };
 
                 if (!string.IsNullOrEmpty(msg.ToolCallId))
                     msgObj["tool_call_id"] = msg.ToolCallId;
@@ -223,13 +443,17 @@ public class LLMClient
 
                     foreach (var call in msg.ToolCalls)
                     {
-                        JObject toolObj = new JObject();
-                        toolObj["id"] = call.Id ?? "";
-                        toolObj["type"] = "function";
+                        JObject toolObj = new JObject
+                        {
+                            ["id"] = call.Id ?? "",
+                            ["type"] = "function"
+                        };
 
-                        JObject functionObj = new JObject();
-                        functionObj["name"] = call.Name ?? "";
-                        functionObj["arguments"] = call.Arguments ?? "";
+                        JObject functionObj = new JObject
+                        {
+                            ["name"] = call.Name ?? "",
+                            ["arguments"] = call.Arguments ?? ""
+                        };
 
                         toolObj["function"] = functionObj;
                         toolCallsArray.Add(toolObj);
@@ -243,9 +467,11 @@ public class LLMClient
 
                     if (!string.IsNullOrEmpty(msg.Content))
                     {
-                        JObject textPart = new JObject();
-                        textPart["type"] = "text";
-                        textPart["text"] = msg.Content;
+                        JObject textPart = new JObject
+                        {
+                            ["type"] = "text",
+                            ["text"] = msg.Content
+                        };
                         contentArray.Add(textPart);
                     }
 
@@ -264,9 +490,11 @@ public class LLMClient
 
                     if (contentArray.Count == 0)
                     {
-                        JObject emptyText = new JObject();
-                        emptyText["type"] = "text";
-                        emptyText["text"] = "";
+                        JObject emptyText = new JObject
+                        {
+                            ["type"] = "text",
+                            ["text"] = ""
+                        };
                         contentArray.Add(emptyText);
                     }
 
@@ -283,223 +511,10 @@ public class LLMClient
 
         payload["messages"] = messages;
 
-        // Tools
+        // Add tools if any are enabled
         if (enabledTools != null && enabledTools.Count > 0)
         {
-            JArray toolsArray = new JArray();
-            foreach (var toolName in enabledTools)
-            {
-                if (toolName == "run_shell_command")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-                    JObject func = new JObject();
-                    func["name"] = "run_shell_command";
-                    func["description"] = "Execute a shell command on the host system and return its output.";
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-                    JObject properties = new JObject();
-                    JObject commandProp = new JObject();
-                    commandProp["type"] = "string";
-                    commandProp["description"] = "Full command line to execute. Keep it short and avoid interactive programs.";
-                    properties["command"] = commandProp;
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("command");
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "run_web_search")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-                    JObject func = new JObject();
-                    func["name"] = "run_web_search";
-                    func["description"] = "Search the web using DuckDuckGo and return HTML results.";
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-                    JObject properties = new JObject();
-                    JObject queryProp = new JObject();
-                    queryProp["type"] = "string";
-                    queryProp["description"] = "The search query to look up on the web.";
-                    properties["query"] = queryProp;
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("query");
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "read_website")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-
-                    JObject func = new JObject();
-                    func["name"] = "read_website";
-                    func["description"] = "Browse to a specific URL/web page and return its HTML content.";
-
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-
-                    JObject properties = new JObject();
-                    JObject urlProp = new JObject();
-                    urlProp["type"] = "string";
-                    urlProp["description"] = "The URL of the web page to get the content of.";
-                    properties["URL"] = urlProp;
-
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("URL");
-
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "download_video")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-
-                    JObject func = new JObject();
-                    func["name"] = "download_video";
-                    func["description"] = "Download an online video using YT-DLP to the user's desktop, returning YT-DLP's output";
-
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-
-                    JObject properties = new JObject();
-                    JObject urlProp = new JObject();
-                    urlProp["type"] = "string";
-                    urlProp["description"] = "The URL of the video to download.";
-                    properties["URL"] = urlProp;
-
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("URL");
-
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "download_file")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-
-                    JObject func = new JObject();
-                    func["name"] = "download_file";
-                    func["description"] = "Downloads a file from the internet using cURL and saves it to the provided location.";
-
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-
-                    JObject properties = new JObject();
-
-                    JObject filenameProp = new JObject();
-                    filenameProp["type"] = "string";
-                    filenameProp["description"] = "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
-                    properties["filename"] = filenameProp;
-
-                    JObject urlProp = new JObject();
-                    urlProp["type"] = "string";
-                    urlProp["description"] = "The URL of the file to download.";
-                    properties["URL"] = urlProp;
-
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("filename", "URL");
-
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "read_file")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-
-                    JObject func = new JObject();
-                    func["name"] = "read_file";
-                    func["description"] = "Read the contents of a local file and return it as a string.";
-
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-
-                    JObject properties = new JObject();
-                    JObject filenameProp = new JObject();
-                    filenameProp["type"] = "string";
-                    filenameProp["description"] = "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
-                    properties["filename"] = filenameProp;
-
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("filename");
-
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "write_file")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-
-                    JObject func = new JObject();
-                    func["name"] = "write_file";
-                    func["description"] = "Write the given content to a local file, creating or overwriting it.";
-
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-
-                    JObject properties = new JObject();
-
-                    JObject filenameProp = new JObject();
-                    filenameProp["type"] = "string";
-                    filenameProp["description"] = "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
-                    properties["filename"] = filenameProp;
-
-                    JObject contentProp = new JObject();
-                    contentProp["type"] = "string";
-                    contentProp["description"] = "The content to write into the file.";
-                    properties["content"] = contentProp;
-
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("filename", "content");
-
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-                else if (toolName == "extract_file")
-                {
-                    JObject tool = new JObject();
-                    tool["type"] = "function";
-
-                    JObject func = new JObject();
-                    func["name"] = "extract_file";
-                    func["description"] = "Extract an archive file using 7za.exe to a specified destination directory.";
-
-                    JObject parameters = new JObject();
-                    parameters["type"] = "object";
-
-                    JObject properties = new JObject();
-
-                    JObject archivePathProp = new JObject();
-                    archivePathProp["type"] = "string";
-                    archivePathProp["description"] = "The full path of the archive file to extract. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
-                    properties["archive_path"] = archivePathProp;
-
-                    JObject destinationPathProp = new JObject();
-                    destinationPathProp["type"] = "string";
-                    destinationPathProp["description"] = "The full path of the destination directory where files will be extracted. Directory will be created if it doesn't exist. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.";
-                    properties["destination_path"] = destinationPathProp;
-
-                    parameters["properties"] = properties;
-                    parameters["required"] = new JArray("archive_path", "destination_path");
-
-                    func["parameters"] = parameters;
-                    tool["function"] = func;
-                    toolsArray.Add(tool);
-                }
-
-            }
-
+            JArray toolsArray = BuildToolsArray(enabledTools);
             if (toolsArray.Count > 0)
                 payload["tools"] = toolsArray;
         }
@@ -577,11 +592,11 @@ public class LLMClient
                                             };
                                         }
 
+                                        var temp = partialToolCalls[index];
+
                                         if (!string.IsNullOrEmpty(id))
                                         {
-                                            var temp = partialToolCalls[index];
                                             temp.Id = id;
-                                            partialToolCalls[index] = temp;
                                         }
 
                                         if (function != null)
@@ -591,18 +606,16 @@ public class LLMClient
 
                                             if (!string.IsNullOrEmpty(name))
                                             {
-                                                var temp = partialToolCalls[index];
                                                 temp.Name = name;
-                                                partialToolCalls[index] = temp;
                                             }
 
                                             if (!string.IsNullOrEmpty(argsChunk))
                                             {
-                                                var temp = partialToolCalls[index];
                                                 temp.Arguments += argsChunk;
-                                                partialToolCalls[index] = temp;
                                             }
                                         }
+
+                                        partialToolCalls[index] = temp;
                                     }
                                 }
                             }

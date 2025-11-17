@@ -1,15 +1,16 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 public static class ToolHandler
 {
+    // Maximum character limit for file and website content
+    public const int MAX_CONTENT_LENGTH = 8000;
+
     public struct ToolCall
     {
         public string Id;
@@ -29,214 +30,173 @@ public static class ToolHandler
         toolContent = "";
         exitCode = 0;
 
-        if (call.Name == "run_shell_command")
+        try
         {
-            // Expected arguments payload should contain {"command": "..."} as JSON.
-            string command = Trim(JsonExtractString(call.Arguments, "command"));
-            if (string.IsNullOrEmpty(command))
+            switch (call.Name)
             {
-                toolContent = "error: missing 'command' argument for run_shell_command.";
-                return true;
-            }
+                case "run_shell_command":
+                    {
+                        string command = GetRequiredArg(call.Arguments, "command");
+                        string output = RunShellCommand(command, out exitCode);
+                        toolContent = FormatCommandResult(command, output, exitCode);
+                        return true;
+                    }
 
-            try
-            {
-                string output = RunShellCommand(command, out exitCode);
-                toolContent = FormatCommandResult(command, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
+                case "read_website":
+                    {
+                        string URL = GetRequiredArg(call.Arguments, "URL");
+                        string output = ReadWebsite(URL, out exitCode);
+                        toolContent = FormatCommandResult("read website: " + URL, output, exitCode);
+                        return true;
+                    }
 
+                case "run_web_search":
+                    {
+                        string query = GetRequiredArg(call.Arguments, "query");
+                        string output = RunWebSearch(query, out exitCode);
+                        toolContent = FormatCommandResult("web search: " + query, output, exitCode);
+                        return true;
+                    }
+
+                case "download_video":
+                    {
+                        string URL = GetRequiredArg(call.Arguments, "URL");
+                        string output = DownloadHandler.DownloadVideo(URL, out exitCode);
+                        toolContent = FormatCommandResult("download video: " + URL, output, exitCode);
+                        return true;
+                    }
+
+                case "download_file":
+                    {
+                        string filename = GetRequiredArg(call.Arguments, "filename");
+                        string URL = GetRequiredArg(call.Arguments, "URL");
+                        string output = DownloadHandler.DownloadFile(filename, URL, out exitCode);
+                        toolContent = FormatCommandResult("download file: " + URL, output, exitCode);
+                        return true;
+                    }
+
+                case "read_file":
+                    {
+                        string filename = GetRequiredArg(call.Arguments, "filename");
+                        int.TryParse(Trim(JsonExtractString(call.Arguments, "offset")), out int offset);
+                        string output = FileHandler.ReadFile(filename, out exitCode, offset);
+                        toolContent = FormatCommandResult("read file: " + filename, output, exitCode);
+                        return true;
+                    }
+
+                case "write_file":
+                    {
+                        string filename = GetRequiredArg(call.Arguments, "filename");
+                        string content = Trim(JsonExtractString(call.Arguments, "content"));
+                        string output = FileHandler.WriteFile(filename, content, out exitCode);
+                        toolContent = FormatCommandResult("write file: " + filename, output, exitCode);
+                        return true;
+                    }
+
+                case "extract_file":
+                    {
+                        string archivePath = GetRequiredArg(call.Arguments, "archive_path");
+                        string destinationPath = GetRequiredArg(call.Arguments, "destination_path");
+                        string output = ExtractFile(archivePath, destinationPath, out exitCode);
+                        toolContent = FormatCommandResult("extract file: " + archivePath, output, exitCode);
+                        return true;
+                    }
+
+                case "move_file":
+                    {
+                        string sourcePath = GetRequiredArg(call.Arguments, "source_path");
+                        string destinationPath = GetRequiredArg(call.Arguments, "destination_path");
+                        string output = FileHandler.MoveFile(sourcePath, destinationPath, out exitCode);
+                        toolContent = FormatCommandResult("move file: " + sourcePath, output, exitCode);
+                        return true;
+                    }
+
+                case "copy_file":
+                    {
+                        string sourcePath = GetRequiredArg(call.Arguments, "source_path");
+                        string destinationPath = GetRequiredArg(call.Arguments, "destination_path");
+                        string output = FileHandler.CopyFile(sourcePath, destinationPath, out exitCode);
+                        toolContent = FormatCommandResult("copy file: " + sourcePath, output, exitCode);
+                        return true;
+                    }
+
+                case "delete_file":
+                    {
+                        string filePath = GetRequiredArg(call.Arguments, "file_path");
+                        string output = FileHandler.DeleteFile(filePath, out exitCode);
+                        toolContent = FormatCommandResult("delete file: " + filePath, output, exitCode);
+                        return true;
+                    }
+
+                case "list_directory":
+                    {
+                        string directoryPath = GetRequiredArg(call.Arguments, "directory_path");
+                        string output = FileHandler.ListDirectory(directoryPath, out exitCode);
+                        toolContent = FormatCommandResult("list directory: " + directoryPath, output, exitCode);
+                        return true;
+                    }
+
+                default:
+                    toolContent = $"error: unknown tool '{call.Name}'.";
+                    return false;
+            }
+        }
+        catch (Exception e)
+        {
+            toolContent = "error: " + e.Message;
             return true;
         }
+    }
 
-        if (call.Name == "read_website")
-        {
-            // Expected arguments payload should contain {"URL": "..."} as JSON.
-            string URL = Trim(JsonExtractString(call.Arguments, "URL"));
-            if (string.IsNullOrEmpty(URL))
-            {
-                toolContent = "error: missing 'URL' argument for read_website.";
-                return true;
-            }
-
-            try
-            {
-                string output = ReadWebsite(URL, out exitCode);
-                toolContent = FormatCommandResult("read website: " + URL, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        if (call.Name == "run_web_search")
-        {
-            // Expected arguments payload should contain {"query": "..."} as JSON.
-            string query = Trim(JsonExtractString(call.Arguments, "query"));
-            if (string.IsNullOrEmpty(query))
-            {
-                toolContent = "error: missing 'query' argument for run_web_search.";
-                return true;
-            }
-
-            try
-            {
-                string output = RunWebSearch(query, out exitCode);
-                toolContent = FormatCommandResult("web search: " + query, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        if (call.Name == "download_video")
-        {
-            // Expected arguments payload should contain {"URL": "..."} as JSON.
-            string URL = Trim(JsonExtractString(call.Arguments, "URL"));
-            if (string.IsNullOrEmpty(URL))
-            {
-                toolContent = "error: missing 'URL' argument for download_video.";
-                return true;
-            }
-
-            try
-            {
-                string output = DownloadVideo(URL, out exitCode);
-                toolContent = FormatCommandResult("download video: " + URL, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        if (call.Name == "download_file")
-        {
-            // Expected arguments payload should contain {"filename": "...", "content": "..."} as JSON.
-            string filename = Trim(JsonExtractString(call.Arguments, "filename"));
-            string URL = Trim(JsonExtractString(call.Arguments, "URL"));
-
-            if (string.IsNullOrEmpty(URL))
-            {
-                toolContent = "error: missing 'URL' argument for download_file.";
-                return true;
-            }
-
-            try
-            {
-                string output = DownloadFile(filename, URL, out exitCode);
-                toolContent = FormatCommandResult("download file: " + URL, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        if (call.Name == "read_file")
-        {
-            // Expected arguments payload should contain {"filename": "..."} as JSON.
-            string filename = Trim(JsonExtractString(call.Arguments, "filename"));
-            if (string.IsNullOrEmpty(filename))
-            {
-                toolContent = "error: missing 'filename' argument for read_file.";
-                return true;
-            }
-
-            try
-            {
-                string output = ReadFile(filename, out exitCode);
-                toolContent = FormatCommandResult("read file: " + filename, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        if (call.Name == "write_file")
-        {
-            // Expected arguments payload should contain {"filename": "...", "content": "..."} as JSON.
-            string filename = Trim(JsonExtractString(call.Arguments, "filename"));
-            string content = Trim(JsonExtractString(call.Arguments, "content"));
-
-            if (string.IsNullOrEmpty(filename))
-            {
-                toolContent = "error: missing 'filename' argument for write_file.";
-                return true;
-            }
-
-            if (content == null)
-            {
-                toolContent = "error: missing 'content' argument for write_file.";
-                return true;
-            }
-
-            try
-            {
-                string output = WriteFile(filename, content, out exitCode);
-                toolContent = FormatCommandResult("write file: " + filename, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        if (call.Name == "extract_file")
-        {
-            // Expected arguments payload should contain {"archive_path": "...", "destination_path": "..."} as JSON.
-            string archivePath = Trim(JsonExtractString(call.Arguments, "archive_path"));
-            string destinationPath = Trim(JsonExtractString(call.Arguments, "destination_path"));
-
-            if (string.IsNullOrEmpty(archivePath))
-            {
-                toolContent = "error: missing 'archive_path' argument for extract_file.";
-                return true;
-            }
-
-            if (string.IsNullOrEmpty(destinationPath))
-            {
-                toolContent = "error: missing 'destination_path' argument for extract_file.";
-                return true;
-            }
-
-            try
-            {
-                string output = ExtractFile(archivePath, destinationPath, out exitCode);
-                toolContent = FormatCommandResult("extract file: " + archivePath, output, exitCode);
-            }
-            catch (Exception e)
-            {
-                toolContent = "error: " + e.Message;
-            }
-
-            return true;
-        }
-
-        toolContent = $"error: unknown tool '{call.Name}'.";
-        return false;
+    private static string GetRequiredArg(string arguments, string argName)
+    {
+        string value = Trim(JsonExtractString(arguments, argName));
+        if (string.IsNullOrEmpty(value))
+            throw new ArgumentException($"missing '{argName}' argument.");
+        return value;
     }
 
     // Placeholder helper methods
     private static string Trim(string s) => s?.Trim() ?? "";
+
+    // Generic process execution helper (public for use by other handlers)
+    public static string ExecuteProcess(string fileName, string arguments, out int exitCode, bool combineErrorOutput = true)
+    {
+        try
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = fileName,
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            using (Process process = Process.Start(psi))
+            {
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                exitCode = process.ExitCode;
+                
+                // Combine stdout and stderr if requested
+                if (combineErrorOutput && !string.IsNullOrEmpty(error))
+                {
+                    return output + error;
+                }
+                return output;
+            }
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            throw new InvalidOperationException($"Failed to execute {fileName}: {ex.Message}", ex);
+        }
+    }
 
     private static string JsonExtractString(string json, string key)
     {
@@ -286,52 +246,12 @@ public static class ToolHandler
     // Runs shell commands on the OS
     private static string RunShellCommand(string command, out int exitCode)
     {
-        var output = new StringBuilder();
-        exitCode = 0;
-
-        try
-        {
-            using (Process process = new Process())
-            {
-                process.StartInfo.FileName = "cmd.exe"; // For Windows shell
-                process.StartInfo.Arguments = "/c " + command; // /c executes the command and exits
-                process.StartInfo.RedirectStandardOutput = true;
-                process.StartInfo.RedirectStandardError = true;
-                process.StartInfo.UseShellExecute = false; // Required to redirect output
-                process.StartInfo.CreateNoWindow = true;
-
-                process.OutputDataReceived += (sender, args) =>
-                {
-                    if (args.Data != null)
-                        output.AppendLine(args.Data);
-                };
-
-                process.ErrorDataReceived += (sender, args) =>
-                {
-                    if (args.Data != null)
-                        output.AppendLine(args.Data);
-                };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                process.WaitForExit();
-
-                exitCode = process.ExitCode;
-            }
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException("Failed to execute command.", ex);
-        }
-
-        return output.ToString();
+        return ExecuteProcess("cmd.exe", "/c " + command, out exitCode);
     }
 
     // Searches the web with DuckDuckGo, falls back to Wiby if DDG fails or returns no results
     private static string RunWebSearch(string query, out int exitCode)
     {
-        exitCode = 0;
         string html = "";
 
         // Try DuckDuckGo first
@@ -341,23 +261,7 @@ public static class ToolHandler
             string arguments = "-s -L \"https://duckduckgo.com/html/?q=" + HttpUtility.UrlEncode(query) + "\" " +
                                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
 
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "curl.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8
-            };
-
-            using (Process process = Process.Start(psi))
-            using (StreamReader reader = process.StandardOutput)
-            {
-                html = reader.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-            }
+            html = ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
         }
         catch (Exception ex)
         {
@@ -407,7 +311,6 @@ public static class ToolHandler
     // Searches the web with Wiby using their JSON API
     private static string RunWibySearch(string query, out int exitCode)
     {
-        exitCode = 0;
         string json = "";
 
         // Run CURL to get JSON results from Wiby
@@ -417,23 +320,7 @@ public static class ToolHandler
             string arguments = "-s -L \"https://wiby.me/json/?q=" + HttpUtility.UrlEncode(query) + "\" " +
                                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
 
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "curl.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8
-            };
-
-            using (Process process = Process.Start(psi))
-            using (StreamReader reader = process.StandardOutput)
-            {
-                json = reader.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-            }
+            json = ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
         }
         catch (Exception ex)
         {
@@ -482,7 +369,6 @@ public static class ToolHandler
 
     private static string ReadWebsite(string URL, out int exitCode)
     {
-        exitCode = 0;
         string html = "";
 
         try
@@ -491,23 +377,7 @@ public static class ToolHandler
             string arguments = "-s -L \"" + URL + "\" " +
                                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
 
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "curl.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8
-            };
-
-            using (Process process = Process.Start(psi))
-            using (StreamReader reader = process.StandardOutput)
-            {
-                html = reader.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-            }
+            html = ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
 
             // Strip out DOCTYPE, <script> and <style> blocks
             html = Regex.Replace(html, @"<!DOCTYPE[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
@@ -564,9 +434,9 @@ public static class ToolHandler
             html = Regex.Replace(html, @"[ \t]+", " ", RegexOptions.Multiline);
             // Trim leading/trailing whitespace from each line
             html = Regex.Replace(html, @"^\s+|\s+$", "", RegexOptions.Multiline);
-            // Truncate to 8000 characters
-            if (html.Length > 8000)
-                html = html.Substring(0, 8000);
+            // Truncate to max content length
+            if (html.Length > MAX_CONTENT_LENGTH)
+                html = html.Substring(0, MAX_CONTENT_LENGTH);
         }
         catch (Exception ex)
         {
@@ -575,333 +445,6 @@ public static class ToolHandler
         }
 
         return html+"\n";
-    }
-    private static string DownloadVideo(string URL, out int exitCode)
-    {
-        exitCode = 0;
-
-        try
-        {
-            // Get the user's desktop path
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-
-            // Use an explicit output template in the desktop folder so yt-dlp handles the file naming
-            string outputTemplate = Path.Combine(desktopPath, "%(title)s.%(ext)s");
-
-            // Build arguments: no progress, output template, then the URL (each argument quoted)
-            string arguments = $"--no-progress -o \"{outputTemplate}\" \"{URL}\"";
-
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "yt-dlp.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8
-            };
-
-            using (Process process = Process.Start(psi))
-            {
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-
-                if (exitCode != 0)
-                    return $"yt-dlp exited with code {exitCode}:\n{error}";
-
-                return output;
-            }
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error running yt-dlp.exe: " + ex.Message;
-        }
-    }
-
-    private static string DownloadFile(string filename, string URL, out int exitCode)
-    {
-        exitCode = 0;
-
-        try
-        {
-            // Expand environment variables in filename
-            filename = Environment.ExpandEnvironmentVariables(filename);
-
-            // Get expected MIME types based on file extension
-            string fileExtension = Path.GetExtension(filename).ToLower();
-            string[] expectedTypes = GetExpectedMimeTypes(fileExtension);
-
-            string contentType = "";
-
-            // Only perform HEAD request if we have expected MIME types to validate
-            if (expectedTypes != null)
-            {
-                contentType = GetContentTypeFromURL(URL, out int headExitCode);
-                
-                // If HEAD request succeeds, validate the content type
-                if (headExitCode == 0 && !string.IsNullOrEmpty(contentType))
-                {
-                    // Verify content type matches expected type
-                    bool isValidType = false;
-                    foreach (string expectedType in expectedTypes)
-                    {
-                        if (contentType.ToLower().Contains(expectedType.ToLower()))
-                        {
-                            isValidType = true;
-                            break;
-                        }
-                    }
-
-                    if (!isValidType)
-                    {
-                        exitCode = 1;
-                        return $"File type mismatch: Expected {string.Join(" or ", expectedTypes)} but got '{contentType}'. Download cancelled.";
-                    }
-                }
-                // If HEAD request fails, proceed with download anyway
-            }
-
-            // Ensure directory exists
-            string directory = Path.GetDirectoryName(filename);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            // Build curl arguments
-            string arguments =
-                "-L -s " +
-                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\" " +
-                "-o \"" + filename + "\" " +
-                "\"" + URL + "\"";
-
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "curl.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-
-            string stdOut = "";
-            string stdErr = "";
-
-            using (Process process = Process.Start(psi))
-            {
-                stdOut = process.StandardOutput.ReadToEnd();
-                stdErr = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-            }
-
-            if (exitCode != 0)
-            {
-                return $"curl exited with code {exitCode}: {stdErr}";
-            }
-
-            string successMessage = $"File downloaded successfully: {filename}";
-            if (!string.IsNullOrEmpty(contentType))
-            {
-                successMessage += $" (Content-Type: {contentType})";
-            }
-
-            return successMessage;
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error running curl.exe: " + ex.Message;
-        }
-    }
-
-    private static string GetContentTypeFromURL(string URL, out int exitCode)
-    {
-        exitCode = 0;
-        
-        try
-        {
-            // Build curl HEAD request arguments
-            string arguments =
-                "-I -L -s " +
-                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\" " +
-                "\"" + URL + "\"";
-
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "curl.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-
-            string stdOut = "";
-            
-            using (Process process = Process.Start(psi))
-            {
-                stdOut = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-            }
-
-            if (exitCode != 0)
-            {
-                return "";
-            }
-
-            // Extract Content-Type from headers
-            Regex contentTypeRegex = new Regex(@"content-type:\s*([^\r\n;]+)", RegexOptions.IgnoreCase);
-            Match match = contentTypeRegex.Match(stdOut);
-            
-            if (match.Success)
-            {
-                return match.Groups[1].Value.Trim();
-            }
-
-            return "";
-        }
-        catch (Exception)
-        {
-            exitCode = -1;
-            return "";
-        }
-    }
-
-    private static readonly Dictionary<string, string[]> MimeTypeMap = new Dictionary<string, string[]>()
-    {
-        // Images
-        { ".jpg", new[] { "image/jpeg" } },
-        { ".jpeg", new[] { "image/jpeg" } },
-        { ".png", new[] { "image/png" } },
-        { ".gif", new[] { "image/gif" } },
-        { ".webp", new[] { "image/webp" } },
-        { ".bmp", new[] { "image/bmp" } },
-        { ".svg", new[] { "image/svg+xml" } },
-        { ".ico", new[] { "image/x-icon", "image/vnd.microsoft.icon" } },
-
-        // Documents
-        { ".pdf", new[] { "application/pdf" } },
-        { ".doc", new[] { "application/msword" } },
-        { ".docx", new[] { "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } },
-        { ".xls", new[] { "application/vnd.ms-excel" } },
-        { ".xlsx", new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } },
-        { ".ppt", new[] { "application/vnd.ms-powerpoint" } },
-        { ".pptx", new[] { "application/vnd.openxmlformats-officedocument.presentationml.presentation" } },
-
-        // Text files
-        { ".txt", new[] { "text/plain" } },
-        { ".html", new[] { "text/html" } },
-        { ".htm", new[] { "text/html" } },
-        { ".css", new[] { "text/css" } },
-        { ".js", new[] { "text/javascript", "application/javascript" } },
-        { ".json", new[] { "application/json" } },
-        { ".xml", new[] { "text/xml", "application/xml" } },
-        { ".csv", new[] { "text/csv" } },
-
-        // Archives
-        { ".zip", new[] { "application/zip" } },
-        { ".rar", new[] { "application/x-rar-compressed" } },
-        { ".7z", new[] { "application/x-7z-compressed" } },
-        { ".tar", new[] { "application/x-tar" } },
-        { ".gz", new[] { "application/gzip" } },
-
-        // Audio
-        { ".mp3", new[] { "audio/mpeg" } },
-        { ".wav", new[] { "audio/wav" } },
-        { ".ogg", new[] { "audio/ogg" } },
-        { ".flac", new[] { "audio/flac" } },
-
-        // Video
-        { ".mp4", new[] { "video/mp4" } },
-        { ".avi", new[] { "video/x-msvideo" } },
-        { ".mkv", new[] { "video/x-matroska" } },
-        { ".mov", new[] { "video/quicktime" } },
-        { ".webm", new[] { "video/webm" } },
-
-        // Executables and binaries
-        { ".exe", new[] { "application/x-msdownload", "application/octet-stream" } },
-        { ".dll", new[] { "application/x-msdownload", "application/octet-stream" } },
-        { ".bin", new[] { "application/octet-stream" } }
-    };
-
-    private static string[] GetExpectedMimeTypes(string fileExtension)
-    {
-        string[] result;
-        if (MimeTypeMap.TryGetValue(fileExtension.ToLower(), out result))
-        {
-            return result;
-        }
-        return null;
-    }
-
-    private static string ReadFile(string filename, out int exitCode, int maxLength = 8000)
-    {
-        exitCode = 0;
-
-        try
-        {
-            // Expand environment variables in filename
-            filename = Environment.ExpandEnvironmentVariables(filename);
-
-            if (!File.Exists(filename))
-            {
-                exitCode = 1;
-                return $"File not found: {filename}";
-            }
-
-            string content = File.ReadAllText(filename, Encoding.UTF8);
-
-            if (content.Length > maxLength)
-            {
-                content = content.Substring(0, maxLength) + "\n...[truncated]";
-            }
-
-            return content;
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error reading file: " + ex.Message;
-        }
-    }
-
-    private static string WriteFile(string filename, string content, out int exitCode)
-    {
-        exitCode = 0;
-
-        try
-        {
-            // Expand environment variables in filename
-            filename = Environment.ExpandEnvironmentVariables(filename);
-
-            // Ensure the directory exists
-            string directory = Path.GetDirectoryName(filename);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            File.WriteAllText(filename, content, Encoding.UTF8);
-            return $"File written successfully: {filename}";
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error writing file: " + ex.Message;
-        }
     }
 
     private static string ExtractFile(string archivePath, string destinationPath, out int exitCode)
@@ -938,35 +481,14 @@ public static class ToolHandler
             // Build 7za.exe arguments: x (extract with full paths) -o (output directory) -y (yes to all prompts)
             string arguments = $"x \"{archivePath}\" -o\"{destinationPath}\" -y";
 
-            ProcessStartInfo psi = new ProcessStartInfo
-            {
-                FileName = "7za.exe",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
-
-            string stdOut = "";
-            string stdErr = "";
-
-            using (Process process = Process.Start(psi))
-            {
-                stdOut = process.StandardOutput.ReadToEnd();
-                stdErr = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
-            }
+            string output = ExecuteProcess("7za.exe", arguments, out exitCode);
 
             if (exitCode != 0)
             {
-                return $"7za exited with code {exitCode}:\n{stdErr}\n{stdOut}";
+                return $"7za exited with code {exitCode}:\n{output}";
             }
 
-            return $"Archive extracted successfully to: {destinationPath}\n{stdOut}";
+            return $"Archive extracted successfully to: {destinationPath}\n{output}";
         }
         catch (Exception ex)
         {
@@ -974,8 +496,6 @@ public static class ToolHandler
             return "Error running 7za.exe: " + ex.Message;
         }
     }
-
-
 
     private static string FormatCommandResult(string command, string output, int exitCode)
     {
