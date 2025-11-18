@@ -4,9 +4,6 @@ using System.Text;
 
 public static class FileHandler
 {
-    // Maximum character limit for file content
-    public const int MAX_CONTENT_LENGTH = 8000;
-
     public static string ReadFile(string filename, out int exitCode, int offset = 0)
     {
         exitCode = 0;
@@ -35,7 +32,7 @@ public static class FileHandler
             }
 
             // Always read up to MAX_CONTENT_LENGTH characters (or until EOF)
-            int endPos = Math.Min(offset + MAX_CONTENT_LENGTH, totalLength);
+            int endPos = Math.Min(offset + SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH, totalLength);
             string excerpt = content.Substring(offset, endPos - offset);
 
             // Build result with header

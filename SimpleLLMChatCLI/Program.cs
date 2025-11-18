@@ -8,6 +8,12 @@ namespace SimpleLLMChatCLI
 {
     internal class Program
     {
+        // Maximum character limit for file and website content
+        public static int MAX_CONTENT_LENGTH = 8000;
+
+        // SearxNG instance URL
+        public static string SEARXNG_INSTANCE = "";
+
         // Print interactive CLI instructions
         static void printCliInstructions()
         {
@@ -42,6 +48,12 @@ namespace SimpleLLMChatCLI
 
             // Get show tool output setting
             bool showToolOutput = config.GetShowToolOutput();
+
+            // Get and set max content length
+            MAX_CONTENT_LENGTH = config.GetMaxContentLength();
+
+            // Get and set SearxNG instance
+            SEARXNG_INSTANCE = config.GetSearxNGInstance();
 
             // Conversation storage
             List<ChatMessage> conversation = new List<ChatMessage>();

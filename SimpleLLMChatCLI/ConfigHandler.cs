@@ -93,4 +93,20 @@ public class ConfigHandler
         }
         return false; // Default to false if not specified or invalid
     }
+
+    public int GetMaxContentLength()
+    {
+        if (configMap.ContainsKey("maxcontentlength"))
+        {
+            string value = configMap["maxcontentlength"];
+            if (int.TryParse(value, out int result))
+                return result;
+        }
+        return 8000; // Default to 8000 if not specified or invalid
+    }
+
+    public string GetSearxNGInstance()
+    {
+        return configMap.ContainsKey("searxnginstance") ? configMap["searxnginstance"] : "";
+    }
 }

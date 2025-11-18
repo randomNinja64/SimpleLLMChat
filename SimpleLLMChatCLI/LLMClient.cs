@@ -301,11 +301,11 @@ public class LLMClient
                 case "read_file":
                     tool = CreateToolDefinition(
                         "read_file",
-                        $"Read the contents of a local file and return it as a string. Always reads up to {FileHandler.MAX_CONTENT_LENGTH} characters. Use the offset parameter to read different parts of large files.",
+                        $"Read the contents of a local file and return it as a string. Always reads up to {SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH} characters. Use the offset parameter to read different parts of large files.",
                         new Dictionary<string, PropertyInfo>
                         {
                             { "filename", new PropertyInfo("string", "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
-                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {FileHandler.MAX_CONTENT_LENGTH} reads characters {FileHandler.MAX_CONTENT_LENGTH}-{FileHandler.MAX_CONTENT_LENGTH * 2}.") }
+                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH} reads characters {SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH}-{SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH * 2}.") }
                         },
                         new[] { "filename" }
                     );

@@ -14,6 +14,8 @@ namespace SimpleLLMChatGUI
         private string _sysPrompt;
         private string _assistantName;
         private bool _showToolOutput;
+        private int _maxContentLength;
+        private string _searxngInstance;
         private ProcessHandler _processHandler;
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -61,6 +63,18 @@ namespace SimpleLLMChatGUI
             set { _showToolOutput = value; OnPropertyChanged("ShowToolOutput"); }
         }
 
+        public int MaxContentLength
+        {
+            get { return _maxContentLength; }
+            set { _maxContentLength = value; OnPropertyChanged("MaxContentLength"); }
+        }
+
+        public string SearxNGInstance
+        {
+            get { return _searxngInstance; }
+            set { _searxngInstance = value; OnPropertyChanged("SearxNGInstance"); }
+        }
+
         public Options(ProcessHandler processHandler)
         {
             InitializeComponent();
@@ -75,6 +89,8 @@ namespace SimpleLLMChatGUI
             SysPrompt = "";
             AssistantName = "";
             ShowToolOutput = true; // Default to showing tool outputs
+            MaxContentLength = 8000; // Default to 8000 characters
+            SearxNGInstance = ""; // Default to empty
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -119,6 +135,17 @@ namespace SimpleLLMChatGUI
                 if (settings.TryGetValue("showtooloutput", out value))
                 {
                     ShowToolOutput = (value == "1");
+                }
+                if (settings.TryGetValue("maxcontentlength", out value))
+                {
+                    if (int.TryParse(value, out int maxLength))
+                    {
+                        MaxContentLength = maxLength;
+                    }
+                }
+                if (settings.TryGetValue("searxnginstance", out value))
+                {
+                    SearxNGInstance = value;
                 }
 
                 // Sync password box manually (not bound)
@@ -174,13 +201,15 @@ namespace SimpleLLMChatGUI
 
             var lines = new List<string>
             {
-                "llmserver=" + ServerURL,
                 "apikey=" + ApiKey,
-                "model=" + Model,
-                "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
                 "assistantname=" + AssistantName,
-                "tools=" + string.Join(",", selectedTools),
-                "showtooloutput=" + (ShowToolOutput ? "1" : "0")
+                "llmserver=" + ServerURL,
+                "maxcontentlength=" + MaxContentLength,
+                "model=" + Model,
+                "searxnginstance=" + SearxNGInstance,
+                "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
+                "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
+                "tools=" + string.Join(",", selectedTools)
             };
 
             File.WriteAllLines(path, lines.ToArray());

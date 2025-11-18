@@ -5,12 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Web;
 public static class ToolHandler
 {
-    // Maximum character limit for file and website content
-    public const int MAX_CONTENT_LENGTH = 8000;
-
     public struct ToolCall
     {
         public string Id;
@@ -53,7 +49,26 @@ public static class ToolHandler
                 case "run_web_search":
                     {
                         string query = GetRequiredArg(call.Arguments, "query");
-                        string output = RunWebSearch(query, out exitCode);
+                        string output = "";
+                        
+                        // If SearXNG instance is set, try it first
+                        if (!string.IsNullOrWhiteSpace(SimpleLLMChatCLI.Program.SEARXNG_INSTANCE))
+                        {
+                            output = SearchHandler.RunSearXNGSearch(query, out exitCode);
+                        }
+                        
+                        // If no results yet, try DDG
+                        if (string.IsNullOrWhiteSpace(output) || output.Trim() == "")
+                        {
+                            output = SearchHandler.RunDDGSearch(query, out exitCode);
+                        }
+
+                        // If no results yet, try Wiby
+                        if (string.IsNullOrWhiteSpace(output) || output.Trim() == "")
+                        {
+                            output = SearchHandler.RunWibySearch(query, out exitCode);
+                        }
+                        
                         toolContent = FormatCommandResult("web search: " + query, output, exitCode);
                         return true;
                     }
@@ -249,124 +264,6 @@ public static class ToolHandler
         return ExecuteProcess("cmd.exe", "/c " + command, out exitCode);
     }
 
-    // Searches the web with DuckDuckGo, falls back to Wiby if DDG fails or returns no results
-    private static string RunWebSearch(string query, out int exitCode)
-    {
-        string html = "";
-
-        // Try DuckDuckGo first
-        try
-        {
-            // Build curl command arguments
-            string arguments = "-s -L \"https://duckduckgo.com/html/?q=" + HttpUtility.UrlEncode(query) + "\" " +
-                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
-
-            html = ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
-        }
-        catch (Exception ex)
-        {
-            // DDG failed, try Wiby
-            return RunWibySearch(query, out exitCode);
-        }
-
-        // Parse result snippets
-        Regex snippetRegex = new Regex("<a class=\"result__snippet\" href=\"([^\"]+)\">(.+?)</a>", RegexOptions.IgnoreCase);
-        Regex htmlTagRegex = new Regex("<[^>]+>");
-        Regex uddgRegex = new Regex("uddg=([^&]+)");
-
-        MatchCollection matches = snippetRegex.Matches(html);
-        StringBuilder results = new StringBuilder();
-
-        foreach (Match match in matches)
-        {
-            string href = match.Groups[1].Value;
-            string snippet = match.Groups[2].Value;
-
-            // Remove HTML tags from snippet
-            snippet = htmlTagRegex.Replace(snippet, "");
-
-            // Extract the actual URL from the uddg parameter
-            Match urlMatch = uddgRegex.Match(href);
-            if (urlMatch.Success)
-            {
-                string fixedUrl = HttpUtility.UrlDecode(urlMatch.Groups[1].Value);
-                
-                // Skip ads (URLs containing duckduckgo.com/y.js are ad tracking links)
-                if (!fixedUrl.Contains("duckduckgo.com/y.js"))
-                {
-                    results.AppendLine(fixedUrl + " : " + snippet);
-                }
-            }
-        }
-
-        // If DDG returned no results, try Wiby
-        if (results.Length == 0)
-        {
-            return RunWibySearch(query, out exitCode);
-        }
-
-        return results.ToString();
-    }
-
-    // Searches the web with Wiby using their JSON API
-    private static string RunWibySearch(string query, out int exitCode)
-    {
-        string json = "";
-
-        // Run CURL to get JSON results from Wiby
-        try
-        {
-            // Build curl command arguments for JSON API
-            string arguments = "-s -L \"https://wiby.me/json/?q=" + HttpUtility.UrlEncode(query) + "\" " +
-                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
-
-            json = ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error running curl.exe for search: " + ex.Message;
-        }
-
-        // Parse JSON response (Wiby returns an array at the root level)
-        try
-        {
-            JArray resultsArray = JArray.Parse(json);
-
-            StringBuilder results = new StringBuilder();
-            if (resultsArray == null || resultsArray.Count == 0)
-            {
-                return "No results found.";
-            }
-
-            foreach (JToken result in resultsArray)
-            {
-                string url = result["URL"]?.ToString() ?? "";
-                string title = result["Title"]?.ToString() ?? "";
-                string snippet = result["Snippet"]?.ToString() ?? "";
-
-                if (!string.IsNullOrEmpty(url))
-                {
-                    results.AppendLine(url + " : " + title + " - " + snippet);
-                }
-            }
-
-            if (results.Length == 0)
-            {
-                return "No results found.";
-            }
-
-            return results.ToString();
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error parsing JSON: " + ex.Message;
-        }
-    }
-
-
-
     private static string ReadWebsite(string URL, out int exitCode)
     {
         string html = "";
@@ -435,8 +332,8 @@ public static class ToolHandler
             // Trim leading/trailing whitespace from each line
             html = Regex.Replace(html, @"^\s+|\s+$", "", RegexOptions.Multiline);
             // Truncate to max content length
-            if (html.Length > MAX_CONTENT_LENGTH)
-                html = html.Substring(0, MAX_CONTENT_LENGTH);
+            if (html.Length > SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH)
+                html = html.Substring(0, SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH);
         }
         catch (Exception ex)
         {
