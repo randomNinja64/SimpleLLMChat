@@ -69,6 +69,12 @@ public static class ToolHandler
                             output = SearchHandler.RunWibySearch(query, out exitCode);
                         }
                         
+                        // If no results from all 3, set output to "No results found."
+                        if (string.IsNullOrWhiteSpace(output) || output.Trim() == "")
+                        {
+                            output = "No results found.";
+                        }
+                        
                         toolContent = FormatCommandResult("web search: " + query, output, exitCode);
                         return true;
                     }

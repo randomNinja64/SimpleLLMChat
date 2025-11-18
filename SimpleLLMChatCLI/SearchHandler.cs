@@ -89,7 +89,7 @@ public static class SearchHandler
             StringBuilder results = new StringBuilder();
             if (resultsArray == null || resultsArray.Count == 0)
             {
-                return "No results found.";
+                return "";
             }
 
             foreach (JToken result in resultsArray)
@@ -106,15 +106,15 @@ public static class SearchHandler
 
             if (results.Length == 0)
             {
-                return "No results found.";
+                return "";
             }
 
             return results.ToString();
         }
-        catch (Exception ex)
+        catch
         {
             exitCode = -1;
-            return "Error parsing JSON: " + ex.Message;
+            return "";
         }
     }
 
@@ -139,39 +139,49 @@ public static class SearchHandler
             return "";
         }
 
-        StringBuilder results = new StringBuilder();
+        // Check if JSON is empty or invalid before parsing
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            exitCode = -1;
+            return "";
+        }
 
         try
         {
-            JObject root = JObject.Parse(json);
-            JArray sngResults = (JArray)root["results"];
+            JArray sngResults = JToken.Parse(json)["results"] as JArray;
 
-            if (results == null)
+            StringBuilder results = new StringBuilder();
+
+            if (sngResults == null)
             {
                 return "";
             }
 
-            foreach (JObject item in sngResults)
+            foreach (JToken result in sngResults)
             {
-                string title = (string)item["title"];
-                string url = (string)item["url"];
-                string content = (string)item["content"];
+                string title = result["title"]?.ToString() ?? "";
+                string url = result["url"]?.ToString() ?? "";
+                string content = result["content"]?.ToString() ?? "";
 
-                // Null-checks
-                if (url == null) continue;
-
-                results.AppendLine(url + " : " + (title ?? ""));
-
-                if (!string.IsNullOrEmpty(content))
-                    results.AppendLine("  " + content);
+                if (!string.IsNullOrEmpty(url))
+                {
+                    results.AppendLine(url + " : " + title + " - " + content);
+                }
             }
+
+            if (results.Length == 0)
+            {
+                return "";
+            }
+
+            return results.ToString();
         }
         catch (Exception ex)
         {
-            results.AppendLine("Error parsing SearXNG JSON: " + ex.Message);
+            // Search failed, return empty
+            exitCode = -1;
+            return "";
         }
-
-        return results.ToString();
     }
 
 }
