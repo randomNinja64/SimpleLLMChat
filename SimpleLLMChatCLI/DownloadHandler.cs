@@ -55,21 +55,25 @@ public static class DownloadHandler
                 // If HEAD request succeeds, validate the content type
                 if (headExitCode == 0 && !string.IsNullOrEmpty(contentType))
                 {
-                    // Verify content type matches expected type
-                    bool isValidType = false;
-                    foreach (string expectedType in expectedTypes)
+                    // Always accept application/octet-stream (generic binary stream)
+                    if (!contentType.ToLower().Contains("application/octet-stream"))
                     {
-                        if (contentType.ToLower().Contains(expectedType.ToLower()))
+                        // Verify content type matches expected type
+                        bool isValidType = false;
+                        foreach (string expectedType in expectedTypes)
                         {
-                            isValidType = true;
-                            break;
+                            if (contentType.ToLower().Contains(expectedType.ToLower()))
+                            {
+                                isValidType = true;
+                                break;
+                            }
                         }
-                    }
 
-                    if (!isValidType)
-                    {
-                        exitCode = 1;
-                        return $"File type mismatch: Expected {string.Join(" or ", expectedTypes)} but got '{contentType}'. Download cancelled.";
+                        if (!isValidType)
+                        {
+                            exitCode = 1;
+                            return $"File type mismatch: Expected {string.Join(" or ", expectedTypes)} but got '{contentType}'. Download cancelled.";
+                        }
                     }
                 }
                 // If HEAD request fails, proceed with download anyway
@@ -131,7 +135,9 @@ public static class DownloadHandler
             }
 
             // Extract Content-Type from headers
-            Regex contentTypeRegex = new Regex(@"content-type:\s*([^\r\n;]+)", RegexOptions.IgnoreCase);
+            // When following redirects, curl returns multiple sets of headers
+            // Search from the end to get the LAST Content-Type (from the final destination)
+            Regex contentTypeRegex = new Regex(@"content-type:\s*([^\r\n;]+)", RegexOptions.IgnoreCase | RegexOptions.RightToLeft);
             Match match = contentTypeRegex.Match(headers);
             
             if (match.Success)
