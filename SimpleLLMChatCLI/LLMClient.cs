@@ -110,6 +110,48 @@ public class LLMClient
             }
 
             LLMCompletionResponse response = sendMessages(conversation, enabledTools);
+            
+            // Check if context overflow occurred
+            if (response.FinishReason == "context_overflow")
+            {
+                if (!outputOnly)
+                {
+                    Console.WriteLine("\n[Context overflow detected - summarizing conversation history...]");
+                }
+                
+                // Remove the user message we just added (we'll re-add it after summarization)
+                conversation.RemoveAt(conversation.Count - 1);
+                
+                // Get summary of the conversation
+                string summary = SummarizeConversation(conversation, outputOnly);
+                
+                if (string.IsNullOrEmpty(summary))
+                {
+                    return;
+                }
+                
+                // Replace conversation with just the summary
+                conversation.Clear();
+                ChatMessage summaryMsg = new ChatMessage
+                {
+                    Role = "user",
+                    Content = "Previous conversation summary:\n" + summary
+                };
+                conversation.Add(summaryMsg);
+                
+                // Re-add the current user message
+                conversation.Add(userMsg);
+                
+                if (!outputOnly)
+                {
+                    Console.WriteLine("[Conversation summarized - retrying...]");
+                    Console.WriteLine();
+                    Console.Write(assistantName + ": ");
+                }
+                
+                // Retry with the summarized context
+                response = sendMessages(conversation, enabledTools);
+            }
 
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
@@ -188,6 +230,63 @@ public class LLMClient
             };
             conversation.Add(assistantMsg);
             break;
+        }
+    }
+
+    private string SummarizeConversation(List<ChatMessage> conversation, bool outputOnly)
+    {
+        try
+        {
+            // Create a copy of the conversation so we can add the summary prompt without modifying the original
+            List<ChatMessage> summaryRequest = new List<ChatMessage>(conversation);
+            
+            // Add request for summary
+            ChatMessage summaryPrompt = new ChatMessage
+            {
+                Role = "user",
+                Content = "Please provide a concise summary of our conversation so far. Include key topics discussed, important decisions made, code written, files modified, and any ongoing tasks or context needed to continue our work. Keep it under 500 words."
+            };
+            summaryRequest.Add(summaryPrompt);
+            
+            // Send without tools to get just a text summary
+            LLMCompletionResponse response = sendMessages(summaryRequest, new List<string>());
+            
+            if (response.FinishReason == "context_overflow" || response.FinishReason == "request_failed")
+            {
+                // If even summarization fails, try with just the most recent messages
+                if (!outputOnly)
+                {
+                    Console.WriteLine("[Attempting summary with recent messages only...]");
+                }
+                
+                summaryRequest.Clear();
+                
+                // Take only the last 10 messages (or fewer if there aren't that many)
+                int startIndex = Math.Max(0, conversation.Count - 10);
+                for (int i = startIndex; i < conversation.Count; i++)
+                {
+                    summaryRequest.Add(conversation[i]);
+                }
+                
+                summaryRequest.Add(summaryPrompt);
+                response = sendMessages(summaryRequest, new List<string>());
+                
+                if (response.FinishReason == "context_overflow" || response.FinishReason == "request_failed")
+                {
+                    if (!outputOnly)
+                    {
+                        Console.Error.WriteLine("[ERROR] Even recent messages exceed context limit. Please start a new conversation.");
+                    }
+                    return ""; // Give up
+                }
+            }
+            
+            return response.Content;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[ERROR] Failed to summarize conversation: " + ex.Message);
+            return "";
         }
     }
 
@@ -384,6 +483,18 @@ public class LLMClient
                             { "directory_path", new PropertyInfo("string", "The full path of the directory to list. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") }
                         },
                         new[] { "directory_path" }
+                    );
+                    break;
+
+                case "run_python_script":
+                    tool = CreateToolDefinition(
+                        "run_python_script",
+                        "Create and execute a Python script. The script is created as a temporary file, executed, and then automatically deleted.",
+                        new Dictionary<string, PropertyInfo>
+                        {
+                            { "script_content", new PropertyInfo("string", "The complete Python script code to execute. Should be valid Python syntax.") }
+                        },
+                        new[] { "script_content" }
                     );
                     break;
             }
@@ -632,10 +743,35 @@ public class LLMClient
                 completionResponse.Content = output.ToString();
             }
         }
+        catch (WebException webEx)
+        {
+            // Check if it's a context overflow error
+            if (webEx.Response != null)
+            {
+                using (var errorResponse = (HttpWebResponse)webEx.Response)
+                using (var reader = new StreamReader(errorResponse.GetResponseStream()))
+                {
+                    string errorText = reader.ReadToEnd();
+                    
+                    // Check for common context overflow indicators
+                    if (errorText.Contains("context_length_exceeded") || 
+                        errorText.Contains("maximum context length") ||
+                        errorText.Contains("context window") ||
+                        errorText.Contains("too many tokens") ||
+                        (errorResponse.StatusCode == HttpStatusCode.BadRequest && errorText.Contains("length")))
+                    {
+                        Console.Error.WriteLine("Context length exceeded.");
+                        return new LLMCompletionResponse("", null, "context_overflow");
+                    }
+                }
+            }
+            
+            Console.Error.WriteLine("Error sending request: " + webEx.Message);
+            return new LLMCompletionResponse("", null, "request_failed");
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine("Error sending request: " + ex.Message);
-
             return new LLMCompletionResponse("", null, "request_failed");
         }
 

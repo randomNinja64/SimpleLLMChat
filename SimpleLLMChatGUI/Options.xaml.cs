@@ -20,7 +20,7 @@ namespace SimpleLLMChatGUI
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private readonly List<string> _availableTools = new List<string> { "copy_file", "delete_file", "download_file", "download_video", "extract_file", "list_directory", "move_file", "read_file", "read_website", "run_shell_command", "run_web_search", "write_file" };
+        private readonly List<string> _availableTools = new List<string> { "copy_file", "delete_file", "download_file", "download_video", "extract_file", "list_directory", "move_file", "read_file", "read_website", "run_python_script", "run_shell_command", "run_web_search", "write_file" };
 
         public List<string> AvailableTools
         {
