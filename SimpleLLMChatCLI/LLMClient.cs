@@ -409,15 +409,90 @@ public class LLMClient
         return toolsArray;
     }
 
-    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools)
+    private JObject BuildMessageObject(ChatMessage msg)
     {
-        LLMCompletionResponse completionResponse = new LLMCompletionResponse
+        JObject msgObj = new JObject
         {
-            Content = string.Empty,
-            ToolCalls = new List<ToolHandler.ToolCall>(),
-            FinishReason = string.Empty
+            ["role"] = msg.Role
         };
 
+        if (!string.IsNullOrEmpty(msg.ToolCallId))
+            msgObj["tool_call_id"] = msg.ToolCallId;
+
+        if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
+        {
+            msgObj["content"] = msg.Content ?? "";
+            JArray toolCallsArray = new JArray();
+
+            foreach (var call in msg.ToolCalls)
+            {
+                JObject toolObj = new JObject
+                {
+                    ["id"] = call.Id ?? "",
+                    ["type"] = "function"
+                };
+
+                JObject functionObj = new JObject
+                {
+                    ["name"] = call.Name ?? "",
+                    ["arguments"] = call.Arguments ?? ""
+                };
+
+                toolObj["function"] = functionObj;
+                toolCallsArray.Add(toolObj);
+            }
+
+            msgObj["tool_calls"] = toolCallsArray;
+        }
+        else if (msg.Image != null)
+        {
+            JArray contentArray = new JArray();
+
+            if (!string.IsNullOrEmpty(msg.Content))
+            {
+                JObject textPart = new JObject
+                {
+                    ["type"] = "text",
+                    ["text"] = msg.Content
+                };
+                contentArray.Add(textPart);
+            }
+
+            if (!string.IsNullOrEmpty(msg.Image))
+            {
+                JObject imgPart = new JObject
+                {
+                    ["type"] = "image_url",
+                    ["image_url"] = new JObject
+                    {
+                        ["url"] = "data:image/png;base64," + msg.Image
+                    }
+                };
+                contentArray.Add(imgPart);
+            }
+
+            if (contentArray.Count == 0)
+            {
+                JObject emptyText = new JObject
+                {
+                    ["type"] = "text",
+                    ["text"] = ""
+                };
+                contentArray.Add(emptyText);
+            }
+
+            msgObj["content"] = contentArray;
+        }
+        else
+        {
+            msgObj["content"] = msg.Content ?? "";
+        }
+
+        return msgObj;
+    }
+
+    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools)
+    {
         // Build payload
         JObject payload = new JObject
         {
@@ -440,84 +515,7 @@ public class LLMClient
         {
             foreach (var msg in conversation)
             {
-                JObject msgObj = new JObject
-                {
-                    ["role"] = msg.Role
-                };
-
-                if (!string.IsNullOrEmpty(msg.ToolCallId))
-                    msgObj["tool_call_id"] = msg.ToolCallId;
-
-                if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
-                {
-                    msgObj["content"] = msg.Content ?? "";
-                    JArray toolCallsArray = new JArray();
-
-                    foreach (var call in msg.ToolCalls)
-                    {
-                        JObject toolObj = new JObject
-                        {
-                            ["id"] = call.Id ?? "",
-                            ["type"] = "function"
-                        };
-
-                        JObject functionObj = new JObject
-                        {
-                            ["name"] = call.Name ?? "",
-                            ["arguments"] = call.Arguments ?? ""
-                        };
-
-                        toolObj["function"] = functionObj;
-                        toolCallsArray.Add(toolObj);
-                    }
-
-                    msgObj["tool_calls"] = toolCallsArray;
-                }
-                else if (msg.Image != null)
-                {
-                    JArray contentArray = new JArray();
-
-                    if (!string.IsNullOrEmpty(msg.Content))
-                    {
-                        JObject textPart = new JObject
-                        {
-                            ["type"] = "text",
-                            ["text"] = msg.Content
-                        };
-                        contentArray.Add(textPart);
-                    }
-
-                    if (!string.IsNullOrEmpty(msg.Image))
-                    {
-                        JObject imgPart = new JObject
-                        {
-                            ["type"] = "image_url",
-                            ["image_url"] = new JObject
-                            {
-                                ["url"] = "data:image/png;base64," + msg.Image
-                            }
-                        };
-                        contentArray.Add(imgPart);
-                    }
-
-                    if (contentArray.Count == 0)
-                    {
-                        JObject emptyText = new JObject
-                        {
-                            ["type"] = "text",
-                            ["text"] = ""
-                        };
-                        contentArray.Add(emptyText);
-                    }
-
-                    msgObj["content"] = contentArray;
-                }
-                else
-                {
-                    msgObj["content"] = msg.Content ?? "";
-                }
-
-                messages.Add(msgObj);
+                messages.Add(BuildMessageObject(msg));
             }
         }
 
@@ -533,7 +531,18 @@ public class LLMClient
 
         payload["stream"] = true;
 
-        // Send HTTP request
+        return SendHttpRequest(payload);
+    }
+
+    private LLMCompletionResponse SendHttpRequest(JObject payload)
+    {
+        LLMCompletionResponse completionResponse = new LLMCompletionResponse
+        {
+            Content = string.Empty,
+            ToolCalls = new List<ToolHandler.ToolCall>(),
+            FinishReason = string.Empty
+        };
+
         try
         {
             var request = (HttpWebRequest)WebRequest.Create($"{llmEndpoint}/v1/chat/completions");
@@ -558,13 +567,42 @@ public class LLMClient
 
                 // ✅ accumulate tool call argument chunks across deltas
                 Dictionary<int, ToolHandler.ToolCall> partialToolCalls = new Dictionary<int, ToolHandler.ToolCall>();
+                string lastEvent = null; // Track the last event type for error handling
 
                 while ((line = reader.ReadLine()) != null)
                 {
+                    if (line.StartsWith("event: "))
+                    {
+                        // Store event type for next data line
+                        lastEvent = line.Substring(7).Trim();
+                        Console.WriteLine();
+                        Console.WriteLine("[SSE Event] " + lastEvent);
+                        continue;
+                    }
+                    else if (line.StartsWith("error: "))
+                    {
+                        // Direct error line
+                        string errorMsg = line.Substring(7).Trim();
+                        Console.WriteLine();
+                        Console.WriteLine("[SSE Error] " + errorMsg);
+                        continue;
+                    }
+                    
                     if (line.StartsWith("data: "))
                     {
                         string jsonPart = line.Substring(6);
                         if (jsonPart == "[DONE]") break;
+
+                        // Check if this is an error response (either from event: error or error object in data)
+                        if (lastEvent == "error" || jsonPart.Contains("\"error\""))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("[API Error] " + jsonPart);
+                            lastEvent = null;
+                            continue;
+                        }
+                        
+                        lastEvent = null; // Reset event type after processing
 
                         try
                         {
