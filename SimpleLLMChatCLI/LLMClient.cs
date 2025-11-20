@@ -571,23 +571,6 @@ public class LLMClient
 
                 while ((line = reader.ReadLine()) != null)
                 {
-                    if (line.StartsWith("event: "))
-                    {
-                        // Store event type for next data line
-                        lastEvent = line.Substring(7).Trim();
-                        Console.WriteLine();
-                        Console.WriteLine("[SSE Event] " + lastEvent);
-                        continue;
-                    }
-                    else if (line.StartsWith("error: "))
-                    {
-                        // Direct error line
-                        string errorMsg = line.Substring(7).Trim();
-                        Console.WriteLine();
-                        Console.WriteLine("[SSE Error] " + errorMsg);
-                        continue;
-                    }
-                    
                     if (line.StartsWith("data: "))
                     {
                         string jsonPart = line.Substring(6);
@@ -596,8 +579,7 @@ public class LLMClient
                         // Check if this is an error response (either from event: error or error object in data)
                         if (lastEvent == "error" || jsonPart.Contains("\"error\""))
                         {
-                            Console.WriteLine();
-                            Console.WriteLine("[API Error] " + jsonPart);
+                            Console.Write("[API Error] " + jsonPart.Trim() + "\n");
                             lastEvent = null;
                             continue;
                         }

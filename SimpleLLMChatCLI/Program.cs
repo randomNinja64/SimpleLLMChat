@@ -214,7 +214,6 @@ namespace SimpleLLMChatCLI
                                 showToolOutput);
 
                 Console.WriteLine();
-                Console.WriteLine();
             }
         }
     }

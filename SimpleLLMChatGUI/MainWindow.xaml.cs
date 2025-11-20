@@ -206,20 +206,24 @@ namespace SimpleLLMChatGUI
             }
         }
 
+        private void ClearChatAndRestart()
+        {
+            // Queue the clear operation to run after all pending output has been processed
+            Dispatcher.Invoke((Action)(() =>
+            {
+                chatOutput.Document.Blocks.Clear();
+                StartLLMProcess();
+                SetInputControlsEnabled(true);
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         private void clearButton_Click(object sender, RoutedEventArgs e)
         {
-            //Clear output
-            chatOutput.Document.Blocks.Clear();
-
-            // Kill running process (same as Options save button)
+            // Kill running process first to stop any new output
             if (processHandler != null)
                 processHandler.Dispose();
 
-            // Start new process (same as Options save button)
-            StartLLMProcess();
-            
-            // Re-enable input controls
-            SetInputControlsEnabled(true);
+            ClearChatAndRestart();
         }
 
         private void optionsButton_Click(object sender, RoutedEventArgs e)
@@ -229,13 +233,7 @@ namespace SimpleLLMChatGUI
 
             if (optionsDialog.ShowDialog() == true)
             {
-                //Clear output
-                chatOutput.Document.Blocks.Clear();
-
-                StartLLMProcess();
-                
-                // Re-enable input controls
-                SetInputControlsEnabled(true);
+                ClearChatAndRestart();
             }
         }
 
