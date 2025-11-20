@@ -10,7 +10,7 @@ Features
 - Interactive CLI
 - GUI Wrapper Available
 - Contextual Awareness
-- Supports OAI-compatible endpoints (HTTP only for now)
+- Supports OAI-compatible endpoints
 - Streams assistant responses as they are generated (realtime)
 - Tools (See "Tools" section)
 
@@ -19,7 +19,7 @@ Requirements
 ------------------------------------------------------------
 
 - Windows XP or above to run the client
-- An OpenAI compatible LLM Server that accepts HTTP(non-S) requests (LM Studio, etc.)
+- An OpenAI compatible LLM Server (LM Studio, etc.) (Endpoints requiring TLS 1.2 may not work properly on older systems)
 - For the web-based tools, a curl.exe and yt-dlp.exe is needed in the program's folder (Not Included)
 
 ------------------------------------------------------------
@@ -28,13 +28,15 @@ Configuration
 
 LLMSettings.ini is explained below.
 
-llmserver= (OpenAI-compatible endpoint in the format http://ip:port)
 apiKey= test (API key if required by your endpoint)
-model= modelname (model to load (if supported by your endpoint))
-sysprompt= "" (custom system prompt)
 assistantname= LLM (Display name for the assistant in the UI)
-tools= (a comma separated list of tools the AI is allowed to use)
+llmserver= (OpenAI-compatible endpoint in the format http://ip:port)
+maxcontentlength= (number of characters to load from a file/webpage, adjust according to your context window)
+model= modelname (model to load (if supported by your endpoint))
+searxnginstance= (optional, SearXNG JSON API is supported for web search)
 showtooloutput= 0/1 (controls whether or not the full output of tool calls is shown)
+sysprompt= "" (custom system prompt)
+tools= (a comma separated list of tools the AI is allowed to use)
 
 ------------------------------------------------------------
 Tools (Available Tools/Requirements)
@@ -51,7 +53,7 @@ move_file: Moves a file on the user's PC.
 read_file: Reads a file from the user's PC.
 read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 run_shell_command: Runs a shell command (Enable with caution)
-run_web_search: Searches the web using DuckDuckGo (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
+run_web_search: Searches the web using SearXNG with DuckDuckGo and Wiby as fallbacks (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
 write_file: Writes a file to the user's PC.
 
 ------------------------------------------------------------
