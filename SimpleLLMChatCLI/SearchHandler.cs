@@ -7,26 +7,57 @@ using System.Web;
 
 public static class SearchHandler
 {
-    // Searches the web with DuckDuckGo
-    public static string RunDDGSearch(string query, out int exitCode)
-    {
-        string html = "";
+    // Delegate for parsing search results from raw response
+    private delegate string ResultParser(string response, out int exitCode);
 
-        // Try DuckDuckGo
+    // Generic search template - executes curl and parses results
+    private static string ExecuteSearch(string url, ResultParser parser, out int exitCode)
+    {
+        exitCode = 0;
+        string response = "";
+
+        // Execute curl request
         try
         {
-            // Build curl command arguments
-            string arguments = "-s -L \"https://duckduckgo.com/html/?q=" + HttpUtility.UrlEncode(query) + "\" " +
-                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
-
-            html = ToolHandler.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
+            string arguments = $"-s -L \"{url}\" -H \"User-Agent: {ToolHandler.USER_AGENT}\"";
+            response = ToolHandler.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
         }
         catch (Exception ex)
         {
-            // DDG failed, return empty
+            exitCode = -1;
+            return "Error running curl.exe for search: " + ex.Message;
+        }
+
+        // Check for empty response
+        if (string.IsNullOrWhiteSpace(response))
+        {
             exitCode = -1;
             return "";
         }
+
+        // Parse the response using the provided parser
+        try
+        {
+            return parser(response, out exitCode);
+        }
+        catch
+        {
+            exitCode = -1;
+            return "";
+        }
+    }
+
+    // Searches the web with DuckDuckGo
+    public static string RunDDGSearch(string query, out int exitCode)
+    {
+        string url = "https://duckduckgo.com/html/?q=" + HttpUtility.UrlEncode(query);
+        return ExecuteSearch(url, ParseDDGResults, out exitCode);
+    }
+
+    // Parses DuckDuckGo HTML results
+    private static string ParseDDGResults(string html, out int exitCode)
+    {
+        exitCode = 0;
 
         // Parse result snippets
         Regex snippetRegex = new Regex("<a class=\"result__snippet\" href=\"([^\"]+)\">(.+?)</a>", RegexOptions.IgnoreCase);
@@ -64,124 +95,82 @@ public static class SearchHandler
     // Searches the web with Wiby using their JSON API
     public static string RunWibySearch(string query, out int exitCode)
     {
-        string json = "";
+        string url = "https://wiby.me/json/?q=" + HttpUtility.UrlEncode(query);
+        return ExecuteSearch(url, ParseWibyResults, out exitCode);
+    }
 
-        // Run CURL to get JSON results from Wiby
-        try
+    // Parses Wiby JSON results (array at root level)
+    private static string ParseWibyResults(string json, out int exitCode)
+    {
+        exitCode = 0;
+
+        JArray resultsArray = JArray.Parse(json);
+
+        StringBuilder results = new StringBuilder();
+        if (resultsArray == null || resultsArray.Count == 0)
         {
-            // Build curl command arguments for JSON API
-            string arguments = "-s -L \"https://wiby.me/json/?q=" + HttpUtility.UrlEncode(query) + "\" " +
-                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
-
-            json = ToolHandler.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error running curl.exe for search: " + ex.Message;
-        }
-
-        // Parse JSON response (Wiby returns an array at the root level)
-        try
-        {
-            JArray resultsArray = JArray.Parse(json);
-
-            StringBuilder results = new StringBuilder();
-            if (resultsArray == null || resultsArray.Count == 0)
-            {
-                return "";
-            }
-
-            foreach (JToken result in resultsArray)
-            {
-                string url = result["URL"]?.ToString() ?? "";
-                string title = result["Title"]?.ToString() ?? "";
-                string snippet = result["Snippet"]?.ToString() ?? "";
-
-                if (!string.IsNullOrEmpty(url))
-                {
-                    results.AppendLine(url + " : " + title + " - " + snippet);
-                }
-            }
-
-            if (results.Length == 0)
-            {
-                return "";
-            }
-
-            return results.ToString();
-        }
-        catch
-        {
-            exitCode = -1;
             return "";
         }
+
+        foreach (JToken result in resultsArray)
+        {
+            string url = result["URL"]?.ToString() ?? "";
+            string title = result["Title"]?.ToString() ?? "";
+            string snippet = result["Snippet"]?.ToString() ?? "";
+
+            if (!string.IsNullOrEmpty(url))
+            {
+                results.AppendLine(url + " : " + title + " - " + snippet);
+            }
+        }
+
+        if (results.Length == 0)
+        {
+            return "";
+        }
+
+        return results.ToString();
     }
 
     // Searches the web with SearXNG
     public static string RunSearXNGSearch(string query, out int exitCode)
     {
-        string json = "";
+        string url = Program.SEARXNG_INSTANCE + "/search?q=" + HttpUtility.UrlEncode(query) + "&format=json";
+        return ExecuteSearch(url, ParseSearXNGResults, out exitCode);
+    }
 
-        try
-        {
-            // Build curl command arguments
-            string arguments =
-                "-s -L \"" + Program.SEARXNG_INSTANCE + "/search?q=" + HttpUtility.UrlEncode(query) + "&format=json" + "\" " +
-                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
+    // Parses SearXNG JSON results (object with "results" array)
+    private static string ParseSearXNGResults(string json, out int exitCode)
+    {
+        exitCode = 0;
 
-            json = ToolHandler.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
-        }
-        catch (Exception ex)
+        JArray sngResults = JToken.Parse(json)["results"] as JArray;
+
+        StringBuilder results = new StringBuilder();
+
+        if (sngResults == null)
         {
-            // Search failed, return empty
-            exitCode = -1;
             return "";
         }
 
-        // Check if JSON is empty or invalid before parsing
-        if (string.IsNullOrWhiteSpace(json))
+        foreach (JToken result in sngResults)
         {
-            exitCode = -1;
+            string title = result["title"]?.ToString() ?? "";
+            string url = result["url"]?.ToString() ?? "";
+            string content = result["content"]?.ToString() ?? "";
+
+            if (!string.IsNullOrEmpty(url))
+            {
+                results.AppendLine(url + " : " + title + " - " + content);
+            }
+        }
+
+        if (results.Length == 0)
+        {
             return "";
         }
 
-        try
-        {
-            JArray sngResults = JToken.Parse(json)["results"] as JArray;
-
-            StringBuilder results = new StringBuilder();
-
-            if (sngResults == null)
-            {
-                return "";
-            }
-
-            foreach (JToken result in sngResults)
-            {
-                string title = result["title"]?.ToString() ?? "";
-                string url = result["url"]?.ToString() ?? "";
-                string content = result["content"]?.ToString() ?? "";
-
-                if (!string.IsNullOrEmpty(url))
-                {
-                    results.AppendLine(url + " : " + title + " - " + content);
-                }
-            }
-
-            if (results.Length == 0)
-            {
-                return "";
-            }
-
-            return results.ToString();
-        }
-        catch (Exception ex)
-        {
-            // Search failed, return empty
-            exitCode = -1;
-            return "";
-        }
+        return results.ToString();
     }
 
 }

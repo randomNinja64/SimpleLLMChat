@@ -81,16 +81,16 @@ public static class DownloadHandler
 
             // Ensure directory exists
             string directory = Path.GetDirectoryName(filename);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            if (!FileHandler.EnsureDirectoryExists(directory, out int dirExitCode, out string dirError))
             {
-                Directory.CreateDirectory(directory);
+                exitCode = dirExitCode;
+                return dirError;
             }
 
             // Build curl arguments
             string arguments =
                 "-L -s " +
-                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\" " +
+                "-H \"User-Agent: " + ToolHandler.USER_AGENT + "\" " +
                 "-o \"" + filename + "\" " +
                 "\"" + URL + "\"";
 
@@ -123,8 +123,7 @@ public static class DownloadHandler
             // Build curl HEAD request arguments
             string arguments =
                 "-I -L -s " +
-                "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\" " +
+                "-H \"User-Agent: " + ToolHandler.USER_AGENT + "\" " +
                 "\"" + URL + "\"";
 
             string headers = ToolHandler.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);

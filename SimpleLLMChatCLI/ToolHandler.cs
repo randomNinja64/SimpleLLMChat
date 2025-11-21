@@ -7,6 +7,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 public static class ToolHandler
 {
+    // Common user agent string for HTTP requests
+    public const string USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36";
+
     public struct ToolCall
     {
         public string Id;
@@ -99,7 +102,7 @@ public static class ToolHandler
                 case "read_file":
                     {
                         string filename = GetRequiredArg(call.Arguments, "filename");
-                        int.TryParse(Trim(JsonExtractString(call.Arguments, "offset")), out int offset);
+                        int.TryParse(JsonExtractString(call.Arguments, "offset")?.Trim() ?? "", out int offset);
                         string output = FileHandler.ReadFile(filename, out exitCode, offset);
                         toolContent = FormatCommandResult("read file: " + filename, output, exitCode);
                         return true;
@@ -108,7 +111,7 @@ public static class ToolHandler
                 case "write_file":
                     {
                         string filename = GetRequiredArg(call.Arguments, "filename");
-                        string content = Trim(JsonExtractString(call.Arguments, "content"));
+                        string content = JsonExtractString(call.Arguments, "content")?.Trim() ?? "";
                         string output = FileHandler.WriteFile(filename, content, out exitCode);
                         toolContent = FormatCommandResult("write file: " + filename, output, exitCode);
                         return true;
@@ -118,7 +121,7 @@ public static class ToolHandler
                     {
                         string archivePath = GetRequiredArg(call.Arguments, "archive_path");
                         string destinationPath = GetRequiredArg(call.Arguments, "destination_path");
-                        string output = ExtractFile(archivePath, destinationPath, out exitCode);
+                        string output = FileHandler.ExtractFile(archivePath, destinationPath, out exitCode);
                         toolContent = FormatCommandResult("extract file: " + archivePath, output, exitCode);
                         return true;
                     }
@@ -179,14 +182,11 @@ public static class ToolHandler
 
     private static string GetRequiredArg(string arguments, string argName)
     {
-        string value = Trim(JsonExtractString(arguments, argName));
+        string value = JsonExtractString(arguments, argName)?.Trim() ?? "";
         if (string.IsNullOrEmpty(value))
             throw new ArgumentException($"missing '{argName}' argument.");
         return value;
     }
-
-    // Placeholder helper methods
-    private static string Trim(string s) => s?.Trim() ?? "";
 
     // Generic process execution helper (public for use by other handlers)
     public static string ExecuteProcess(string fileName, string arguments, out int exitCode, bool combineErrorOutput = true)
@@ -286,7 +286,7 @@ public static class ToolHandler
         {
             // Build curl command arguments
             string arguments = "-s -L \"" + URL + "\" " +
-                               "-H \"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36\"";
+                               "-H \"User-Agent: " + USER_AGENT + "\"";
 
             html = ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
 
@@ -324,7 +324,7 @@ public static class ToolHandler
             // Remove ul, ol, li tags but keep their content
             html = Regex.Replace(html, @"</?ul\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"</?ol\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"</?li\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"</?li\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.RightToLeft);
             // Remove div tags but keep their content
             html = Regex.Replace(html, @"</?div\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             // Remove strong, span, pre tags but keep their content
@@ -356,56 +356,6 @@ public static class ToolHandler
         }
 
         return html+"\n";
-    }
-
-    private static string ExtractFile(string archivePath, string destinationPath, out int exitCode)
-    {
-        exitCode = 0;
-
-        try
-        {
-            // Expand environment variables in both paths
-            archivePath = Environment.ExpandEnvironmentVariables(archivePath);
-            destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
-
-            // Check if archive exists
-            if (!File.Exists(archivePath))
-            {
-                exitCode = 1;
-                return $"Archive not found: {archivePath}";
-            }
-
-            // Ensure the destination directory exists
-            if (!Directory.Exists(destinationPath))
-            {
-                try
-                {
-                    Directory.CreateDirectory(destinationPath);
-                }
-                catch (Exception ex)
-                {
-                    exitCode = 1;
-                    return $"Failed to create destination directory '{destinationPath}': {ex.Message}";
-                }
-            }
-
-            // Build 7za.exe arguments: x (extract with full paths) -o (output directory) -y (yes to all prompts)
-            string arguments = $"x \"{archivePath}\" -o\"{destinationPath}\" -y";
-
-            string output = ExecuteProcess("7za.exe", arguments, out exitCode);
-
-            if (exitCode != 0)
-            {
-                return $"7za exited with code {exitCode}:\n{output}";
-            }
-
-            return $"Archive extracted successfully to: {destinationPath}\n{output}";
-        }
-        catch (Exception ex)
-        {
-            exitCode = -1;
-            return "Error running 7za.exe: " + ex.Message;
-        }
     }
 
     private static string RunPythonScript(string scriptContent, out int exitCode)

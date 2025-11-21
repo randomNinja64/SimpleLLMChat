@@ -38,30 +38,36 @@ public class ConfigHandler
             }
         }
     }
-    public string GetLLMEndpoint()
+
+    // Generic helper methods to reduce repetition
+    private string GetConfigValue(string key, string defaultValue = "")
     {
-        return configMap.ContainsKey("llmserver") ? configMap["llmserver"] : "http://127.0.0.1";
+        return configMap.ContainsKey(key) ? configMap[key] : defaultValue;
     }
 
-    public string GetApiKey()
+    private int GetConfigInt(string key, int defaultValue)
     {
-        return configMap.ContainsKey("apiKey") ? configMap["apiKey"] : "";
+        if (configMap.ContainsKey(key) && int.TryParse(configMap[key], out int result))
+            return result;
+        return defaultValue;
     }
 
-    public string GetModel()
+    private bool GetConfigBool(string key, bool defaultValue = false)
     {
-        return configMap.ContainsKey("model") ? configMap["model"] : "";
+        if (configMap.ContainsKey(key) && int.TryParse(configMap[key], out int result))
+            return result == 1;
+        return defaultValue;
     }
 
-    public string GetSysPrompt()
-    {
-        return configMap.ContainsKey("sysprompt") ? configMap["sysprompt"] : "";
-    }
-
-    public string GetAssistantName()
-    {
-        return configMap.ContainsKey("assistantname") ? configMap["assistantname"] : "";
-    }
+    // Public getter methods
+    public string GetLLMEndpoint() => GetConfigValue("llmserver");
+    public string GetApiKey() => GetConfigValue("apiKey");
+    public string GetModel() => GetConfigValue("model");
+    public string GetSysPrompt() => GetConfigValue("sysprompt");
+    public string GetAssistantName() => GetConfigValue("assistantname");
+    public string GetSearxNGInstance() => GetConfigValue("searxnginstance");
+    public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
+    public int GetMaxContentLength() => GetConfigInt("maxcontentlength", 8000);
 
     public List<string> getEnabledTools()
     {
@@ -81,32 +87,5 @@ public class ConfigHandler
         }
 
         return tools;
-    }
-
-    public bool GetShowToolOutput()
-    {
-        if (configMap.ContainsKey("showtooloutput"))
-        {
-            string value = configMap["showtooloutput"];
-            if (int.TryParse(value, out int result))
-                return result == 1;
-        }
-        return false; // Default to false if not specified or invalid
-    }
-
-    public int GetMaxContentLength()
-    {
-        if (configMap.ContainsKey("maxcontentlength"))
-        {
-            string value = configMap["maxcontentlength"];
-            if (int.TryParse(value, out int result))
-                return result;
-        }
-        return 8000; // Default to 8000 if not specified or invalid
-    }
-
-    public string GetSearxNGInstance()
-    {
-        return configMap.ContainsKey("searxnginstance") ? configMap["searxnginstance"] : "";
     }
 }

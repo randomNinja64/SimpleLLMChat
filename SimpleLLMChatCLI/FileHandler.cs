@@ -66,9 +66,9 @@ public static class FileHandler
 
             // Ensure the directory exists
             string directory = Path.GetDirectoryName(filename);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            if (!EnsureDirectoryExists(directory, out exitCode, out string errorMessage))
             {
-                Directory.CreateDirectory(directory);
+                return errorMessage;
             }
 
             File.WriteAllText(filename, content, Encoding.UTF8);
@@ -87,37 +87,10 @@ public static class FileHandler
 
         try
         {
-            // Expand environment variables in both paths
-            sourcePath = Environment.ExpandEnvironmentVariables(sourcePath);
-            destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
-
-            // Check if source file exists
-            if (!File.Exists(sourcePath))
+            // Validate paths and prepare for file operation
+            if (!ValidateFileOperationPaths(ref sourcePath, ref destinationPath, out exitCode, out string errorMessage))
             {
-                exitCode = 1;
-                return $"Source file not found: {sourcePath}";
-            }
-
-            // Check if destination file already exists
-            if (File.Exists(destinationPath))
-            {
-                exitCode = 1;
-                return $"Destination file already exists: {destinationPath}";
-            }
-
-            // Ensure the destination directory exists
-            string destinationDirectory = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrEmpty(destinationDirectory) && !Directory.Exists(destinationDirectory))
-            {
-                try
-                {
-                    Directory.CreateDirectory(destinationDirectory);
-                }
-                catch (Exception ex)
-                {
-                    exitCode = 1;
-                    return $"Failed to create destination directory '{destinationDirectory}': {ex.Message}";
-                }
+                return errorMessage;
             }
 
             // Move the file
@@ -138,37 +111,10 @@ public static class FileHandler
 
         try
         {
-            // Expand environment variables in both paths
-            sourcePath = Environment.ExpandEnvironmentVariables(sourcePath);
-            destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
-
-            // Check if source file exists
-            if (!File.Exists(sourcePath))
+            // Validate paths and prepare for file operation
+            if (!ValidateFileOperationPaths(ref sourcePath, ref destinationPath, out exitCode, out string errorMessage))
             {
-                exitCode = 1;
-                return $"Source file not found: {sourcePath}";
-            }
-
-            // Check if destination file already exists
-            if (File.Exists(destinationPath))
-            {
-                exitCode = 1;
-                return $"Destination file already exists: {destinationPath}";
-            }
-
-            // Ensure the destination directory exists
-            string destinationDirectory = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrEmpty(destinationDirectory) && !Directory.Exists(destinationDirectory))
-            {
-                try
-                {
-                    Directory.CreateDirectory(destinationDirectory);
-                }
-                catch (Exception ex)
-                {
-                    exitCode = 1;
-                    return $"Failed to create destination directory '{destinationDirectory}': {ex.Message}";
-                }
+                return errorMessage;
             }
 
             // Copy the file
@@ -181,6 +127,42 @@ public static class FileHandler
             exitCode = -1;
             return "Error copying file: " + ex.Message;
         }
+    }
+
+    // Shared validation for file operations (move, copy, etc.)
+    private static bool ValidateFileOperationPaths(ref string sourcePath, ref string destinationPath, out int exitCode, out string errorMessage)
+    {
+        exitCode = 0;
+        errorMessage = null;
+
+        // Expand environment variables in both paths
+        sourcePath = Environment.ExpandEnvironmentVariables(sourcePath);
+        destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
+
+        // Check if source file exists
+        if (!File.Exists(sourcePath))
+        {
+            exitCode = 1;
+            errorMessage = $"Source file not found: {sourcePath}";
+            return false;
+        }
+
+        // Check if destination file already exists
+        if (File.Exists(destinationPath))
+        {
+            exitCode = 1;
+            errorMessage = $"Destination file already exists: {destinationPath}";
+            return false;
+        }
+
+        // Ensure the destination directory exists
+        string destinationDirectory = Path.GetDirectoryName(destinationPath);
+        if (!EnsureDirectoryExists(destinationDirectory, out exitCode, out errorMessage))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     public static string DeleteFile(string filePath, out int exitCode)
@@ -270,6 +252,72 @@ public static class FileHandler
         {
             exitCode = -1;
             return "Error listing directory: " + ex.Message;
+        }
+    }
+
+    public static string ExtractFile(string archivePath, string destinationPath, out int exitCode)
+    {
+        exitCode = 0;
+
+        try
+        {
+            // Expand environment variables in both paths
+            archivePath = Environment.ExpandEnvironmentVariables(archivePath);
+            destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
+
+            // Check if archive exists
+            if (!File.Exists(archivePath))
+            {
+                exitCode = 1;
+                return $"Archive not found: {archivePath}";
+            }
+
+            // Ensure the destination directory exists
+            if (!EnsureDirectoryExists(destinationPath, out exitCode, out string errorMessage))
+            {
+                return errorMessage;
+            }
+
+            // Build 7za.exe arguments: x (extract with full paths) -o (output directory) -y (yes to all prompts)
+            string arguments = $"x \"{archivePath}\" -o\"{destinationPath}\" -y";
+
+            string output = ToolHandler.ExecuteProcess("7za.exe", arguments, out exitCode);
+
+            if (exitCode != 0)
+            {
+                return $"7za exited with code {exitCode}:\n{output}";
+            }
+
+            return $"Archive extracted successfully to: {destinationPath}\n{output}";
+        }
+        catch (Exception ex)
+        {
+            exitCode = -1;
+            return "Error running 7za.exe: " + ex.Message;
+        }
+    }
+
+    // Helper method to ensure a directory exists
+    public static bool EnsureDirectoryExists(string directoryPath, out int exitCode, out string errorMessage)
+    {
+        exitCode = 0;
+        errorMessage = null;
+
+        if (string.IsNullOrEmpty(directoryPath) || Directory.Exists(directoryPath))
+        {
+            return true;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(directoryPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            exitCode = 1;
+            errorMessage = $"Failed to create directory '{directoryPath}': {ex.Message}";
+            return false;
         }
     }
 
