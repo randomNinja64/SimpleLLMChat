@@ -69,23 +69,34 @@ public class ConfigHandler
     public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
     public int GetMaxContentLength() => GetConfigInt("maxcontentlength", 8000);
 
-    public List<string> getEnabledTools()
+    // Helper method to parse comma-separated list from config
+    private List<string> GetConfigList(string key)
     {
-        var tools = new List<string>();
+        var list = new List<string>();
 
-        if (!configMap.ContainsKey("tools"))
-            return tools;
+        if (!configMap.ContainsKey(key))
+            return list;
 
-        string toolsLine = configMap["tools"];
-        var tokens = toolsLine.Split(',');
+        string value = configMap[key];
+        var tokens = value.Split(',');
 
         foreach (var token in tokens)
         {
             string trimmed = token.Trim();
             if (!string.IsNullOrEmpty(trimmed))
-                tools.Add(trimmed);
+                list.Add(trimmed);
         }
 
-        return tools;
+        return list;
+    }
+
+    public List<string> getEnabledTools()
+    {
+        return GetConfigList("tools");
+    }
+
+    public List<string> getToolsRequiringApproval()
+    {
+        return GetConfigList("toolsrequiringapproval");
     }
 }

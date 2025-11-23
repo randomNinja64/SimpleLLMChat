@@ -8,6 +8,8 @@ namespace SimpleLLMChatGUI
 {
     public partial class Options : Window, INotifyPropertyChanged
     {
+        private const string ConfigFileName = "LLMSettings.ini";
+
         private string _serverUrl;
         private string _apiKey;
         private string _model;
@@ -30,49 +32,49 @@ namespace SimpleLLMChatGUI
         public string ServerURL
         {
             get { return _serverUrl; }
-            set { _serverUrl = value; OnPropertyChanged("ServerURL"); }
+            set { _serverUrl = value; OnPropertyChanged(nameof(ServerURL)); }
         }
 
         public string ApiKey
         {
             get { return _apiKey; }
-            set { _apiKey = value; OnPropertyChanged("ApiKey"); }
+            set { _apiKey = value; OnPropertyChanged(nameof(ApiKey)); }
         }
 
         public string Model
         {
             get { return _model; }
-            set { _model = value; OnPropertyChanged("Model"); }
+            set { _model = value; OnPropertyChanged(nameof(Model)); }
         }
 
         public string SysPrompt
         {
             get { return _sysPrompt; }
-            set { _sysPrompt = value; OnPropertyChanged("SysPrompt"); }
+            set { _sysPrompt = value; OnPropertyChanged(nameof(SysPrompt)); }
         }
 
         public string AssistantName
         {
             get { return _assistantName; }
-            set { _assistantName = value; OnPropertyChanged("AssistantName"); }
+            set { _assistantName = value; OnPropertyChanged(nameof(AssistantName)); }
         }
 
         public bool ShowToolOutput
         {
             get { return _showToolOutput; }
-            set { _showToolOutput = value; OnPropertyChanged("ShowToolOutput"); }
+            set { _showToolOutput = value; OnPropertyChanged(nameof(ShowToolOutput)); }
         }
 
         public int MaxContentLength
         {
             get { return _maxContentLength; }
-            set { _maxContentLength = value; OnPropertyChanged("MaxContentLength"); }
+            set { _maxContentLength = value; OnPropertyChanged(nameof(MaxContentLength)); }
         }
 
         public string SearxNGInstance
         {
             get { return _searxngInstance; }
-            set { _searxngInstance = value; OnPropertyChanged("SearxNGInstance"); }
+            set { _searxngInstance = value; OnPropertyChanged(nameof(SearxNGInstance)); }
         }
 
         public Options(ProcessHandler processHandler)
@@ -97,8 +99,7 @@ namespace SimpleLLMChatGUI
         {
             ApiKey = ApiKeyPasswordBox.Password;
 
-            string configFile = "LLMSettings.ini";
-            SaveIni(configFile);
+            SaveIni(ConfigFileName);
 
             // Kill running process
             if (_processHandler != null)
@@ -116,46 +117,40 @@ namespace SimpleLLMChatGUI
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            string configFile = "LLMSettings.ini";
-
-            if (File.Exists(configFile))
+            if (File.Exists(ConfigFileName))
             {
-                var settings = LoadIni(configFile);
+                var settings = LoadIni(ConfigFileName);
 
-                string value;
-                if (settings.TryGetValue("llmserver", out value)) ServerURL = value;
-                if (settings.TryGetValue("apikey", out value)) ApiKey = value;
-                if (settings.TryGetValue("model", out value)) Model = value;
-                if (settings.TryGetValue("sysprompt", out value)) SysPrompt = value.Trim('"');
-                if (settings.TryGetValue("assistantname", out value)) AssistantName = value;
-                if (settings.TryGetValue("tools", out value))
-                {
-                    ApplyToolSelection(value);
-                }
-                if (settings.TryGetValue("showtooloutput", out value))
-                {
-                    ShowToolOutput = (value == "1");
-                }
-                if (settings.TryGetValue("maxcontentlength", out value))
+                LoadSettingValue(settings, "llmserver", value => ServerURL = value);
+                LoadSettingValue(settings, "apikey", value => ApiKey = value);
+                LoadSettingValue(settings, "model", value => Model = value);
+                LoadSettingValue(settings, "sysprompt", value => SysPrompt = value.Trim('"'));
+                LoadSettingValue(settings, "assistantname", value => AssistantName = value);
+                LoadSettingValue(settings, "showtooloutput", value => ShowToolOutput = (value == "1"));
+                LoadSettingValue(settings, "maxcontentlength", value =>
                 {
                     if (int.TryParse(value, out int maxLength))
-                    {
                         MaxContentLength = maxLength;
-                    }
-                }
-                if (settings.TryGetValue("searxnginstance", out value))
-                {
-                    SearxNGInstance = value;
-                }
+                });
+                LoadSettingValue(settings, "searxnginstance", value => SearxNGInstance = value);
+
+                LoadSettingValue(settings, "tools", ApplyToolSelection);
+                LoadSettingValue(settings, "toolsrequiringapproval", ApplyToolsRequiringApprovalSelection);
 
                 // Sync password box manually (not bound)
                 ApiKeyPasswordBox.Password = ApiKey;
             }
             else
             {
-                MessageBox.Show("INI file not found: " + configFile, "Warning",
+                MessageBox.Show("INI file not found: " + ConfigFileName, "Warning",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        private void LoadSettingValue(Dictionary<string, string> settings, string key, Action<string> setter)
+        {
+            if (settings.TryGetValue(key, out string value))
+                setter(value);
         }
 
         private Dictionary<string, string> LoadIni(string path)
@@ -182,15 +177,14 @@ namespace SimpleLLMChatGUI
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private void SaveIni(string path)
+        private List<string> GetSelectedToolsFromListBox(System.Windows.Controls.ListBox listBox)
         {
             var selectedTools = new List<string>();
 
-            foreach (var item in ToolsListBox.SelectedItems)
+            foreach (var item in listBox.SelectedItems)
             {
                 var toolName = item as string;
                 if (!string.IsNullOrWhiteSpace(toolName))
@@ -198,6 +192,14 @@ namespace SimpleLLMChatGUI
                     selectedTools.Add(toolName);
                 }
             }
+
+            return selectedTools;
+        }
+
+        private void SaveIni(string path)
+        {
+            var selectedTools = GetSelectedToolsFromListBox(ToolsListBox);
+            var selectedToolsRequiringApproval = GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox);
 
             var lines = new List<string>
             {
@@ -209,15 +211,16 @@ namespace SimpleLLMChatGUI
                 "searxnginstance=" + SearxNGInstance,
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
-                "tools=" + string.Join(",", selectedTools)
+                "tools=" + string.Join(",", selectedTools),
+                "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };
 
-            File.WriteAllLines(path, lines.ToArray());
+            File.WriteAllLines(path, lines);
         }
 
-        private void ApplyToolSelection(string toolsValue)
+        private void ApplyToolSelectionToListBox(System.Windows.Controls.ListBox listBox, string toolsValue)
         {
-            if (ToolsListBox == null || string.IsNullOrWhiteSpace(toolsValue))
+            if (listBox == null || string.IsNullOrWhiteSpace(toolsValue))
                 return;
 
             var requestedTools = toolsValue.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
@@ -228,17 +231,27 @@ namespace SimpleLLMChatGUI
                 if (trimmed.Length == 0)
                     continue;
 
-                foreach (var item in ToolsListBox.Items)
+                foreach (var item in listBox.Items)
                 {
                     var toolName = item as string;
                     if (toolName != null &&
                         string.Equals(toolName, trimmed, StringComparison.OrdinalIgnoreCase))
                     {
-                        ToolsListBox.SelectedItems.Add(item);
+                        listBox.SelectedItems.Add(item);
                         break;
                     }
                 }
             }
+        }
+
+        private void ApplyToolSelection(string toolsValue)
+        {
+            ApplyToolSelectionToListBox(ToolsListBox, toolsValue);
+        }
+
+        private void ApplyToolsRequiringApprovalSelection(string toolsValue)
+        {
+            ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, toolsValue);
         }
     }
 }

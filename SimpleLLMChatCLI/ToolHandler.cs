@@ -429,7 +429,7 @@ public static class ToolHandler
         }
     }
 
-    private static string FormatCommandResult(string command, string output, int exitCode)
+    public static string FormatCommandResult(string command, string output, int exitCode)
     {
         return $"Command: {command}\nExit Code: {exitCode}\nOutput:\n{output}";
     }

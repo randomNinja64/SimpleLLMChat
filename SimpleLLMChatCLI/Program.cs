@@ -46,6 +46,9 @@ namespace SimpleLLMChatCLI
             // Get enabled tools
             List<string> enabledTools = config.getEnabledTools();
 
+            // Get tools requiring approval
+            List<string> toolsRequiringApproval = config.getToolsRequiringApproval();
+
             // Get show tool output setting
             bool showToolOutput = config.GetShowToolOutput();
 
@@ -130,6 +133,7 @@ namespace SimpleLLMChatCLI
                         base64Image,
                         config.GetAssistantName(),
                         enabledTools,
+                        toolsRequiringApproval,
                         outputOnly,
                         showToolOutput);
                     return;
@@ -210,6 +214,7 @@ namespace SimpleLLMChatCLI
                                 imageBase64,
                                 config.GetAssistantName(),
                                 enabledTools,
+                                toolsRequiringApproval,
                                 false,
                                 showToolOutput);
 

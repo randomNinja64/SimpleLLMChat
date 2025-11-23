@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Windows.Forms;
 
 public class LLMClient
 {
@@ -89,6 +90,7 @@ public class LLMClient
         string image,
         string assistantName,
         List<string> enabledTools,
+        List<string> toolsRequiringApproval,
         bool outputOnly,
         bool showToolOutput)
     {
@@ -132,19 +134,60 @@ public class LLMClient
                     }
 
                     int exitCode = 0;
-
                     string toolContent;
 
-                    bool handled;
                     if (!enabledTools.Contains(call.Name))
                     {
-                        toolContent = "error: tool '" + call.Name + "' is disabled by configuration.";
-                        handled = true;
+                        exitCode = -1;
+                        toolContent = ToolHandler.FormatCommandResult(
+                            call.Name,
+                            "error: tool '" + call.Name + "' is disabled by configuration.",
+                            exitCode
+                        );
+                    }
+                    else if (toolsRequiringApproval != null && toolsRequiringApproval.Contains(call.Name))
+                    {
+                        // Tool requires approval - prompt user
+                        // Parse escape sequences for better display formatting
+                        string formattedArguments = call.Arguments
+                            .Replace("\\n", "\n")
+                            .Replace("\\r", "\r")
+                            .Replace("\\t", "\t")
+                            .Replace("\\\"", "\"")
+                            .Replace("\\'", "'")
+                            .Replace("\\\\", "\\");
+                        
+                        string approvalMessage = "Run tool: " + call.Name + "\n\n" +
+                                                "With arguments:\n" + formattedArguments + "?";
+                        
+                        DialogResult result = MessageBox.Show(
+                            approvalMessage,
+                            "Tool Call",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question,
+                            MessageBoxDefaultButton.Button2
+                        );
+
+                        if (result == DialogResult.Yes)
+                        {
+                            // User approved - execute the tool
+                            ToolHandler.ExecuteToolCall(call, out toolContent, out exitCode);
+                        }
+                        else
+                        {
+                            // User declined - return cancellation message
+                            exitCode = -1;
+                            toolContent = ToolHandler.FormatCommandResult(
+                                call.Name,
+                                "Tool execution was cancelled by the user.",
+                                exitCode
+                            );
+                        }
                     }
                     else
                     {
                         // Execute the requested tool and capture its output
-                        handled = ToolHandler.ExecuteToolCall(call, out toolContent, out exitCode);
+                        ToolHandler.ExecuteToolCall(call, out toolContent, out exitCode);
                     }
 
                     ChatMessage toolMsg = new ChatMessage
@@ -157,22 +200,20 @@ public class LLMClient
 
                     if (!outputOnly)
                     {
+                        Console.WriteLine("[tool output]");
                         if (showToolOutput)
                         {
-                            Console.WriteLine("[tool output]");
                             Console.Write(toolContent);
+                            if (!toolContent.EndsWith("\n"))
+                            {
+                                Console.WriteLine(); // Add newline if not present
+                            }
                         }
                         else
                         {
                             // Show only the exit code
-                            Console.WriteLine("[tool output]");
                             Console.WriteLine("Exit Code: " + exitCode);
                         }
-                    }
-
-                    if (!handled && !outputOnly)
-                    {
-                        Console.WriteLine("[warning] tool not fully handled.");
                     }
                 }
 
@@ -187,6 +228,11 @@ public class LLMClient
                 Content = response.Content
             };
             conversation.Add(assistantMsg);
+            
+            if (!outputOnly)
+            {
+                Console.WriteLine(); // Add newline after assistant response
+            }
             break;
         }
     }
