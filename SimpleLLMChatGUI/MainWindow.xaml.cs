@@ -13,6 +13,7 @@ namespace SimpleLLMChatGUI
 {
     public partial class MainWindow : Window
     {
+        private const string ConfigFileName = "LLMSettings.ini";
         private ProcessHandler processHandler;
         private ImageHandler imageHandler;
         private HotkeyHandler hotkeyHandler;
@@ -89,9 +90,56 @@ namespace SimpleLLMChatGUI
         {
             Dispatcher.Invoke((Action)(() =>
             {
+                if (IsMarkdownParsingEnabled())
+                {
+                    MarkdownHandler.processMarkdown(chatOutput);
+                }
                 SetInputControlsEnabled(true);
                 chatInput.Focus();
             }));
+        }
+
+        private bool IsMarkdownParsingEnabled()
+        {
+            if (!File.Exists(ConfigFileName))
+                return true; // Default to enabled if config doesn't exist
+
+            try
+            {
+                var settings = LoadIni(ConfigFileName);
+                if (settings.TryGetValue("markdownparsing", out string value))
+                {
+                    return value == "1";
+                }
+            }
+            catch
+            {
+                // If there's an error reading the file, default to enabled
+            }
+
+            return true; // Default to enabled
+        }
+
+        private System.Collections.Generic.Dictionary<string, string> LoadIni(string path)
+        {
+            var dict = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string line in File.ReadAllLines(path))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith("#") || !trimmed.Contains("="))
+                    continue;
+
+                string[] parts = trimmed.Split(new char[] { '=' }, 2);
+                if (parts.Length == 2)
+                {
+                    string key = parts[0].Trim();
+                    string val = parts[1].Trim();
+                    dict[key] = val;
+                }
+            }
+
+            return dict;
         }
 
         private void SetInputControlsEnabled(bool enabled)

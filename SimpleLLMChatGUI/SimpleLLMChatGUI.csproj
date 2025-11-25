@@ -79,6 +79,7 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MarkdownHandler.cs" />
     <Compile Include="Options.xaml.cs">
       <DependentUpon>Options.xaml</DependentUpon>
     </Compile>

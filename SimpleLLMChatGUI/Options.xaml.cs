@@ -17,6 +17,7 @@ namespace SimpleLLMChatGUI
         private string _assistantName;
         private bool _showToolOutput;
         private int _maxContentLength;
+        private bool _markdownParsing;
         private string _searxngInstance;
         private ProcessHandler _processHandler;
 
@@ -71,6 +72,12 @@ namespace SimpleLLMChatGUI
             set { _maxContentLength = value; OnPropertyChanged(nameof(MaxContentLength)); }
         }
 
+        public bool MarkdownParsing
+        {
+            get { return _markdownParsing; }
+            set { _markdownParsing = value; OnPropertyChanged(nameof(MarkdownParsing)); }
+        }
+
         public string SearxNGInstance
         {
             get { return _searxngInstance; }
@@ -92,6 +99,7 @@ namespace SimpleLLMChatGUI
             AssistantName = "";
             ShowToolOutput = true; // Default to showing tool outputs
             MaxContentLength = 8000; // Default to 8000 characters
+            MarkdownParsing = true; // Default to enabling markdown parsing
             SearxNGInstance = ""; // Default to empty
         }
 
@@ -132,6 +140,7 @@ namespace SimpleLLMChatGUI
                     if (int.TryParse(value, out int maxLength))
                         MaxContentLength = maxLength;
                 });
+                LoadSettingValue(settings, "markdownparsing", value => MarkdownParsing = (value == "1"));
                 LoadSettingValue(settings, "searxnginstance", value => SearxNGInstance = value);
 
                 LoadSettingValue(settings, "tools", ApplyToolSelection);
@@ -207,6 +216,7 @@ namespace SimpleLLMChatGUI
                 "assistantname=" + AssistantName,
                 "llmserver=" + ServerURL,
                 "maxcontentlength=" + MaxContentLength,
+                "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
                 "model=" + Model,
                 "searxnginstance=" + SearxNGInstance,
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),

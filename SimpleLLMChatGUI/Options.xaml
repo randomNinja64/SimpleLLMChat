@@ -92,6 +92,12 @@
                       Content="Show Tool Call Outputs"
                       IsChecked="{Binding ShowToolOutput, UpdateSourceTrigger=PropertyChanged}"
                       Margin="0,10,0,0"/>
+
+            <!-- Markdown Parsing -->
+            <CheckBox x:Name="MarkdownParsingCheckBox"
+                      Content="Enable Markdown Parsing"
+                      IsChecked="{Binding MarkdownParsing, UpdateSourceTrigger=PropertyChanged}"
+                      Margin="0,10,0,0"/>
             
             </StackPanel>
         </ScrollViewer>
