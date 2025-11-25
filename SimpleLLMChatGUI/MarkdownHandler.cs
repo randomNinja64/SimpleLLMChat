@@ -12,9 +12,12 @@ namespace SimpleLLMChatGUI
     public class MarkdownHandler
     {
         private static readonly Regex HeaderPattern = new Regex(@"^(#{1,6})\s+(.+)$", RegexOptions.Compiled);
-        private static readonly Regex BoldItalicPattern = new Regex(@"(\*\*\*|___)(.+?)\1", RegexOptions.Compiled);
-        private static readonly Regex BoldPattern = new Regex(@"(?<!\*)\*\*(?!\*)(.+?)\*\*(?!\*)|(?<!_)__(?!_)(.+?)__(?!_)", RegexOptions.Compiled);
-        private static readonly Regex ItalicPattern = new Regex(@"(?<!\*)\*(?!\*)(.+?)\*(?!\*)|(?<!_)_(?!_)(.+?)_(?!_)", RegexOptions.Compiled);
+        // Bold italic: requires word boundaries (not adjacent to word characters including underscore)
+        private static readonly Regex BoldItalicPattern = new Regex(@"(?<![a-zA-Z0-9_])(\*\*\*|___)(.+?)\1(?![a-zA-Z0-9_])", RegexOptions.Compiled);
+        // Bold: **text** or __text__, not adjacent to word characters or the same marker character
+        private static readonly Regex BoldPattern = new Regex(@"(?<![a-zA-Z0-9_])(?<!\*)\*\*(.+?)\*\*(?![a-zA-Z0-9_])(?!\*)|(?<![a-zA-Z0-9_])(?<!_)__(.+?)__(?![a-zA-Z0-9_])(?!_)", RegexOptions.Compiled);
+        // Italic: *text* or _text_, not adjacent to word characters or the same marker character
+        private static readonly Regex ItalicPattern = new Regex(@"(?<![a-zA-Z0-9_])(?<!\*)\*(.+?)\*(?![a-zA-Z0-9_])(?!\*)|(?<![a-zA-Z0-9_])(?<!_)_(.+?)_(?![a-zA-Z0-9_])(?!_)", RegexOptions.Compiled);
         private static readonly Regex StrikethroughPattern = new Regex(@"~~(.+?)~~", RegexOptions.Compiled);
         private static readonly Regex InlineCodePattern = new Regex(@"`([^`]+)`", RegexOptions.Compiled);
 
@@ -30,7 +33,9 @@ namespace SimpleLLMChatGUI
                 string paragraphText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text;
 
                 // Check for 4-backtick code block markers first (more specific)
-                if (paragraphText.Contains("````"))
+                // A code block delimiter must start with backticks (or be just backticks after trimming)
+                string trimmedText = paragraphText.Trim();
+                if (trimmedText.StartsWith("````") || trimmedText == "````")
                 {
                     insideFourBacktickBlock = !insideFourBacktickBlock;
                     // Remove the entire line containing the ```` marker
@@ -39,7 +44,9 @@ namespace SimpleLLMChatGUI
                 }
 
                 // Check for 3-backtick code block markers
-                if (paragraphText.Contains("```"))
+                // A code block delimiter must start with ``` (optionally followed by language identifier)
+                // or be exactly ``` (closing delimiter)
+                if (trimmedText.StartsWith("```") || trimmedText == "```")
                 {
                     insideCodeBlock = !insideCodeBlock;
                     // Remove the entire line containing the ``` marker
@@ -89,10 +96,6 @@ namespace SimpleLLMChatGUI
                 {
                     foreach (var run in paragraph.Inlines.OfType<Run>().ToList())
                     {
-                        // Skip already formatted runs
-                        if (IsAlreadyFormatted(run))
-                            continue;
-                            
                         ApplyFormatting(run, processor.Pattern, processor.CreateFormattedRun);
                     }
                 }
@@ -128,10 +131,6 @@ namespace SimpleLLMChatGUI
         {
             foreach (var run in paragraph.Inlines.OfType<Run>().ToList())
             {
-                // Skip already formatted runs
-                if (IsAlreadyFormatted(run))
-                    continue;
-                    
                 if (!InlineCodePattern.IsMatch(run.Text) || !(run.Parent is Paragraph parent))
                     continue;
 
@@ -171,10 +170,6 @@ namespace SimpleLLMChatGUI
             if (InlineCodePattern.IsMatch(run.Text))
                 return;
 
-            // Skip if run is already formatted (has non-default formatting applied)
-            if (IsAlreadyFormatted(run))
-                return;
-
             var matches = pattern.Matches(run.Text);
             if (matches.Count == 0 || !(run.Parent is Paragraph parent))
                 return;
@@ -185,28 +180,6 @@ namespace SimpleLLMChatGUI
             foreach (var inline in newInlines)
                 parent.Inlines.InsertBefore(run, inline);
             parent.Inlines.Remove(run);
-        }
-
-        private static bool IsAlreadyFormatted(Run run)
-        {
-            // Check if the run already has formatting applied
-            if (run.FontWeight != FontWeights.Normal)
-                return true;
-            if (run.FontStyle != FontStyles.Normal)
-                return true;
-            if (run.TextDecorations != null && run.TextDecorations.Count > 0)
-                return true;
-            if (run.Background != null)
-                return true;
-            
-            // Check if parent Span has formatting
-            if (run.Parent is Span parentSpan)
-            {
-                if (parentSpan.Background != null)
-                    return true;
-            }
-            
-            return false;
         }
 
         private static List<Inline> BuildInlines(string text, MatchCollection matches, Func<Match, Run> createFormattedRun)

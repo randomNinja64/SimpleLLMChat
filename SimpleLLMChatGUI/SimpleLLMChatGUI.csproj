@@ -69,6 +69,9 @@
     </Compile>
     <Compile Include="HotkeyHandler.cs" />
     <Compile Include="ImageHandler.cs" />
+    <Compile Include="..\Shared\IniFileHandler.cs">
+      <Link>Shared\IniFileHandler.cs</Link>
+    </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

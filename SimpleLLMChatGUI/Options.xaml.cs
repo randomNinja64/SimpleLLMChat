@@ -127,7 +127,7 @@ namespace SimpleLLMChatGUI
         {
             if (File.Exists(ConfigFileName))
             {
-                var settings = LoadIni(ConfigFileName);
+                var settings = IniFileHandler.LoadIni(ConfigFileName);
 
                 LoadSettingValue(settings, "llmserver", value => ServerURL = value);
                 LoadSettingValue(settings, "apikey", value => ApiKey = value);
@@ -160,28 +160,6 @@ namespace SimpleLLMChatGUI
         {
             if (settings.TryGetValue(key, out string value))
                 setter(value);
-        }
-
-        private Dictionary<string, string> LoadIni(string path)
-        {
-            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (string line in File.ReadAllLines(path))
-            {
-                string trimmed = line.Trim();
-                if (trimmed.Length == 0 || trimmed.StartsWith("#") || !trimmed.Contains("="))
-                    continue;
-
-                string[] parts = trimmed.Split(new char[] { '=' }, 2);
-                if (parts.Length == 2)
-                {
-                    string key = parts[0].Trim();
-                    string val = parts[1].Trim();
-                    dict[key] = val;
-                }
-            }
-
-            return dict;
         }
 
         protected virtual void OnPropertyChanged(string propertyName)

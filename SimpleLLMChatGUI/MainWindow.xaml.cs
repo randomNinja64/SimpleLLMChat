@@ -106,7 +106,7 @@ namespace SimpleLLMChatGUI
 
             try
             {
-                var settings = LoadIni(ConfigFileName);
+                var settings = IniFileHandler.LoadIni(ConfigFileName);
                 if (settings.TryGetValue("markdownparsing", out string value))
                 {
                     return value == "1";
@@ -118,28 +118,6 @@ namespace SimpleLLMChatGUI
             }
 
             return true; // Default to enabled
-        }
-
-        private System.Collections.Generic.Dictionary<string, string> LoadIni(string path)
-        {
-            var dict = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (string line in File.ReadAllLines(path))
-            {
-                string trimmed = line.Trim();
-                if (trimmed.Length == 0 || trimmed.StartsWith("#") || !trimmed.Contains("="))
-                    continue;
-
-                string[] parts = trimmed.Split(new char[] { '=' }, 2);
-                if (parts.Length == 2)
-                {
-                    string key = parts[0].Trim();
-                    string val = parts[1].Trim();
-                    dict[key] = val;
-                }
-            }
-
-            return dict;
         }
 
         private void SetInputControlsEnabled(bool enabled)

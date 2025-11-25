@@ -55,6 +55,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SearchHandler.cs" />
     <Compile Include="ToolHandler.cs" />
+    <Compile Include="..\Shared\IniFileHandler.cs">
+      <Link>Shared\IniFileHandler.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

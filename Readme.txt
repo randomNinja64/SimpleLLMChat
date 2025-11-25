@@ -31,12 +31,14 @@ LLMSettings.ini is explained below.
 apiKey= test (API key if required by your endpoint)
 assistantname= LLM (Display name for the assistant in the UI)
 llmserver= (OpenAI-compatible endpoint in the format http://ip:port)
+markdownparsing= 0/1 (controls whether or not markdown is rendered)
 maxcontentlength= (number of characters to load from a file/webpage, adjust according to your context window)
 model= modelname (model to load (if supported by your endpoint))
 searxnginstance= (optional, SearXNG JSON API is supported for web search)
 showtooloutput= 0/1 (controls whether or not the full output of tool calls is shown)
 sysprompt= "" (custom system prompt)
 tools= (a comma separated list of tools the AI is allowed to use)
+toolsrequiringapproval= (a comma separated list of tools that require manual approval for the AI to use)
 
 ------------------------------------------------------------
 Tools (Available Tools/Requirements)

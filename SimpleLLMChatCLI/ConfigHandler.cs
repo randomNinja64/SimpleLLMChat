@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 
 public class ConfigHandler
 {
@@ -14,28 +12,17 @@ public class ConfigHandler
 
     private void LoadConfig(string filename)
     {
-        if (!File.Exists(filename))
+        configMap = IniFileHandler.LoadIni(filename);
+        
+        if (configMap.Count == 0 && System.IO.File.Exists(filename))
         {
-            Console.Error.WriteLine("Failed to open config file: " + filename);
-            return;
+            // File exists but is empty or has no valid entries
+            // This is not necessarily an error, so we don't log it
         }
-
-        using (var reader = new StreamReader(filename, Encoding.UTF8, true))
+        else if (configMap.Count == 0)
         {
-            string line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                if (string.IsNullOrEmpty(line) || line.TrimStart().StartsWith("#"))
-                    continue;
-
-                var pos = line.IndexOf('=');
-                if (pos != -1)
-                {
-                    string key = line.Substring(0, pos).Trim();
-                    string value = line.Substring(pos + 1).Trim();
-                    configMap[key] = value;
-                }
-            }
+            // File doesn't exist - log warning
+            Console.Error.WriteLine("Failed to open config file: " + filename);
         }
     }
 
