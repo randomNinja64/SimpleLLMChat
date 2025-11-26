@@ -13,7 +13,7 @@ namespace SimpleLLMChatGUI
 {
     public partial class MainWindow : Window
     {
-        private const string ConfigFileName = "LLMSettings.ini";
+        public const string ConfigFileName = "LLMSettings.ini";
         private ProcessHandler processHandler;
         private ImageHandler imageHandler;
         private HotkeyHandler hotkeyHandler;

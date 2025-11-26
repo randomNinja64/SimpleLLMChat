@@ -8,8 +8,6 @@ namespace SimpleLLMChatGUI
 {
     public partial class Options : Window, INotifyPropertyChanged
     {
-        private const string ConfigFileName = "LLMSettings.ini";
-
         private string _serverUrl;
         private string _apiKey;
         private string _model;
@@ -107,7 +105,7 @@ namespace SimpleLLMChatGUI
         {
             ApiKey = ApiKeyPasswordBox.Password;
 
-            SaveIni(ConfigFileName);
+            SaveIni(MainWindow.ConfigFileName);
 
             // Kill running process
             if (_processHandler != null)
@@ -125,9 +123,9 @@ namespace SimpleLLMChatGUI
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            if (File.Exists(ConfigFileName))
+            if (File.Exists(MainWindow.ConfigFileName))
             {
-                var settings = IniFileHandler.LoadIni(ConfigFileName);
+                var settings = IniFileHandler.LoadIni(MainWindow.ConfigFileName);
 
                 LoadSettingValue(settings, "llmserver", value => ServerURL = value);
                 LoadSettingValue(settings, "apikey", value => ApiKey = value);
@@ -151,7 +149,7 @@ namespace SimpleLLMChatGUI
             }
             else
             {
-                MessageBox.Show("INI file not found: " + ConfigFileName, "Warning",
+                MessageBox.Show("INI file not found: " + MainWindow.ConfigFileName, "Warning",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
