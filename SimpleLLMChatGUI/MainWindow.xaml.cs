@@ -15,7 +15,7 @@ namespace SimpleLLMChatGUI
     {
         public const string ConfigFileName = "LLMSettings.ini";
         private ProcessHandler processHandler;
-        private ImageHandler imageHandler;
+        private readonly ImageHandler imageHandler;
         private HotkeyHandler hotkeyHandler;
         private HwndSource source;
         private bool suppressAttachDialog;
@@ -139,7 +139,7 @@ namespace SimpleLLMChatGUI
 
             if (processHandler.IsProcessRunning)
             {
-                if (imageHandler != null && imageHandler.IsImageAttached && !string.IsNullOrEmpty(imageHandler.AttachedImagePath))
+                if (imageHandler?.IsImageAttached == true && !string.IsNullOrEmpty(imageHandler.AttachedImagePath))
                 {
                     // Send input with image
                     if (!processHandler.SendInputWithImage(imageHandler.AttachedImagePath, userInput))
