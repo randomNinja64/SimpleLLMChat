@@ -86,9 +86,6 @@ namespace SimpleLLMChatGUI
             // Build the final command
             string command = "image " + quotedPath + " " + prompt;
 
-            // Debug: show exactly what will be sent
-            //MessageBox.Show("Sending command:\n" + command, "Debug Input");
-
             return SendInput(command);
         }
 
