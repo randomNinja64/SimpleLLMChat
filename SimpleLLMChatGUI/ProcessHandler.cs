@@ -48,10 +48,7 @@ namespace SimpleLLMChatGUI
             }
             catch (Exception ex)
             {
-                if (ErrorOccurred != null)
-                {
-                    ErrorOccurred("Failed to start process: " + ex.Message);
-                }
+                ErrorOccurred?.Invoke("Failed to start process: " + ex.Message);
                 return false;
             }
         }
@@ -68,10 +65,7 @@ namespace SimpleLLMChatGUI
                 }
                 catch (Exception ex)
                 {
-                    if (ErrorOccurred != null)
-                    {
-                        ErrorOccurred("Error sending input: " + ex.Message);
-                    }
+                    ErrorOccurred?.Invoke("Error sending input: " + ex.Message);
                     return false;
                 }
             }
@@ -82,8 +76,7 @@ namespace SimpleLLMChatGUI
         {
             if (string.IsNullOrWhiteSpace(imagePath))
             {
-                if (ErrorOccurred != null)
-                    ErrorOccurred("Image path cannot be empty.");
+                ErrorOccurred?.Invoke("Image path cannot be empty.");
                 return false;
             }
 
@@ -248,9 +241,9 @@ namespace SimpleLLMChatGUI
                 filteredText = NormalizeLineEndings(filteredText);
 
                 // Raise event immediately for real-time streaming
-                if (!string.IsNullOrEmpty(filteredText) && OutputReceived != null)
+                if (!string.IsNullOrEmpty(filteredText))
                 {
-                    OutputReceived(filteredText);
+                    OutputReceived?.Invoke(filteredText);
                 }
             }
         }

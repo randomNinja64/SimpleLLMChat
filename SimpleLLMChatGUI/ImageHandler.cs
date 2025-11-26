@@ -19,8 +19,7 @@ namespace SimpleLLMChatGUI
                 return;
             AttachedImagePath = path;
             IsImageAttached = true;
-            if (ImageSelected != null)
-                ImageSelected(AttachedImagePath);
+            ImageSelected?.Invoke(AttachedImagePath);
         }
 
         public bool SelectImage()
@@ -33,8 +32,7 @@ namespace SimpleLLMChatGUI
             {
                 AttachedImagePath = openFileDialog.FileName;
                 IsImageAttached = true;
-                if (ImageSelected != null)
-                    ImageSelected(AttachedImagePath);
+                ImageSelected?.Invoke(AttachedImagePath);
                 return true;
             }
 
@@ -45,8 +43,7 @@ namespace SimpleLLMChatGUI
         {
             IsImageAttached = false;
             AttachedImagePath = null;
-            if (ImageDetached != null)
-                ImageDetached();
+            ImageDetached?.Invoke();
         }
     }
 }

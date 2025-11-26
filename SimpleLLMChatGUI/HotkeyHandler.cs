@@ -133,8 +133,7 @@ namespace SimpleLLMChatGUI
                                 bitmap.Save(screenshotPath, ImageFormat.Jpeg);
                             }
 
-                            if (ScreenshotTaken != null)
-                                ScreenshotTaken(screenshotPath);
+                            ScreenshotTaken?.Invoke(screenshotPath);
                             return;
                         }
                     }
@@ -155,13 +154,11 @@ namespace SimpleLLMChatGUI
                     bitmap.Save(screenshotPath, ImageFormat.Jpeg);
                 }
 
-                if (ScreenshotTaken != null)
-                    ScreenshotTaken(screenshotPath);
+                ScreenshotTaken?.Invoke(screenshotPath);
             }
             catch (Exception ex)
             {
-                if (ErrorOccurred != null)
-                    ErrorOccurred("Failed to take screenshot: " + ex.Message);
+                ErrorOccurred?.Invoke("Failed to take screenshot: " + ex.Message);
             }
         }
 
