@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -153,6 +153,9 @@ namespace SimpleLLMChatCLI
 
                 if (userInput == null)
                     continue;
+
+                // Decode multi-line text: replace <<NEWLINE>> marker back to newlines
+                userInput = userInput.Replace("<<NEWLINE>>", "\n");
 
                 if (userInput == "exit")
                     break;

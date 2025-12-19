@@ -223,12 +223,17 @@ namespace SimpleLLMChatGUI
                 imageHandler.DetachImage();
         }
 
-        private void chatInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        private void chatInput_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            // Send on Enter (without Shift), create new line on Shift+Enter
             if (e.Key == Key.Enter && sendButton.IsEnabled)
             {
-                e.Handled = true; // prevent the ding sound
-                sendButton_Click(sendButton, new RoutedEventArgs());
+                if (Keyboard.Modifiers != ModifierKeys.Shift)
+                {
+                    e.Handled = true; // prevent the ding sound and new line
+                    sendButton_Click(sendButton, new RoutedEventArgs());
+                }
+                // If Shift+Enter, allow default behavior (new line)
             }
         }
 

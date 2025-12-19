@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -59,7 +59,9 @@ namespace SimpleLLMChatGUI
             {
                 try
                 {
-                    llmProcess.StandardInput.WriteLine(input);
+                    // Encode multi-line text as single line: replace newlines with <<NEWLINE>> marker
+                    string encodedInput = input.Replace("\r\n", "<<NEWLINE>>").Replace("\n", "<<NEWLINE>>").Replace("\r", "<<NEWLINE>>");
+                    llmProcess.StandardInput.WriteLine(encodedInput);
                     llmProcess.StandardInput.Flush();
                     return true;
                 }

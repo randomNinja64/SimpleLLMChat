@@ -1,4 +1,4 @@
-﻿<Window x:Class="SimpleLLMChatGUI.MainWindow"
+<Window x:Class="SimpleLLMChatGUI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Simple LLM Chat" Height="350" Width="450" Loaded="Window_Loaded"
@@ -84,8 +84,8 @@
             <!-- Attach button with PNG -->
             <ToggleButton Name="attachButton"
               Grid.Column="0"
-              Width="40"
-              Height="30"
+              Width="45"
+              Height="40"
               VerticalAlignment="Bottom"
               Margin="0,0,5,0"
               ToolTip="Attach Image (if supported by model)"
@@ -97,16 +97,22 @@
 
             <TextBox Name="chatInput"
                      Grid.Column="1"
-                     Height="30"
+                     Height="40"
+                     MinHeight="25"
+                     MaxHeight="100"
                      VerticalAlignment="Bottom"
                      Margin="0,0,5,0"
-                     HorizontalAlignment="Stretch" KeyDown="chatInput_KeyDown" />
+                     HorizontalAlignment="Stretch"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     PreviewKeyDown="chatInput_PreviewKeyDown" />
 
             <Button Name="sendButton"
                     Grid.Column="2"
                     Content="Send"
-                    Width="40"
-                    Height="30"
+                    Width="45"
+                    Height="40"
                     VerticalAlignment="Bottom" Click="sendButton_Click" />
         </Grid>
     </Grid>
