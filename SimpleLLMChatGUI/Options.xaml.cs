@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Windows;
+using System.Windows.Media;
 
 namespace SimpleLLMChatGUI
 {
@@ -17,15 +19,23 @@ namespace SimpleLLMChatGUI
         private int _maxContentLength;
         private bool _markdownParsing;
         private string _searxngInstance;
+        private string _customFontFamily;
+        private int _chatFontSize;
         private ProcessHandler _processHandler;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         private readonly List<string> _availableTools = new List<string> { "copy_file", "delete_file", "download_file", "download_video", "extract_file", "list_directory", "move_file", "read_file", "read_website", "run_python_script", "run_shell_command", "run_web_search", "write_file" };
+        private readonly List<string> _systemFonts;
 
         public List<string> AvailableTools
         {
             get { return _availableTools; }
+        }
+
+        public List<string> SystemFonts
+        {
+            get { return _systemFonts; }
         }
 
         public string ServerURL
@@ -82,12 +92,31 @@ namespace SimpleLLMChatGUI
             set { _searxngInstance = value; OnPropertyChanged(nameof(SearxNGInstance)); }
         }
 
+        public string CustomFontFamily
+        {
+            get { return _customFontFamily; }
+            set { _customFontFamily = value; OnPropertyChanged(nameof(CustomFontFamily)); }
+        }
+
+        public int ChatFontSize
+        {
+            get { return _chatFontSize; }
+            set { _chatFontSize = value; OnPropertyChanged(nameof(ChatFontSize)); }
+        }
+
         public Options(ProcessHandler processHandler)
         {
             InitializeComponent();
             DataContext = this;
 
             _processHandler = processHandler;
+
+            // Load system fonts
+            _systemFonts = Fonts.SystemFontFamilies
+                .Select(f => f.Source)
+                .OrderBy(f => f)
+                .ToList();
+            _systemFonts.Insert(0, "Default");
 
             // Default values
             ServerURL = "";
@@ -99,13 +128,15 @@ namespace SimpleLLMChatGUI
             MaxContentLength = 8000; // Default to 8000 characters
             MarkdownParsing = true; // Default to enabling markdown parsing
             SearxNGInstance = ""; // Default to empty
+            CustomFontFamily = ""; // Default to empty (use system default)
+            ChatFontSize = 12; // Default font size
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             ApiKey = ApiKeyPasswordBox.Password;
 
-            SaveIni(MainWindow.ConfigFileName);
+            SaveIni(App.ConfigFileName);
 
             // Kill running process
             if (_processHandler != null)
@@ -123,33 +154,41 @@ namespace SimpleLLMChatGUI
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            if (File.Exists(MainWindow.ConfigFileName))
-            {
-                var settings = IniFileHandler.LoadIni(MainWindow.ConfigFileName);
+            // Apply custom font to this window
+            FontHandler.ApplyFontToWindow(this);
 
-                LoadSettingValue(settings, "llmserver", value => ServerURL = value);
-                LoadSettingValue(settings, "apikey", value => ApiKey = value);
-                LoadSettingValue(settings, "model", value => Model = value);
-                LoadSettingValue(settings, "sysprompt", value => SysPrompt = value.Trim('"'));
-                LoadSettingValue(settings, "assistantname", value => AssistantName = value);
-                LoadSettingValue(settings, "showtooloutput", value => ShowToolOutput = (value == "1"));
-                LoadSettingValue(settings, "maxcontentlength", value =>
+            if (App.Settings.Count > 0 || File.Exists(App.ConfigFileName))
+            {
+
+                LoadSettingValue(App.Settings, "llmserver", value => ServerURL = value);
+                LoadSettingValue(App.Settings, "apikey", value => ApiKey = value);
+                LoadSettingValue(App.Settings, "model", value => Model = value);
+                LoadSettingValue(App.Settings, "sysprompt", value => SysPrompt = value.Trim('"'));
+                LoadSettingValue(App.Settings, "assistantname", value => AssistantName = value);
+                LoadSettingValue(App.Settings, "showtooloutput", value => ShowToolOutput = (value == "1"));
+                LoadSettingValue(App.Settings, "maxcontentlength", value =>
                 {
                     if (int.TryParse(value, out int maxLength))
                         MaxContentLength = maxLength;
                 });
-                LoadSettingValue(settings, "markdownparsing", value => MarkdownParsing = (value == "1"));
-                LoadSettingValue(settings, "searxnginstance", value => SearxNGInstance = value);
+                LoadSettingValue(App.Settings, "markdownparsing", value => MarkdownParsing = (value == "1"));
+                LoadSettingValue(App.Settings, "searxnginstance", value => SearxNGInstance = value);
+                LoadSettingValue(App.Settings, "customfontfamily", value => CustomFontFamily = value);
+                LoadSettingValue(App.Settings, "fontsize", value =>
+                {
+                    if (int.TryParse(value, out int fontSize) && fontSize > 0)
+                        ChatFontSize = fontSize;
+                });
 
-                LoadSettingValue(settings, "tools", ApplyToolSelection);
-                LoadSettingValue(settings, "toolsrequiringapproval", ApplyToolsRequiringApprovalSelection);
+                LoadSettingValue(App.Settings, "tools", ApplyToolSelection);
+                LoadSettingValue(App.Settings, "toolsrequiringapproval", ApplyToolsRequiringApprovalSelection);
 
                 // Sync password box manually (not bound)
                 ApiKeyPasswordBox.Password = ApiKey;
             }
             else
             {
-                MessageBox.Show("INI file not found: " + MainWindow.ConfigFileName, "Warning",
+                MessageBox.Show("INI file not found: " + App.ConfigFileName, "Warning",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -197,6 +236,8 @@ namespace SimpleLLMChatGUI
                 "searxnginstance=" + SearxNGInstance,
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
+                "customfontfamily=" + CustomFontFamily,
+                "fontsize=" + ChatFontSize,
                 "tools=" + string.Join(",", selectedTools),
                 "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };

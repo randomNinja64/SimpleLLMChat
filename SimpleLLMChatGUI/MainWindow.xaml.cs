@@ -1,7 +1,9 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,7 +15,6 @@ namespace SimpleLLMChatGUI
 {
     public partial class MainWindow : Window
     {
-        public const string ConfigFileName = "LLMSettings.ini";
         private ProcessHandler processHandler;
         private readonly ImageHandler imageHandler;
         private HotkeyHandler hotkeyHandler;
@@ -44,6 +45,8 @@ namespace SimpleLLMChatGUI
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            FontHandler.ApplyFontToWindow(this);
+            LoadAndApplyFontSize();
             StartLLMProcess();
         }
 
@@ -101,23 +104,24 @@ namespace SimpleLLMChatGUI
 
         private bool IsMarkdownParsingEnabled()
         {
-            if (!File.Exists(ConfigFileName))
-                return true; // Default to enabled if config doesn't exist
-
-            try
+            if (App.Settings.TryGetValue("markdownparsing", out string value))
             {
-                var settings = IniFileHandler.LoadIni(ConfigFileName);
-                if (settings.TryGetValue("markdownparsing", out string value))
-                {
-                    return value == "1";
-                }
-            }
-            catch
-            {
-                // If there's an error reading the file, default to enabled
+                return value == "1";
             }
 
             return true; // Default to enabled
+        }
+
+        private void LoadAndApplyFontSize()
+        {
+            if (App.Settings.TryGetValue("fontsize", out string fontSizeValue))
+            {
+                if (int.TryParse(fontSizeValue, out int parsedSize) && parsedSize > 0)
+                {
+                    FontHandler.ApplyFontSizeToControl(chatOutput, parsedSize);
+                    FontHandler.ApplyFontSizeToControl(chatInput, parsedSize);
+                }
+            }
         }
 
         private void SetInputControlsEnabled(bool enabled)
@@ -264,6 +268,9 @@ namespace SimpleLLMChatGUI
 
             if (optionsDialog.ShowDialog() == true)
             {
+                App.LoadSettings(); // Reload settings after options dialog saves
+                FontHandler.ApplyFontToWindow(this);
+                LoadAndApplyFontSize();
                 ClearChatAndRestart();
             }
         }
