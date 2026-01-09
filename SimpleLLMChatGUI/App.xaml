@@ -64,7 +64,7 @@
 
         <!-- CheckBoxes -->
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{DynamicResource ChatTextColorBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource LabelTextColorBrush}"/>
         </Style>
 
         <!-- Labels -->

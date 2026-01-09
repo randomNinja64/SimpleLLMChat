@@ -30,6 +30,8 @@ LLMSettings.ini is explained below.
 
 apiKey= test (API key if required by your endpoint)
 assistantname= LLM (Display name for the assistant in the UI)
+customfontfamily= Custom font setting for the GUI (can use any font installed on the system)
+fontsize= Size of the displayed text in chat
 llmserver= (OpenAI-compatible endpoint in the format http://ip:port)
 markdownparsing= 0/1 (controls whether or not markdown is rendered)
 maxcontentlength= (number of characters to load from a file/webpage, adjust according to your context window)

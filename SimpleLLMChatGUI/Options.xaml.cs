@@ -238,6 +238,8 @@ namespace SimpleLLMChatGUI
             {
                 "apikey=" + ApiKey,
                 "assistantname=" + AssistantName,
+                "customfontfamily=" + CustomFontFamily,
+                "fontsize=" + ChatFontSize,
                 "llmserver=" + ServerURL,
                 "maxcontentlength=" + MaxContentLength,
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
@@ -245,8 +247,6 @@ namespace SimpleLLMChatGUI
                 "searxnginstance=" + SearxNGInstance,
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
-                "customfontfamily=" + CustomFontFamily,
-                "fontsize=" + ChatFontSize,
                 "tools=" + string.Join(",", selectedTools),
                 "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };
