@@ -50,6 +50,7 @@
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml">
       <RequiredTargetFramework>4.0</RequiredTargetFramework>
     </Reference>
@@ -70,6 +71,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="ColorHelper.cs" />
     <Compile Include="FontHandler.cs" />
     <Compile Include="HotkeyHandler.cs" />
     <Compile Include="ImageHandler.cs" />
@@ -84,11 +86,18 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="ColorsForm.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MarkdownHandler.cs" />
     <Compile Include="Options.xaml.cs">
       <DependentUpon>Options.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ColorsForm.xaml.cs">
+      <DependentUpon>ColorsForm.xaml</DependentUpon>
     </Compile>
     <Compile Include="ProcessHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">

@@ -152,6 +152,15 @@ namespace SimpleLLMChatGUI
             Close();
         }
 
+        private void ChooseColorsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var colorsForm = new ColorsForm
+            {
+                Owner = this
+            };
+            colorsForm.ShowDialog();
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             // Apply custom font to this window

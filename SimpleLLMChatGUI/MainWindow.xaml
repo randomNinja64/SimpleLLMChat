@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Simple LLM Chat" Height="350" Width="450" Loaded="Window_Loaded"
         MinWidth="380" MinHeight="200"
-        Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
+        Background="{DynamicResource WindowBackgroundColorBrush}">
     <Grid Margin="5">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

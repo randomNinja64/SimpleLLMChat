@@ -205,8 +205,8 @@ public static class DownloadHandler
         { ".webm", new[] { "video/webm" } },
 
         // Executables and binaries
-        { ".exe", new[] { "application/x-msdownload", "application/octet-stream" } },
-        { ".dll", new[] { "application/x-msdownload", "application/octet-stream" } },
+        { ".exe", new[] { "application/x-msdownload", "application/x-msdos-program", "application/octet-stream" } },
+        { ".dll", new[] { "application/x-msdownload", "application/x-msdos-program", "application/octet-stream" } },
         { ".bin", new[] { "application/octet-stream" } }
     };
 

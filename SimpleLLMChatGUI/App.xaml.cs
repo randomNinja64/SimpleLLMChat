@@ -13,6 +13,7 @@ namespace SimpleLLMChatGUI
     public partial class App : Application
     {
         public const string ConfigFileName = "LLMSettings.ini";
+        public const string ColorsFileName = "colors.ini";
         private static Dictionary<string, string> _cachedSettings;
 
         public static Dictionary<string, string> Settings

@@ -1,12 +1,12 @@
 <Window x:Class="SimpleLLMChatGUI.Options"
             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-            Title="Options" Height="575" Width="400"
-            MinHeight="575" MinWidth="400" MaxWidth="400" MaxHeight="810"
+            Title="Options" Height="575" Width="420"
+            MinHeight="575" MinWidth="420" MaxWidth="500" MaxHeight="810"
             WindowStartupLocation="CenterOwner"
             ResizeMode="CanResize"
             Loaded="Window_Loaded"
-            Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
+            Background="{DynamicResource WindowBackgroundColorBrush}">
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -31,14 +31,22 @@
                 <ComboBox x:Name="CustomFontComboBox"
                          ItemsSource="{Binding SystemFonts}"
                          SelectedItem="{Binding CustomFontFamily, UpdateSourceTrigger=PropertyChanged}"
-                         Height="23"
-                         IsEditable="True"/>
+                         Height="23"/>
 
                 <!-- Font Size -->
                 <Label Content="Font Size:"/>
                 <TextBox x:Name="FontSizeTextBox"
                         Text="{Binding ChatFontSize, UpdateSourceTrigger=PropertyChanged}"
                         Height="23"/>
+
+                <!-- Colors -->
+                <Label Content="Colors:"/>
+                <Button x:Name="ChooseColorsButton"
+                        Content="Choose Colors..."
+                        Height="23"
+                        HorizontalAlignment="Left"
+                        Width="120"
+                        Click="ChooseColorsButton_Click"/>
 
                 <!-- Markdown Parsing -->
                 <CheckBox x:Name="MarkdownParsingCheckBox"

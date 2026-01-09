@@ -47,6 +47,7 @@ namespace SimpleLLMChatGUI
         {
             FontHandler.ApplyFontToWindow(this);
             LoadAndApplyFontSize();
+            LoadAndApplyColors();
             StartLLMProcess();
         }
 
@@ -123,6 +124,23 @@ namespace SimpleLLMChatGUI
                 }
             }
         }
+
+        private void LoadAndApplyColors()
+        {
+            if (File.Exists(App.ColorsFileName))
+            {
+                try
+                {
+                    var colorSettings = IniFileHandler.LoadIni(App.ColorsFileName);
+                    ColorHelper.LoadAndApplyColors(colorSettings);
+                }
+                catch
+                {
+                    // On error, do nothing (use system defaults)
+                }
+            }
+        }
+
 
         private void SetInputControlsEnabled(bool enabled)
         {
@@ -271,6 +289,7 @@ namespace SimpleLLMChatGUI
                 App.LoadSettings(); // Reload settings after options dialog saves
                 FontHandler.ApplyFontToWindow(this);
                 LoadAndApplyFontSize();
+                LoadAndApplyColors();
                 ClearChatAndRestart();
             }
         }
