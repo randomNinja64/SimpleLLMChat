@@ -44,6 +44,12 @@ namespace SimpleLLMChatGUI
             set { SetColor("chattextcolor", value); }
         }
 
+        public System.Windows.Media.Color? CodeBlockBackgroundColor
+        {
+            get { return _colorSettings["codeblockbackgroundcolor"].Value; }
+            set { SetColor("codeblockbackgroundcolor", value); }
+        }
+
         public System.Windows.Media.Color? WindowBackgroundColor
         {
             get { return _colorSettings["windowbackgroundcolor"].Value; }
@@ -66,6 +72,7 @@ namespace SimpleLLMChatGUI
                 { "buttontextcolor", ButtonTextColorPreview },
                 { "chatbackgroundcolor", ChatBackgroundColorPreview },
                 { "chattextcolor", ChatTextColorPreview },
+                { "codeblockbackgroundcolor", CodeBlockBackgroundColorPreview },
                 { "labeltextcolor", LabelTextColorPreview },
                 { "windowbackgroundcolor", WindowBackgroundColorPreview }
             };
@@ -157,6 +164,16 @@ namespace SimpleLLMChatGUI
         private void ClearChatTextColorButton_Click(object sender, RoutedEventArgs e)
         {
             ChatTextColor = null;
+        }
+
+        private void CodeBlockBackgroundColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowColorDialogForSetting("codeblockbackgroundcolor", color => CodeBlockBackgroundColor = color);
+        }
+
+        private void ClearCodeBlockBackgroundColorButton_Click(object sender, RoutedEventArgs e)
+        {
+            CodeBlockBackgroundColor = null;
         }
 
         private void LabelTextColorButton_Click(object sender, RoutedEventArgs e)

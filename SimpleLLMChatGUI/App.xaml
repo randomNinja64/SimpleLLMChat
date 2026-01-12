@@ -21,6 +21,10 @@
         <SolidColorBrush x:Key="ChatTextColorBrush"
                          Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"/>
 
+        <!-- Dynamic brush for code block background color -->
+        <SolidColorBrush x:Key="CodeBlockBackgroundColorBrush"
+                         Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}"/>
+
         <!-- Dynamic brush for window background color -->
         <SolidColorBrush x:Key="WindowBackgroundColorBrush"
                          Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}"/>

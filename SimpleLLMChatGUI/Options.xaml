@@ -106,7 +106,8 @@
                          Height="100">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}">
+                            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}"
+                                     Foreground="{x:Static SystemColors.ControlTextBrush}">
                                 <TextBlock Text="{Binding}"/>
                             </CheckBox>
                         </DataTemplate>
@@ -121,7 +122,8 @@
                          Height="100">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}">
+                            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}"
+                                     Foreground="{x:Static SystemColors.ControlTextBrush}">
                                 <TextBlock Text="{Binding}"/>
                             </CheckBox>
                         </DataTemplate>

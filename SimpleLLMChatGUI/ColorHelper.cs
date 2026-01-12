@@ -58,6 +58,16 @@ namespace SimpleLLMChatGUI
                 }
             },
             {
+                "codeblockbackgroundcolor",
+                new ColorConfig
+                {
+                    Key = "codeblockbackgroundcolor",
+                    ResourceKey = "CodeBlockBackgroundColorBrush",
+                    DefaultSystemColor = SystemColors.ControlColor,
+                    DefaultSystemBrush = SystemColors.ControlBrush
+                }
+            },
+            {
                 "labeltextcolor",
                 new ColorConfig
                 {

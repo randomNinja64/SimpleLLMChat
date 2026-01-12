@@ -69,10 +69,10 @@ namespace SimpleLLMChatGUI
                 // Skip processing if we're inside an excluded region
                 if (insideCodeBlock || insideFourBacktickBlock || insideThinkTag)
                 {
-                    // Style code block paragraphs with window background color
+                    // Style code block paragraphs with code block background color
                     if (insideCodeBlock)
                     {
-                        paragraph.Background = Application.Current.Resources["WindowBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
+                        paragraph.Background = Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
                     }
                     continue;
                 }
@@ -145,10 +145,10 @@ namespace SimpleLLMChatGUI
                         newInlines.Add(new Run(run.Text.Substring(lastIndex, codeMatch.Index - lastIndex)));
 
                     // Code block (unformatted, just the content without backticks)
-                    // Wrap in Span with window background color for emphasis
+                    // Wrap in Span with code block background color for emphasis
                     var codeRun = new Run(codeMatch.Groups[1].Value);
                     var codeSpan = new Span(codeRun);
-                    codeSpan.Background = Application.Current.Resources["WindowBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
+                    codeSpan.Background = Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
                     newInlines.Add(codeSpan);
                     lastIndex = codeMatch.Index + codeMatch.Length;
                 }
