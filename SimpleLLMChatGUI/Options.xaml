@@ -102,33 +102,17 @@
                 <Label Content="Tools:" Margin="0,0,0,0"/>
                 <ListBox x:Name="ToolsListBox"
                          ItemsSource="{Binding AvailableTools}"
+                         ItemTemplate="{StaticResource MultiSelectListBoxItemTemplate}"
                          SelectionMode="Multiple"
-                         Height="100">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}"
-                                     Foreground="{x:Static SystemColors.ControlTextBrush}">
-                                <TextBlock Text="{Binding}"/>
-                            </CheckBox>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                         Height="100" />
 
                 <!-- Tools Requiring Approval -->
                 <Label Content="Tools Requiring Approval:" Margin="0,0,0,0"/>
                 <ListBox x:Name="ToolsRequiringApprovalListBox"
                          ItemsSource="{Binding AvailableTools}"
+                         ItemTemplate="{StaticResource MultiSelectListBoxItemTemplate}"
                          SelectionMode="Multiple"
-                         Height="100">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}"
-                                     Foreground="{x:Static SystemColors.ControlTextBrush}">
-                                <TextBlock Text="{Binding}"/>
-                            </CheckBox>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                         Height="100" />
 
             </StackPanel>
         </ScrollViewer>

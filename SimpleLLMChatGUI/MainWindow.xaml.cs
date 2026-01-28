@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -115,14 +115,9 @@ namespace SimpleLLMChatGUI
 
         private void LoadAndApplyFontSize()
         {
-            if (App.Settings.TryGetValue("fontsize", out string fontSizeValue))
-            {
-                if (int.TryParse(fontSizeValue, out int parsedSize) && parsedSize > 0)
-                {
-                    FontHandler.ApplyFontSizeToControl(chatOutput, parsedSize);
-                    FontHandler.ApplyFontSizeToControl(chatInput, parsedSize);
-                }
-            }
+            int fontSize = FontHandler.GetFontSize();
+            FontHandler.ApplyFontSizeToControl(chatOutput, fontSize);
+            FontHandler.ApplyFontSizeToControl(chatInput, fontSize);
         }
 
         private void LoadAndApplyColors()

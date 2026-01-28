@@ -20,42 +20,6 @@ namespace SimpleLLMChatGUI
 
         private Dictionary<string, ColorSetting> _colorSettings;
 
-        public System.Windows.Media.Color? ButtonTextColor
-        {
-            get { return _colorSettings["buttontextcolor"].Value; }
-            set { SetColor("buttontextcolor", value); }
-        }
-
-        public System.Windows.Media.Color? LabelTextColor
-        {
-            get { return _colorSettings["labeltextcolor"].Value; }
-            set { SetColor("labeltextcolor", value); }
-        }
-
-        public System.Windows.Media.Color? ChatBackgroundColor
-        {
-            get { return _colorSettings["chatbackgroundcolor"].Value; }
-            set { SetColor("chatbackgroundcolor", value); }
-        }
-
-        public System.Windows.Media.Color? ChatTextColor
-        {
-            get { return _colorSettings["chattextcolor"].Value; }
-            set { SetColor("chattextcolor", value); }
-        }
-
-        public System.Windows.Media.Color? CodeBlockBackgroundColor
-        {
-            get { return _colorSettings["codeblockbackgroundcolor"].Value; }
-            set { SetColor("codeblockbackgroundcolor", value); }
-        }
-
-        public System.Windows.Media.Color? WindowBackgroundColor
-        {
-            get { return _colorSettings["windowbackgroundcolor"].Value; }
-            set { SetColor("windowbackgroundcolor", value); }
-        }
-
         public ColorsForm()
         {
             InitializeComponent();
@@ -136,64 +100,21 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        private void ButtonTextColorButton_Click(object sender, RoutedEventArgs e)
+        // Generic event handlers - use Tag property to identify which color
+        private void ChooseColorButton_Click(object sender, RoutedEventArgs e)
         {
-            ShowColorDialogForSetting("buttontextcolor", color => ButtonTextColor = color);
+            if (sender is System.Windows.Controls.Button button && button.Tag is string key)
+            {
+                ShowColorDialogForSetting(key, color => SetColor(key, color));
+            }
         }
 
-        private void ClearButtonTextColorButton_Click(object sender, RoutedEventArgs e)
+        private void ClearColorButton_Click(object sender, RoutedEventArgs e)
         {
-            ButtonTextColor = null;
-        }
-
-        private void ChatBackgroundColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowColorDialogForSetting("chatbackgroundcolor", color => ChatBackgroundColor = color);
-        }
-
-        private void ClearChatBackgroundColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ChatBackgroundColor = null;
-        }
-
-        private void ChatTextColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowColorDialogForSetting("chattextcolor", color => ChatTextColor = color);
-        }
-
-        private void ClearChatTextColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ChatTextColor = null;
-        }
-
-        private void CodeBlockBackgroundColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowColorDialogForSetting("codeblockbackgroundcolor", color => CodeBlockBackgroundColor = color);
-        }
-
-        private void ClearCodeBlockBackgroundColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            CodeBlockBackgroundColor = null;
-        }
-
-        private void LabelTextColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowColorDialogForSetting("labeltextcolor", color => LabelTextColor = color);
-        }
-
-        private void ClearLabelTextColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            LabelTextColor = null;
-        }
-
-        private void WindowBackgroundColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            ShowColorDialogForSetting("windowbackgroundcolor", color => WindowBackgroundColor = color);
-        }
-
-        private void ClearWindowBackgroundColorButton_Click(object sender, RoutedEventArgs e)
-        {
-            WindowBackgroundColor = null;
+            if (sender is System.Windows.Controls.Button button && button.Tag is string key)
+            {
+                SetColor(key, null);
+            }
         }
 
         private void ShowColorDialogForSetting(string key, Action<System.Windows.Media.Color> onColorSelected)

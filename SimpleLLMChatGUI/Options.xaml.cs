@@ -189,8 +189,8 @@ namespace SimpleLLMChatGUI
                         ChatFontSize = fontSize;
                 });
 
-                LoadSettingValue(App.Settings, "tools", ApplyToolSelection);
-                LoadSettingValue(App.Settings, "toolsrequiringapproval", ApplyToolsRequiringApprovalSelection);
+                LoadSettingValue(App.Settings, "tools", value => ApplyToolSelectionToListBox(ToolsListBox, value));
+                LoadSettingValue(App.Settings, "toolsrequiringapproval", value => ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, value));
 
                 // Sync password box manually (not bound)
                 ApiKeyPasswordBox.Password = ApiKey;
@@ -278,16 +278,6 @@ namespace SimpleLLMChatGUI
                     }
                 }
             }
-        }
-
-        private void ApplyToolSelection(string toolsValue)
-        {
-            ApplyToolSelectionToListBox(ToolsListBox, toolsValue);
-        }
-
-        private void ApplyToolsRequiringApprovalSelection(string toolsValue)
-        {
-            ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, toolsValue);
         }
     }
 }

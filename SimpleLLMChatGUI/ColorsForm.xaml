@@ -38,19 +38,19 @@
                     <Label Content="Button Text"
                            VerticalAlignment="Center"/>
 
-                    <Button x:Name="ButtonTextColorButton"
-                            Grid.Column="1"
+                    <Button Grid.Column="1"
                             Content="Choose"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ButtonTextColorButton_Click"/>
+                            Tag="buttontextcolor"
+                            Click="ChooseColorButton_Click"/>
 
-                    <Button x:Name="ClearButtonTextColorButton"
-                            Grid.Column="2"
+                    <Button Grid.Column="2"
                             Content="Clear"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ClearButtonTextColorButton_Click"/>
+                            Tag="buttontextcolor"
+                            Click="ClearColorButton_Click"/>
 
                     <Border x:Name="ButtonTextColorPreview"
                             Grid.Column="3"
@@ -73,19 +73,19 @@
                     <Label Content="Chat BG"
                            VerticalAlignment="Center"/>
 
-                    <Button x:Name="ChatBackgroundColorButton"
-                            Grid.Column="1"
+                    <Button Grid.Column="1"
                             Content="Choose"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ChatBackgroundColorButton_Click"/>
+                            Tag="chatbackgroundcolor"
+                            Click="ChooseColorButton_Click"/>
 
-                    <Button x:Name="ClearChatBackgroundColorButton"
-                            Grid.Column="2"
+                    <Button Grid.Column="2"
                             Content="Clear"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ClearChatBackgroundColorButton_Click"/>
+                            Tag="chatbackgroundcolor"
+                            Click="ClearColorButton_Click"/>
 
                     <Border x:Name="ChatBackgroundColorPreview"
                             Grid.Column="3"
@@ -108,19 +108,19 @@
                     <Label Content="Chat Text"
                            VerticalAlignment="Center"/>
 
-                    <Button x:Name="ChatTextColorButton"
-                            Grid.Column="1"
+                    <Button Grid.Column="1"
                             Content="Choose"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ChatTextColorButton_Click"/>
+                            Tag="chattextcolor"
+                            Click="ChooseColorButton_Click"/>
 
-                    <Button x:Name="ClearChatTextColorButton"
-                            Grid.Column="2"
+                    <Button Grid.Column="2"
                             Content="Clear"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ClearChatTextColorButton_Click"/>
+                            Tag="chattextcolor"
+                            Click="ClearColorButton_Click"/>
 
                     <Border x:Name="ChatTextColorPreview"
                             Grid.Column="3"
@@ -143,19 +143,19 @@
                     <Label Content="Code Block BG"
                            VerticalAlignment="Center"/>
 
-                    <Button x:Name="CodeBlockBackgroundColorButton"
-                            Grid.Column="1"
+                    <Button Grid.Column="1"
                             Content="Choose"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="CodeBlockBackgroundColorButton_Click"/>
+                            Tag="codeblockbackgroundcolor"
+                            Click="ChooseColorButton_Click"/>
 
-                    <Button x:Name="ClearCodeBlockBackgroundColorButton"
-                            Grid.Column="2"
+                    <Button Grid.Column="2"
                             Content="Clear"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ClearCodeBlockBackgroundColorButton_Click"/>
+                            Tag="codeblockbackgroundcolor"
+                            Click="ClearColorButton_Click"/>
 
                     <Border x:Name="CodeBlockBackgroundColorPreview"
                             Grid.Column="3"
@@ -178,19 +178,19 @@
                     <Label Content="Label Text"
                            VerticalAlignment="Center"/>
 
-                    <Button x:Name="LabelTextColorButton"
-                            Grid.Column="1"
+                    <Button Grid.Column="1"
                             Content="Choose"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="LabelTextColorButton_Click"/>
+                            Tag="labeltextcolor"
+                            Click="ChooseColorButton_Click"/>
 
-                    <Button x:Name="ClearLabelTextColorButton"
-                            Grid.Column="2"
+                    <Button Grid.Column="2"
                             Content="Clear"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ClearLabelTextColorButton_Click"/>
+                            Tag="labeltextcolor"
+                            Click="ClearColorButton_Click"/>
 
                     <Border x:Name="LabelTextColorPreview"
                             Grid.Column="3"
@@ -213,19 +213,19 @@
                     <Label Content="Window BG"
                            VerticalAlignment="Center"/>
 
-                    <Button x:Name="WindowBackgroundColorButton"
-                            Grid.Column="1"
+                    <Button Grid.Column="1"
                             Content="Choose"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="WindowBackgroundColorButton_Click"/>
+                            Tag="windowbackgroundcolor"
+                            Click="ChooseColorButton_Click"/>
 
-                    <Button x:Name="ClearWindowBackgroundColorButton"
-                            Grid.Column="2"
+                    <Button Grid.Column="2"
                             Content="Clear"
                             Height="23"
                             Margin="0,0,8,0"
-                            Click="ClearWindowBackgroundColorButton_Click"/>
+                            Tag="windowbackgroundcolor"
+                            Click="ClearColorButton_Click"/>
 
                     <Border x:Name="WindowBackgroundColorPreview"
                             Grid.Column="3"
