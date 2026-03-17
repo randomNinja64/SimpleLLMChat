@@ -11,6 +11,9 @@ namespace SimpleLLMChatCLI
         // Maximum character limit for file and website content
         public static int MAX_CONTENT_LENGTH = 8000;
 
+        // Maximum number of search results to return
+        public static int MAX_SEARCH_RESULTS = 20;
+
         // SearxNG instance URL
         public static string SEARXNG_INSTANCE = "";
 
@@ -54,6 +57,9 @@ namespace SimpleLLMChatCLI
 
             // Get and set max content length
             MAX_CONTENT_LENGTH = config.GetMaxContentLength();
+
+            // Get and set max search results
+            MAX_SEARCH_RESULTS = config.GetMaxSearchResults();
 
             // Get and set SearxNG instance
             SEARXNG_INSTANCE = config.GetSearxNGInstance();

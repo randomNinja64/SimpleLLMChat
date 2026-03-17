@@ -55,6 +55,7 @@ public class ConfigHandler
     public string GetSearxNGInstance() => GetConfigValue("searxnginstance");
     public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
     public int GetMaxContentLength() => GetConfigInt("maxcontentlength", 8000);
+    public int GetMaxSearchResults() => GetConfigInt("maxsearchresults", 20);
 
     // Helper method to parse comma-separated list from config
     private List<string> GetConfigList(string key)

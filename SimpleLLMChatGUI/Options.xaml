@@ -78,6 +78,12 @@
                         Text="{Binding MaxContentLength, UpdateSourceTrigger=PropertyChanged}"
                         Height="23"/>
 
+                <!-- Maximum Search Results -->
+                <Label Content="Maximum Search Results:"/>
+                <TextBox x:Name="MaxSearchResultsTextBox"
+                        Text="{Binding MaxSearchResults, UpdateSourceTrigger=PropertyChanged}"
+                        Height="23"/>
+
                 <!-- Model -->
                 <Label Content="Model:"/>
                 <TextBox x:Name="ModelTextBox"

@@ -17,6 +17,7 @@ namespace SimpleLLMChatGUI
         private string _assistantName;
         private bool _showToolOutput;
         private int _maxContentLength;
+        private int _maxSearchResults;
         private bool _markdownParsing;
         private string _searxngInstance;
         private string _customFontFamily;
@@ -80,6 +81,12 @@ namespace SimpleLLMChatGUI
             set { _maxContentLength = value; OnPropertyChanged(nameof(MaxContentLength)); }
         }
 
+        public int MaxSearchResults
+        {
+            get { return _maxSearchResults; }
+            set { _maxSearchResults = value; OnPropertyChanged(nameof(MaxSearchResults)); }
+        }
+
         public bool MarkdownParsing
         {
             get { return _markdownParsing; }
@@ -126,6 +133,7 @@ namespace SimpleLLMChatGUI
             AssistantName = "";
             ShowToolOutput = true; // Default to showing tool outputs
             MaxContentLength = 8000; // Default to 8000 characters
+            MaxSearchResults = 20; // Default to 20 results
             MarkdownParsing = true; // Default to enabling markdown parsing
             SearxNGInstance = ""; // Default to empty
             CustomFontFamily = ""; // Default to empty (use system default)
@@ -179,6 +187,11 @@ namespace SimpleLLMChatGUI
                 {
                     if (int.TryParse(value, out int maxLength))
                         MaxContentLength = maxLength;
+                });
+                LoadSettingValue(App.Settings, "maxsearchresults", value =>
+                {
+                    if (int.TryParse(value, out int maxResults))
+                        MaxSearchResults = maxResults;
                 });
                 LoadSettingValue(App.Settings, "markdownparsing", value => MarkdownParsing = (value == "1"));
                 LoadSettingValue(App.Settings, "searxnginstance", value => SearxNGInstance = value);
@@ -242,6 +255,7 @@ namespace SimpleLLMChatGUI
                 "fontsize=" + ChatFontSize,
                 "llmserver=" + ServerURL,
                 "maxcontentlength=" + MaxContentLength,
+                "maxsearchresults=" + MaxSearchResults,
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
                 "model=" + Model,
                 "searxnginstance=" + SearxNGInstance,

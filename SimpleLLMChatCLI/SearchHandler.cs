@@ -38,7 +38,14 @@ public static class SearchHandler
         // Parse the response using the provided parser
         try
         {
-            return parser(response, out exitCode);
+            string parsed = parser(response, out exitCode);
+
+            // Truncate to max search results
+            string[] lines = parsed.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (lines.Length > Program.MAX_SEARCH_RESULTS)
+                parsed = string.Join("\n", lines, 0, Program.MAX_SEARCH_RESULTS) + "\n";
+
+            return parsed;
         }
         catch
         {
