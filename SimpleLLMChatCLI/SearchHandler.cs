@@ -11,7 +11,7 @@ public static class SearchHandler
     private delegate string ResultParser(string response, out int exitCode);
 
     // Generic search template - executes curl and parses results
-    private static string ExecuteSearch(string url, ResultParser parser, out int exitCode)
+    private static string ExecuteSearch(string url, ResultParser parser, out int exitCode, params string[] headers)
     {
         exitCode = 0;
         string response = "";
@@ -19,7 +19,8 @@ public static class SearchHandler
         // Execute curl request
         try
         {
-            string arguments = $"-s -L \"{url}\" -H \"User-Agent: {ToolHandler.USER_AGENT}\"";
+            string headerArgs = string.Concat(System.Array.ConvertAll(headers, h => $" -H \"{h}\""));
+            string arguments = $"-s -L \"{url}\" -H \"User-Agent: {ToolHandler.USER_AGENT}\"{headerArgs}";
             response = ToolHandler.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
         }
         catch (Exception ex)
@@ -58,7 +59,9 @@ public static class SearchHandler
     public static string RunDDGSearch(string query, out int exitCode)
     {
         string url = "https://duckduckgo.com/html/?q=" + HttpUtility.UrlEncode(query);
-        return ExecuteSearch(url, ParseDDGResults, out exitCode);
+        return ExecuteSearch(url, ParseDDGResults, out exitCode,
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language: en-US,en;q=0.5");
     }
 
     // Parses DuckDuckGo HTML results
