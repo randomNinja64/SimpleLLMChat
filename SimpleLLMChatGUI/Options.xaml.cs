@@ -174,51 +174,30 @@ namespace SimpleLLMChatGUI
             // Apply custom font to this window
             FontHandler.ApplyFontToWindow(this);
 
-            if (App.Settings.Count > 0 || File.Exists(App.ConfigFileName))
-            {
+            var config = App.Config;
+            ServerURL = config.GetLLMEndpoint();
+            ApiKey = config.GetApiKey();
+            Model = config.GetModel();
+            SysPrompt = config.GetSysPrompt().Trim('"');
+            AssistantName = config.GetAssistantName();
+            ShowToolOutput = config.GetShowToolOutput();
+            MaxContentLength = config.GetMaxContentLength();
+            MaxSearchResults = config.GetMaxSearchResults();
+            MarkdownParsing = config.GetMarkdownParsing();
+            SearxNGInstance = config.GetSearxNGInstance();
+            CustomFontFamily = config.GetCustomFontFamily();
+            ChatFontSize = config.GetFontSize();
 
-                LoadSettingValue(App.Settings, "llmserver", value => ServerURL = value);
-                LoadSettingValue(App.Settings, "apikey", value => ApiKey = value);
-                LoadSettingValue(App.Settings, "model", value => Model = value);
-                LoadSettingValue(App.Settings, "sysprompt", value => SysPrompt = value.Trim('"'));
-                LoadSettingValue(App.Settings, "assistantname", value => AssistantName = value);
-                LoadSettingValue(App.Settings, "showtooloutput", value => ShowToolOutput = (value == "1"));
-                LoadSettingValue(App.Settings, "maxcontentlength", value =>
-                {
-                    if (int.TryParse(value, out int maxLength))
-                        MaxContentLength = maxLength;
-                });
-                LoadSettingValue(App.Settings, "maxsearchresults", value =>
-                {
-                    if (int.TryParse(value, out int maxResults))
-                        MaxSearchResults = maxResults;
-                });
-                LoadSettingValue(App.Settings, "markdownparsing", value => MarkdownParsing = (value == "1"));
-                LoadSettingValue(App.Settings, "searxnginstance", value => SearxNGInstance = value);
-                LoadSettingValue(App.Settings, "customfontfamily", value => CustomFontFamily = value);
-                LoadSettingValue(App.Settings, "fontsize", value =>
-                {
-                    if (int.TryParse(value, out int fontSize) && fontSize > 0)
-                        ChatFontSize = fontSize;
-                });
+            var enabledTools = config.GetEnabledTools();
+            if (enabledTools.Count > 0)
+                ApplyToolSelectionToListBox(ToolsListBox, string.Join(",", enabledTools));
 
-                LoadSettingValue(App.Settings, "tools", value => ApplyToolSelectionToListBox(ToolsListBox, value));
-                LoadSettingValue(App.Settings, "toolsrequiringapproval", value => ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, value));
+            var approvalTools = config.GetToolsRequiringApproval();
+            if (approvalTools.Count > 0)
+                ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, string.Join(",", approvalTools));
 
-                // Sync password box manually (not bound)
-                ApiKeyPasswordBox.Password = ApiKey;
-            }
-            else
-            {
-                MessageBox.Show("INI file not found: " + App.ConfigFileName, "Warning",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        }
-
-        private void LoadSettingValue(Dictionary<string, string> settings, string key, Action<string> setter)
-        {
-            if (settings.TryGetValue(key, out string value))
-                setter(value);
+            // Sync password box manually (not bound)The name 'Fonts' does not exist in the current context
+            ApiKeyPasswordBox.Password = ApiKey;
         }
 
         protected virtual void OnPropertyChanged(string propertyName)

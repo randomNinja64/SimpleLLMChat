@@ -35,6 +35,7 @@ fontsize= Size of the displayed text in chat
 llmserver= (OpenAI-compatible endpoint in the format http://ip:port)
 markdownparsing= 0/1 (controls whether or not markdown is rendered)
 maxcontentlength= (number of characters to load from a file/webpage, adjust according to your context window)
+maxsearchresults= (maximum number of search results to retrieve via the search tool)
 model= modelname (model to load (if supported by your endpoint))
 searxnginstance= (optional, SearXNG JSON API is supported for web search)
 showtooloutput= 0/1 (controls whether or not the full output of tool calls is shown)

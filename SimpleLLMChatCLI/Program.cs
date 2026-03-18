@@ -36,10 +36,10 @@ namespace SimpleLLMChatCLI
             );
 
             // Get enabled tools
-            List<string> enabledTools = Config.getEnabledTools();
+            List<string> enabledTools = Config.GetEnabledTools();
 
             // Get tools requiring approval
-            List<string> toolsRequiringApproval = Config.getToolsRequiringApproval();
+            List<string> toolsRequiringApproval = Config.GetToolsRequiringApproval();
 
             // Get show tool output setting
             bool showToolOutput = Config.GetShowToolOutput();

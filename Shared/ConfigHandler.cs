@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
-namespace SimpleLLMChatCLI
-{
+/// <summary>
+/// Shared configuration handler for both CLI and GUI projects.
+/// Wraps IniFileHandler with typed getters for common settings.
+/// </summary>
 public class ConfigHandler
 {
     private Dictionary<string, string> configMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -15,17 +17,6 @@ public class ConfigHandler
     private void LoadConfig(string filename)
     {
         configMap = IniFileHandler.LoadIni(filename);
-        
-        if (configMap.Count == 0 && System.IO.File.Exists(filename))
-        {
-            // File exists but is empty or has no valid entries
-            // This is not necessarily an error, so we don't log it
-        }
-        else if (configMap.Count == 0)
-        {
-            // File doesn't exist - log warning
-            Console.Error.WriteLine("Failed to open config file: " + filename);
-        }
     }
 
     // Generic helper methods to reduce repetition
@@ -48,17 +39,6 @@ public class ConfigHandler
         return defaultValue;
     }
 
-    // Public getter methods
-    public string GetLLMEndpoint() => GetConfigValue("llmserver");
-    public string GetApiKey() => GetConfigValue("apiKey");
-    public string GetModel() => GetConfigValue("model");
-    public string GetSysPrompt() => GetConfigValue("sysprompt");
-    public string GetAssistantName() => GetConfigValue("assistantname");
-    public string GetSearxNGInstance() => GetConfigValue("searxnginstance");
-    public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
-    public int GetMaxContentLength() => GetConfigInt("maxcontentlength", AppConstants.DefaultMaxContentLength);
-    public int GetMaxSearchResults() => GetConfigInt("maxsearchresults", AppConstants.DefaultMaxSearchResults);
-
     // Helper method to parse comma-separated list from config
     private List<string> GetConfigList(string key)
     {
@@ -80,14 +60,19 @@ public class ConfigHandler
         return list;
     }
 
-    public List<string> getEnabledTools()
-    {
-        return GetConfigList("tools");
-    }
-
-    public List<string> getToolsRequiringApproval()
-    {
-        return GetConfigList("toolsrequiringapproval");
-    }
-}
+    // Public getter methods
+    public string GetLLMEndpoint() => GetConfigValue("llmserver");
+    public string GetApiKey() => GetConfigValue("apiKey");
+    public string GetModel() => GetConfigValue("model");
+    public string GetSysPrompt() => GetConfigValue("sysprompt");
+    public string GetAssistantName() => GetConfigValue("assistantname");
+    public string GetSearxNGInstance() => GetConfigValue("searxnginstance");
+    public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
+    public int GetMaxContentLength() => GetConfigInt("maxcontentlength", AppConstants.DefaultMaxContentLength);
+    public int GetMaxSearchResults() => GetConfigInt("maxsearchresults", AppConstants.DefaultMaxSearchResults);
+    public bool GetMarkdownParsing() => GetConfigBool("markdownparsing", true);
+    public string GetCustomFontFamily() => GetConfigValue("customfontfamily");
+    public int GetFontSize() => GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
+    public List<string> GetEnabledTools() => GetConfigList("tools");
+    public List<string> GetToolsRequiringApproval() => GetConfigList("toolsrequiringapproval");
 }

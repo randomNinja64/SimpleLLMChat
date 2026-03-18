@@ -49,7 +49,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ConfigHandler.cs" />
     <Compile Include="DownloadHandler.cs" />
     <Compile Include="FileHandler.cs" />
     <Compile Include="ImageHandler.cs" />
@@ -63,7 +62,11 @@
     </Compile>
     <Compile Include="..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
-    </Compile>  </ItemGroup>
+    </Compile>
+    <Compile Include="..\Shared\ConfigHandler.cs">
+      <Link>Shared\ConfigHandler.cs</Link>
+    </Compile>
+  </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />

@@ -80,7 +80,11 @@
     </Compile>
     <Compile Include="..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
-    </Compile>    <Compile Include="MainWindow.xaml.cs">
+    </Compile>
+    <Compile Include="..\Shared\ConfigHandler.cs">
+      <Link>Shared\ConfigHandler.cs</Link>
+    </Compile>
+    <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>

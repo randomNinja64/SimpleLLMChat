@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -19,8 +17,8 @@ namespace SimpleLLMChatGUI
             var defaultFont = SystemFonts.MessageFontFamily;
 
             // Use default font if no custom font specified
-            if (!App.Settings.TryGetValue("customfontfamily", out string fontFamilyName) ||
-                string.IsNullOrWhiteSpace(fontFamilyName) ||
+            string fontFamilyName = App.Config.GetCustomFontFamily();
+            if (string.IsNullOrWhiteSpace(fontFamilyName) ||
                 fontFamilyName.Equals("Default", StringComparison.OrdinalIgnoreCase))
             {
                 window.FontFamily = defaultFont;
@@ -51,14 +49,7 @@ namespace SimpleLLMChatGUI
 
         public static int GetFontSize()
         {
-            if (App.Settings.TryGetValue("fontsize", out string fontSizeValue))
-            {
-                if (int.TryParse(fontSizeValue, out int parsedSize) && parsedSize > 0)
-                {
-                    return parsedSize;
-                }
-            }
-            return DefaultFontSize;
+            return App.Config.GetFontSize();
         }
 
         public static void ApplyFontSizeToControl(Control control, int fontSize)
