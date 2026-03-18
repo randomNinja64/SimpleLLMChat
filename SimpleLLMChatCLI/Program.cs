@@ -2,20 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using static LLMClient;
 
 namespace SimpleLLMChatCLI
 {
     internal class Program
     {
-        // Maximum character limit for file and website content
-        public static int MAX_CONTENT_LENGTH = 8000;
-
-        // Maximum number of search results to return
-        public static int MAX_SEARCH_RESULTS = 20;
-
-        // SearxNG instance URL
-        public static string SEARXNG_INSTANCE = "";
+        public static ConfigHandler Config;
 
         // Print interactive CLI instructions
         static void printCliInstructions()
@@ -31,41 +23,29 @@ namespace SimpleLLMChatCLI
             Console.InputEncoding = Encoding.UTF8;
             Console.OutputEncoding = Encoding.UTF8;
 
-            // Get the directory where the executable is located
-            string exeDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            string configPath = System.IO.Path.Combine(exeDirectory, "LLMSettings.ini");
-
             // Load configuration
-            ConfigHandler config = new ConfigHandler(configPath);
+            Config = new ConfigHandler(System.IO.Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
 
             // Initialize LLMClient
             LLMClient client = new LLMClient(
-                config.GetLLMEndpoint(),
-                config.GetApiKey(),
-                config.GetModel(),
-                config.GetSysPrompt()
+                Config.GetLLMEndpoint(),
+                Config.GetApiKey(),
+                Config.GetModel(),
+                Config.GetSysPrompt()
             );
 
             // Get enabled tools
-            List<string> enabledTools = config.getEnabledTools();
+            List<string> enabledTools = Config.getEnabledTools();
 
             // Get tools requiring approval
-            List<string> toolsRequiringApproval = config.getToolsRequiringApproval();
+            List<string> toolsRequiringApproval = Config.getToolsRequiringApproval();
 
             // Get show tool output setting
-            bool showToolOutput = config.GetShowToolOutput();
-
-            // Get and set max content length
-            MAX_CONTENT_LENGTH = config.GetMaxContentLength();
-
-            // Get and set max search results
-            MAX_SEARCH_RESULTS = config.GetMaxSearchResults();
-
-            // Get and set SearxNG instance
-            SEARXNG_INSTANCE = config.GetSearxNGInstance();
+            bool showToolOutput = Config.GetShowToolOutput();
 
             // Conversation storage
-            List<ChatMessage> conversation = new List<ChatMessage>();
+            List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
 
             bool showBanners = true;
 
@@ -137,7 +117,7 @@ namespace SimpleLLMChatCLI
                         conversation,
                         textPrompt,
                         base64Image,
-                        config.GetAssistantName(),
+                        Config.GetAssistantName(),
                         enabledTools,
                         toolsRequiringApproval,
                         outputOnly,
@@ -221,7 +201,7 @@ namespace SimpleLLMChatCLI
                 client.ProcessConversation(conversation,
                                 textPrompt,
                                 imageBase64,
-                                config.GetAssistantName(),
+                                Config.GetAssistantName(),
                                 enabledTools,
                                 toolsRequiringApproval,
                                 false,

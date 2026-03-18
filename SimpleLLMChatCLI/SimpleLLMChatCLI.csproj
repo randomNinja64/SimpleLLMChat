@@ -61,7 +61,9 @@
     <Compile Include="..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>
-  </ItemGroup>
+    <Compile Include="..\Shared\Constants.cs">
+      <Link>Shared\Constants.cs</Link>
+    </Compile>  </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />

@@ -1,10 +1,11 @@
 using Newtonsoft.Json.Linq;
-using SimpleLLMChatCLI;
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 
+namespace SimpleLLMChatCLI
+{
 public static class SearchHandler
 {
     // Delegate for parsing search results from raw response
@@ -43,8 +44,8 @@ public static class SearchHandler
 
             // Truncate to max search results
             string[] lines = parsed.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            if (lines.Length > Program.MAX_SEARCH_RESULTS)
-                parsed = string.Join("\n", lines, 0, Program.MAX_SEARCH_RESULTS) + "\n";
+            if (lines.Length > Program.Config.GetMaxSearchResults())
+                parsed = string.Join("\n", lines, 0, Program.Config.GetMaxSearchResults()) + "\n";
 
             return parsed;
         }
@@ -145,7 +146,7 @@ public static class SearchHandler
     // Searches the web with SearXNG
     public static string RunSearXNGSearch(string query, out int exitCode)
     {
-        string url = Program.SEARXNG_INSTANCE + "/search?q=" + HttpUtility.UrlEncode(query) + "&format=json";
+        string url = Program.Config.GetSearxNGInstance() + "/search?q=" + HttpUtility.UrlEncode(query) + "&format=json";
         return ExecuteSearch(url, ParseSearXNGResults, out exitCode);
     }
 
@@ -184,4 +185,4 @@ public static class SearchHandler
     }
 
 }
-
+}

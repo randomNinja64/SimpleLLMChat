@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Text;
 
+namespace SimpleLLMChatCLI
+{
 public static class FileHandler
 {
     public static string ReadFile(string filename, out int exitCode, int offset = 0)
@@ -32,7 +34,7 @@ public static class FileHandler
             }
 
             // Always read up to MAX_CONTENT_LENGTH characters (or until EOF)
-            int endPos = Math.Min(offset + SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH, totalLength);
+            int endPos = Math.Min(offset + Program.Config.GetMaxContentLength(), totalLength);
             string excerpt = content.Substring(offset, endPos - offset);
 
             // Build result with header
@@ -334,4 +336,4 @@ public static class FileHandler
         return string.Format("{0:0.##} {1}", len, sizes[order]);
     }
 }
-
+}

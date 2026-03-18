@@ -5,6 +5,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+
+namespace SimpleLLMChatCLI
+{
 public static class ToolHandler
 {
     // Common user agent string for HTTP requests
@@ -55,7 +58,7 @@ public static class ToolHandler
                         string output = "";
                         
                         // If SearXNG instance is set, try it first
-                        if (!string.IsNullOrWhiteSpace(SimpleLLMChatCLI.Program.SEARXNG_INSTANCE))
+                        if (!string.IsNullOrWhiteSpace(Program.Config.GetSearxNGInstance()))
                         {
                             output = SearchHandler.RunSearXNGSearch(query, out exitCode);
                         }
@@ -346,8 +349,8 @@ public static class ToolHandler
             // Trim leading/trailing whitespace from each line
             html = Regex.Replace(html, @"^\s+|\s+$", "", RegexOptions.Multiline);
             // Truncate to max content length
-            if (html.Length > SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH)
-                html = html.Substring(0, SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH);
+            if (html.Length > Program.Config.GetMaxContentLength())
+                html = html.Substring(0, Program.Config.GetMaxContentLength());
         }
         catch (Exception ex)
         {
@@ -433,4 +436,5 @@ public static class ToolHandler
     {
         return $"Command: {command}\nExit Code: {exitCode}\nOutput:\n{output}";
     }
+}
 }

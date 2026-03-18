@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
+namespace SimpleLLMChatCLI
+{
 public class ConfigHandler
 {
     private Dictionary<string, string> configMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -54,8 +56,8 @@ public class ConfigHandler
     public string GetAssistantName() => GetConfigValue("assistantname");
     public string GetSearxNGInstance() => GetConfigValue("searxnginstance");
     public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
-    public int GetMaxContentLength() => GetConfigInt("maxcontentlength", 8000);
-    public int GetMaxSearchResults() => GetConfigInt("maxsearchresults", 20);
+    public int GetMaxContentLength() => GetConfigInt("maxcontentlength", AppConstants.DefaultMaxContentLength);
+    public int GetMaxSearchResults() => GetConfigInt("maxsearchresults", AppConstants.DefaultMaxSearchResults);
 
     // Helper method to parse comma-separated list from config
     private List<string> GetConfigList(string key)
@@ -87,4 +89,5 @@ public class ConfigHandler
     {
         return GetConfigList("toolsrequiringapproval");
     }
+}
 }

@@ -132,12 +132,12 @@ namespace SimpleLLMChatGUI
             SysPrompt = "";
             AssistantName = "";
             ShowToolOutput = true; // Default to showing tool outputs
-            MaxContentLength = 8000; // Default to 8000 characters
-            MaxSearchResults = 20; // Default to 20 results
+            MaxContentLength = AppConstants.DefaultMaxContentLength;
+            MaxSearchResults = AppConstants.DefaultMaxSearchResults;
             MarkdownParsing = true; // Default to enabling markdown parsing
             SearxNGInstance = ""; // Default to empty
             CustomFontFamily = ""; // Default to empty (use system default)
-            ChatFontSize = 12; // Default font size
+            ChatFontSize = AppConstants.DefaultChatFontSize;
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
+namespace SimpleLLMChatCLI
+{
 public static class DownloadHandler
 {
     public static string DownloadVideo(string URL, out int exitCode)
@@ -220,4 +222,4 @@ public static class DownloadHandler
         return null;
     }
 }
-
+}

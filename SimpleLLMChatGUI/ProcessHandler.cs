@@ -264,11 +264,5 @@ namespace SimpleLLMChatGUI
                 llmProcess.Dispose();
             }
         }
-
-        public void RestartProcess()
-        {
-            Dispose();
-            StartProcess("SimpleLLMChatCLI.exe");
-        }
     }
 }

@@ -9,6 +9,8 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Windows.Forms;
 
+namespace SimpleLLMChatCLI
+{
 public class LLMClient
 {
     private struct PropertyInfo
@@ -347,11 +349,11 @@ public class LLMClient
                 case "read_file":
                     tool = CreateToolDefinition(
                         "read_file",
-                        $"Read the contents of a local file and return it as a string. Always reads up to {SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH} characters. Use the offset parameter to read different parts of large files.",
+                        $"Read the contents of a local file and return it as a string. Always reads up to {Program.Config.GetMaxContentLength()} characters. Use the offset parameter to read different parts of large files.",
                         new Dictionary<string, PropertyInfo>
                         {
                             { "filename", new PropertyInfo("string", "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
-                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH} reads characters {SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH}-{SimpleLLMChatCLI.Program.MAX_CONTENT_LENGTH * 2}.") }
+                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {Program.Config.GetMaxContentLength()} reads characters {Program.Config.GetMaxContentLength()}-{Program.Config.GetMaxContentLength() * 2}.") }
                         },
                         new[] { "filename" }
                     );
@@ -613,7 +615,6 @@ public class LLMClient
 
                 // ✅ accumulate tool call argument chunks across deltas
                 Dictionary<int, ToolHandler.ToolCall> partialToolCalls = new Dictionary<int, ToolHandler.ToolCall>();
-                string lastEvent = null; // Track the last event type for error handling
 
                 while ((line = reader.ReadLine()) != null)
                 {
@@ -622,15 +623,13 @@ public class LLMClient
                         string jsonPart = line.Substring(6);
                         if (jsonPart == "[DONE]") break;
 
-                        // Check if this is an error response (either from event: error or error object in data)
-                        if (lastEvent == "error" || jsonPart.Contains("\"error\""))
+                        // Check if this is an error response
+                        if (jsonPart.Contains("\"error\""))
                         {
                             Console.Write("[API Error] " + jsonPart.Trim() + "\n");
-                            lastEvent = null;
                             continue;
                         }
-                        
-                        lastEvent = null; // Reset event type after processing
+
 
                         try
                         {
@@ -719,4 +718,5 @@ public class LLMClient
 
         return completionResponse;
     }
+}
 }
