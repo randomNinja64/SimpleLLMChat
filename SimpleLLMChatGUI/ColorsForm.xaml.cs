@@ -29,22 +29,13 @@ namespace SimpleLLMChatGUI
         private void InitializeColorSettings()
         {
             _colorSettings = new Dictionary<string, ColorSetting>();
-            
-            // Map preview borders to keys
-            var previewBorders = new Dictionary<string, Border>
-            {
-                { "buttontextcolor", ButtonTextColorPreview },
-                { "chatbackgroundcolor", ChatBackgroundColorPreview },
-                { "chattextcolor", ChatTextColorPreview },
-                { "codeblockbackgroundcolor", CodeBlockBackgroundColorPreview },
-                { "labeltextcolor", LabelTextColorPreview },
-                { "windowbackgroundcolor", WindowBackgroundColorPreview }
-            };
 
-            // Use centralized color configuration
+            // Use centralized color configuration and find preview borders by naming convention
             foreach (var config in ColorHelper.ColorConfigs.Values)
             {
-                if (previewBorders.TryGetValue(config.Key, out Border previewBorder))
+                // Border names follow PascalCase + "Preview" convention (e.g. "buttontextcolor" -> "ButtonTextColorPreview")
+                var previewBorder = FindName(config.ResourceKey.Replace("Brush", "Preview")) as Border;
+                if (previewBorder != null)
                 {
                     _colorSettings[config.Key] = new ColorSetting
                     {
