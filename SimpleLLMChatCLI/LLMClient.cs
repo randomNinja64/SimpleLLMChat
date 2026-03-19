@@ -25,18 +25,11 @@ public class LLMClient
         }
     }
     
-    private readonly string llmEndpoint;
-    private readonly string apiKey;
-    private readonly string model;
-    private readonly string systemPrompt;
+    private readonly ConfigHandler config;
 
-    public LLMClient(string llmEndpoint, string key, string mdl, string sysprompt)
+    public LLMClient(ConfigHandler config)
     {
-        this.llmEndpoint = llmEndpoint;
-        this.apiKey = key;
-        this.model = mdl;
-        this.systemPrompt = sysprompt;
-
+        this.config = config;
         // Enable modern TLS protocols for HTTPS support
         // .NET 4.0 only has named constant for Tls (1.0)
         // Tls11 = 768, Tls12 = 3072 (numeric values used until .NET 4.5+)
@@ -77,12 +70,14 @@ public class LLMClient
         public string Content;
         public List<ToolHandler.ToolCall> ToolCalls;
         public string FinishReason;
+        public int ReasoningSeconds;
 
         public LLMCompletionResponse(string content, List<ToolHandler.ToolCall> toolCalls, string finishReason)
         {
             Content = content;
             ToolCalls = toolCalls ?? new List<ToolHandler.ToolCall>();
             FinishReason = finishReason;
+            ReasoningSeconds = 0;
         }
     }
 
@@ -113,7 +108,16 @@ public class LLMClient
                 Console.Write(assistantName + ": ");
             }
 
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools);
+            Action<string> onReasoningChunk = (!outputOnly && config.GetShowReasoningOutput()) ? (Action<string>)Console.Write : null;
+            Action<int> onReasoningSummary = (!outputOnly && !config.GetShowReasoningOutput()) ?
+                (Action<int>)(s => Console.WriteLine("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]")) : null;
+            LLMCompletionResponse response = sendMessages(conversation, enabledTools, onReasoningChunk, onReasoningSummary);
+
+            if (response.FinishReason == "request_failed")
+            {
+                Console.WriteLine("Request to LLM Failed (" + response.Content + ")");
+                break;
+            }
 
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
@@ -349,11 +353,11 @@ public class LLMClient
                 case "read_file":
                     tool = CreateToolDefinition(
                         "read_file",
-                        $"Read the contents of a local file and return it as a string. Always reads up to {Program.Config.GetMaxContentLength()} characters. Use the offset parameter to read different parts of large files.",
+                        $"Read the contents of a local file and return it as a string. Always reads up to {config.GetMaxContentLength()} characters. Use the offset parameter to read different parts of large files.",
                         new Dictionary<string, PropertyInfo>
                         {
                             { "filename", new PropertyInfo("string", "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.") },
-                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {Program.Config.GetMaxContentLength()} reads characters {Program.Config.GetMaxContentLength()}-{Program.Config.GetMaxContentLength() * 2}.") }
+                            { "offset", new PropertyInfo("string", $"Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {config.GetMaxContentLength()} reads characters {config.GetMaxContentLength()}-{config.GetMaxContentLength() * 2}.") }
                         },
                         new[] { "filename" }
                     );
@@ -539,12 +543,12 @@ public class LLMClient
         return msgObj;
     }
 
-    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools)
+    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools, Action<string> onReasoningChunk, Action<int> onReasoningSummary)
     {
         // Build payload
         JObject payload = new JObject
         {
-            ["model"] = model
+            ["model"] = config.GetModel()
         };
 
         // Messages
@@ -554,7 +558,7 @@ public class LLMClient
         JObject systemMsg = new JObject
         {
             ["role"] = "system",
-            ["content"] = systemPrompt
+            ["content"] = config.GetSysPrompt()
         };
         messages.Add(systemMsg);
 
@@ -579,10 +583,10 @@ public class LLMClient
 
         payload["stream"] = true;
 
-        return SendHttpRequest(payload);
+        return SendHttpRequest(payload, onReasoningChunk, onReasoningSummary);
     }
 
-    private LLMCompletionResponse SendHttpRequest(JObject payload)
+    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> onReasoningChunk, Action<int> onReasoningSummary)
     {
         LLMCompletionResponse completionResponse = new LLMCompletionResponse
         {
@@ -593,10 +597,10 @@ public class LLMClient
 
         try
         {
-            var request = (HttpWebRequest)WebRequest.Create($"{llmEndpoint}/v1/chat/completions");
+            var request = (HttpWebRequest)WebRequest.Create($"{config.GetLLMEndpoint()}/v1/chat/completions");
             request.Method = "POST";
             request.ContentType = "application/json";
-            request.Headers.Add("Authorization", "Bearer " + apiKey);
+            request.Headers.Add("Authorization", "Bearer " + config.GetApiKey());
 
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
             request.ContentLength = payloadBytes.Length;
@@ -612,6 +616,8 @@ public class LLMClient
             {
                 string line;
                 StringBuilder output = new StringBuilder();
+                bool inReasoning = false;
+                DateTime reasoningStart = DateTime.MinValue;
 
                 // ✅ accumulate tool call argument chunks across deltas
                 Dictionary<int, ToolHandler.ToolCall> partialToolCalls = new Dictionary<int, ToolHandler.ToolCall>();
@@ -639,9 +645,43 @@ public class LLMClient
 
                             foreach (JObject choice in choices)
                             {
+                                string reasoningChunk = (string)choice["delta"]?["reasoning_content"]
+                                    ?? (string)choice["delta"]?["reasoning"];
+                                if (!string.IsNullOrEmpty(reasoningChunk))
+                                {
+                                    if (onReasoningChunk != null)
+                                    {
+                                        if (!inReasoning)
+                                        {
+                                            Console.Write("[thinking]\n");
+                                            inReasoning = true;
+                                        }
+                                        onReasoningChunk(reasoningChunk);
+                                    }
+                                    else if (!inReasoning)
+                                    {
+                                        reasoningStart = DateTime.UtcNow;
+                                        inReasoning = true;
+                                    }
+                                }
+
                                 string content = (string)choice["delta"]?["content"];
                                 if (!string.IsNullOrEmpty(content))
                                 {
+                                    if (inReasoning && onReasoningChunk != null)
+                                    {
+                                        Console.Write("\n[/thinking]");
+                                        Console.WriteLine();
+                                        inReasoning = false;
+                                    }
+                                    else if (inReasoning)
+                                    {
+                                        int seconds = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
+                                        completionResponse.ReasoningSeconds = seconds;
+                                        if (onReasoningSummary != null)
+                                            onReasoningSummary(seconds);
+                                        inReasoning = false;
+                                    }
                                     Console.Write(content);
                                     output.Append(content);
                                 }
@@ -704,16 +744,47 @@ public class LLMClient
                     }
                 }
 
+                // Close reasoning block if stream ended while still inside one
+                if (inReasoning && onReasoningChunk != null)
+                {
+                    Console.Write("\n[/thinking]");
+                    Console.WriteLine();
+                }
+                else if (inReasoning)
+                {
+                    int seconds = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
+                    completionResponse.ReasoningSeconds = seconds;
+                    if (onReasoningSummary != null)
+                        onReasoningSummary(seconds);
+                }
+
                 // finalize tool calls after stream ends
                 completionResponse.ToolCalls.AddRange(partialToolCalls.Values);
                 completionResponse.Content = output.ToString();
             }
         }
+        catch (WebException webEx)
+        {
+            string reason;
+            if (webEx.Response is HttpWebResponse errorResponse)
+            {
+                using (var errorStream = errorResponse.GetResponseStream())
+                using (var errorReader = new StreamReader(errorStream, Encoding.UTF8))
+                {
+                    string body = errorReader.ReadToEnd();
+                    reason = "HTTP " + (int)errorResponse.StatusCode + " " + errorResponse.StatusDescription + ": " + body;
+                }
+            }
+            else
+            {
+                reason = webEx.Message;
+            }
+
+            return new LLMCompletionResponse(reason, null, "request_failed");
+        }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("Error sending request: " + ex.Message);
-
-            return new LLMCompletionResponse("", null, "request_failed");
+            return new LLMCompletionResponse(ex.Message, null, "request_failed");
         }
 
         return completionResponse;

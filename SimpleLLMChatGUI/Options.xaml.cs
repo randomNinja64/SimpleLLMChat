@@ -16,6 +16,7 @@ namespace SimpleLLMChatGUI
         private string _sysPrompt;
         private string _assistantName;
         private bool _showToolOutput;
+        private bool _showReasoningOutput;
         private int _maxContentLength;
         private int _maxSearchResults;
         private bool _markdownParsing;
@@ -75,6 +76,12 @@ namespace SimpleLLMChatGUI
             set { _showToolOutput = value; OnPropertyChanged(nameof(ShowToolOutput)); }
         }
 
+        public bool ShowReasoningOutput
+        {
+            get { return _showReasoningOutput; }
+            set { _showReasoningOutput = value; OnPropertyChanged(nameof(ShowReasoningOutput)); }
+        }
+
         public int MaxContentLength
         {
             get { return _maxContentLength; }
@@ -132,6 +139,7 @@ namespace SimpleLLMChatGUI
             SysPrompt = "";
             AssistantName = "";
             ShowToolOutput = true; // Default to showing tool outputs
+            ShowReasoningOutput = true; // Default to showing reasoning output
             MaxContentLength = AppConstants.DefaultMaxContentLength;
             MaxSearchResults = AppConstants.DefaultMaxSearchResults;
             MarkdownParsing = true; // Default to enabling markdown parsing
@@ -181,6 +189,7 @@ namespace SimpleLLMChatGUI
             SysPrompt = config.GetSysPrompt().Trim('"');
             AssistantName = config.GetAssistantName();
             ShowToolOutput = config.GetShowToolOutput();
+            ShowReasoningOutput = config.GetShowReasoningOutput();
             MaxContentLength = config.GetMaxContentLength();
             MaxSearchResults = config.GetMaxSearchResults();
             MarkdownParsing = config.GetMarkdownParsing();
@@ -238,6 +247,7 @@ namespace SimpleLLMChatGUI
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
                 "model=" + Model,
                 "searxnginstance=" + SearxNGInstance,
+                "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
                 "tools=" + string.Join(",", selectedTools),

@@ -28,12 +28,7 @@ namespace SimpleLLMChatCLI
                 AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
 
             // Initialize LLMClient
-            LLMClient client = new LLMClient(
-                Config.GetLLMEndpoint(),
-                Config.GetApiKey(),
-                Config.GetModel(),
-                Config.GetSysPrompt()
-            );
+            LLMClient client = new LLMClient(Config);
 
             // Get enabled tools
             List<string> enabledTools = Config.GetEnabledTools();
