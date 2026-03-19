@@ -617,6 +617,7 @@ public class LLMClient
                 string line;
                 StringBuilder output = new StringBuilder();
                 bool inReasoning = false;
+                bool firstContent = true;
                 DateTime reasoningStart = DateTime.MinValue;
 
                 // ✅ accumulate tool call argument chunks across deltas
@@ -672,7 +673,9 @@ public class LLMClient
                                     {
                                         Console.Write("\n[/thinking]");
                                         Console.WriteLine();
+                                        Console.WriteLine();
                                         inReasoning = false;
+                                        firstContent = true;
                                     }
                                     else if (inReasoning)
                                     {
@@ -681,6 +684,12 @@ public class LLMClient
                                         if (onReasoningSummary != null)
                                             onReasoningSummary(seconds);
                                         inReasoning = false;
+                                    }
+                                    if (firstContent)
+                                    {
+                                        content = content.TrimStart('\n');
+                                        if (content.Length == 0) continue;
+                                        firstContent = false;
                                     }
                                     Console.Write(content);
                                     output.Append(content);
@@ -748,6 +757,7 @@ public class LLMClient
                 if (inReasoning && onReasoningChunk != null)
                 {
                     Console.Write("\n[/thinking]");
+                    Console.WriteLine();
                     Console.WriteLine();
                 }
                 else if (inReasoning)
