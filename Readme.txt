@@ -38,6 +38,7 @@ maxcontentlength= (number of characters to load from a file/webpage, adjust acco
 maxsearchresults= (maximum number of search results to retrieve via the search tool)
 model= modelname (model to load (if supported by your endpoint))
 searxnginstance= (optional, SearXNG JSON API is supported for web search)
+showreasoningoutput= 0/1 (controls whether the full output of model reasoning is shown)
 showtooloutput= 0/1 (controls whether or not the full output of tool calls is shown)
 sysprompt= "" (custom system prompt)
 tools= (a comma separated list of tools the AI is allowed to use)

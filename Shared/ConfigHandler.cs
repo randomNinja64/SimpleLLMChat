@@ -68,7 +68,7 @@ public class ConfigHandler
     public string GetAssistantName() => GetConfigValue("assistantname");
     public string GetSearxNGInstance() => GetConfigValue("searxnginstance");
     public bool GetShowToolOutput() => GetConfigBool("showtooloutput", false);
-    public bool GetShowReasoningOutput() => GetConfigBool("showreasoningoutput", true);
+    public bool GetShowReasoningOutput() => GetConfigBool("showreasoningoutput", false);
     public int GetMaxContentLength() => GetConfigInt("maxcontentlength", AppConstants.DefaultMaxContentLength);
     public int GetMaxSearchResults() => GetConfigInt("maxsearchresults", AppConstants.DefaultMaxSearchResults);
     public bool GetMarkdownParsing() => GetConfigBool("markdownparsing", true);
