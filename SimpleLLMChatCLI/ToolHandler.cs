@@ -192,13 +192,28 @@ public static class ToolHandler
     }
 
     // Generic process execution helper (public for use by other handlers)
+    // Resolve an executable by checking the dependencies/ folder first, then falling back to system PATH
+    private static string ResolveExecutable(string fileName)
+    {
+        string depsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dependencies");
+        if (Directory.Exists(depsDir))
+        {
+            string candidate = Path.Combine(depsDir, fileName);
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        // Fall back to system PATH resolution
+        return fileName;
+    }
+
     public static string ExecuteProcess(string fileName, string arguments, out int exitCode, bool combineErrorOutput = true)
     {
         try
         {
             ProcessStartInfo psi = new ProcessStartInfo
             {
-                FileName = fileName,
+                FileName = ResolveExecutable(fileName),
                 Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

@@ -205,7 +205,7 @@ namespace SimpleLLMChatGUI
             if (approvalTools.Count > 0)
                 ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, string.Join(",", approvalTools));
 
-            // Sync password box manually (not bound)The name 'Fonts' does not exist in the current context
+            // Sync password box manually (not bound)
             ApiKeyPasswordBox.Password = ApiKey;
         }
 

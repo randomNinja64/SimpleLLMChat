@@ -51,16 +51,16 @@ Tools (Available Tools/Requirements)
 copy_file: Copies a file on the user's PC.
 delete_file: Deletes a file from the user's PC.
 download_file: Downloads a file from the internet using cURL
-(Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
-download_video: Downloads a video from the internet using YT-DLP (Requires a yt-dlp.exe in the same folder as the exe)
-extract_file: Extracts an archive using 7-Zip (Requires a 7za.exe in the same folder as the exe)
+(Requires a curl.exe and preferably a ca-bundle.crt either in a "dependencies" subfolder or PATH variable)
+download_video: Downloads a video from the internet using YT-DLP (Requires a yt-dlp.exe either in a "dependencies" subfolder or PATH variable)
+extract_file: Extracts an archive using 7-Zip (Requires a 7za.exe in the either in a "dependencies" subfolder or PATH variable)
 list_directory: Lists the files and folders in a given path.
 move_file: Moves a file on the user's PC.
 read_file: Reads a file from the user's PC.
-read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
+read_website: Retrieves a cleaned up version of a website's HTML (Requires a curl.exe and preferably a ca-bundle.crt either in a "dependencies" subfolder or PATH variable)
 run_python_script: Creates a python script and runs it. (Requires Python installed to system PATH)
 run_shell_command: Runs a shell command (Enable with caution)
-run_web_search: Searches the web using SearXNG with DuckDuckGo and Wiby as fallbacks (Requires a curl.exe and preferably a ca-bundle.crt in the same folder as the exe)
+run_web_search: Searches the web using SearXNG with DuckDuckGo and Wiby as fallbacks (Requires a curl.exe and preferably a ca-bundle.crt either in a "dependencies" subfolder or PATH variable)
 write_file: Writes a file to the user's PC.
 
 ------------------------------------------------------------
