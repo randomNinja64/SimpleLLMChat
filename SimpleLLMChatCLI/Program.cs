@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -27,8 +28,13 @@ namespace SimpleLLMChatCLI
             Config = new ConfigHandler(System.IO.Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
 
+            // Initialize tool registry and load tools from tools/ directory
+            ToolRegistry registry = new ToolRegistry(Config);
+            string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
+            registry.LoadToolsFromDirectory(toolsDir);
+
             // Initialize LLMClient
-            LLMClient client = new LLMClient(Config);
+            LLMClient client = new LLMClient(Config, registry);
 
             // Get enabled tools
             List<string> enabledTools = Config.GetEnabledTools();

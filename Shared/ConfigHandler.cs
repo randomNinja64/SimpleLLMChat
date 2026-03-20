@@ -60,6 +60,23 @@ public class ConfigHandler
         return list;
     }
 
+    /// <summary>
+    /// Returns the string value for any config key, with proper defaults for int configs.
+    /// Returns null if the key has no value. Used for placeholder replacement in tool manifests.
+    /// </summary>
+    public string GetConfigString(string key)
+    {
+        switch (key.ToLowerInvariant())
+        {
+            case "maxcontentlength": return GetMaxContentLength().ToString();
+            case "maxsearchresults": return GetMaxSearchResults().ToString();
+            case "fontsize": return GetFontSize().ToString();
+            default:
+                string val = GetConfigValue(key);
+                return string.IsNullOrEmpty(val) ? null : val;
+        }
+    }
+
     // Public getter methods
     public string GetLLMEndpoint() => GetConfigValue("llmserver");
     public string GetApiKey() => GetConfigValue("apiKey");

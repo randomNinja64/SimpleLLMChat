@@ -1,0 +1,102 @@
+{
+    "executable": "BuiltInTools.exe",
+    "tools": [
+        {
+            "name": "run_shell_command",
+            "description": "Execute a shell command on the host system and return its output.",
+            "parameters": [
+                { "name": "command", "type": "string", "description": "Full command line to execute. Keep it short and avoid interactive programs.", "required": true }
+            ]
+        },
+        {
+            "name": "read_website",
+            "description": "Browse to a specific URL/web page and return its HTML content.",
+            "parameters": [
+                { "name": "URL", "type": "string", "description": "The URL of the web page to get the content of.", "required": true }
+            ]
+        },
+        {
+            "name": "run_web_search",
+            "description": "Search the web and return a list of URLs with brief snippets. If more detail is needed, URLs can be read with read_website.",
+            "parameters": [
+                { "name": "query", "type": "string", "description": "The search query to look up on the web.", "required": true }
+            ]
+        },
+        {
+            "name": "download_video",
+            "description": "Download an online video using YT-DLP to the user's desktop, returning YT-DLP's output.",
+            "parameters": [
+                { "name": "URL", "type": "string", "description": "The URL of the video to download.", "required": true }
+            ]
+        },
+        {
+            "name": "download_file",
+            "description": "Downloads a file from the internet using cURL and saves it to the provided location.",
+            "parameters": [
+                { "name": "filename", "type": "string", "description": "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "URL", "type": "string", "description": "The URL of the file to download.", "required": true }
+            ]
+        },
+        {
+            "name": "read_file",
+            "description": "Read the contents of a local file and return it as a string. Always reads up to {config.maxContentLength} characters. Use the offset parameter to read different parts of large files.",
+            "parameters": [
+                { "name": "filename", "type": "string", "description": "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "offset", "type": "string", "description": "Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {config.maxContentLength} reads characters {config.maxContentLength}-{config.maxContentLength*2}.", "required": false }
+            ]
+        },
+        {
+            "name": "write_file",
+            "description": "Write the given content to a local file, creating or overwriting it.",
+            "parameters": [
+                { "name": "filename", "type": "string", "description": "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "content", "type": "string", "description": "The content to write into the file.", "required": true }
+            ]
+        },
+        {
+            "name": "extract_file",
+            "description": "Extract an archive file using 7za.exe to a specified destination directory.",
+            "parameters": [
+                { "name": "archive_path", "type": "string", "description": "The full path of the archive file to extract. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "destination_path", "type": "string", "description": "The full path of the destination directory where files will be extracted. Directory will be created if it doesn't exist. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "move_file",
+            "description": "Move or rename a file from one location to another. Destination directory will be created if it doesn't exist.",
+            "parameters": [
+                { "name": "source_path", "type": "string", "description": "The full path of the file to move. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "destination_path", "type": "string", "description": "The full path where the file should be moved to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "copy_file",
+            "description": "Copy a file from one location to another. Destination directory will be created if it doesn't exist.",
+            "parameters": [
+                { "name": "source_path", "type": "string", "description": "The full path of the file to copy. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "destination_path", "type": "string", "description": "The full path where the file should be copied to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "delete_file",
+            "description": "Delete a file from the file system. Use with caution as this operation cannot be undone.",
+            "parameters": [
+                { "name": "file_path", "type": "string", "description": "The full path of the file to delete. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "list_directory",
+            "description": "List all files and subdirectories in a given directory.",
+            "parameters": [
+                { "name": "directory_path", "type": "string", "description": "The full path of the directory to list. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "run_python_script",
+            "description": "Create and execute a Python script. The script is created as a temporary file, executed, and then automatically deleted.",
+            "parameters": [
+                { "name": "script_content", "type": "string", "description": "The complete Python script code to execute. Should be valid Python syntax.", "required": true }
+            ]
+        }
+    ]
+}
