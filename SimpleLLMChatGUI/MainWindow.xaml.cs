@@ -248,8 +248,10 @@ namespace SimpleLLMChatGUI
 
         private void ClearChatAndRestart()
         {
-            // Queue the clear operation to run after all pending output has been processed
-            Dispatcher.Invoke((Action)(() =>
+            // Queue the clear operation to run after all pending output has been processed.
+            // Use BeginInvoke (fire-and-forget) so the UI thread doesn't pump re-entrantly
+            // while waiting — that caused intermittent crashes when clicking Clear.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 chatOutput.Document.Blocks.Clear();
                 StartLLMProcess();

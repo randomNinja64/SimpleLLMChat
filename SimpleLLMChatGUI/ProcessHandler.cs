@@ -257,6 +257,9 @@ namespace SimpleLLMChatGUI
 
         public void Dispose()
         {
+            OutputReceived = null;
+            ErrorOccurred = null;
+            GenerationComplete = null;
             if (llmProcess != null && !llmProcess.HasExited)
             {
                 try { llmProcess.Kill(); }
