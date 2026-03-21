@@ -113,9 +113,8 @@ namespace SimpleLLMChatGUI
                 int headerLevel = headerMatch.Groups[1].Value.Length; // Number of # characters
                 string headerText = headerMatch.Groups[2].Value.Trim();
                 
-                // Set font size based on header level (H1 = 24pt, H2 = 20pt, H3 = 18pt, H4 = 16pt, H5 = 14pt, H6 = 12pt)
-                double[] headerSizes = { 24, 20, 18, 16, 14, 12 };
-                double fontSize = headerLevel <= 6 ? headerSizes[headerLevel - 1] : 12;
+                double[] headerMultipliers = { 2.0, 1.667, 1.5, 1.333, 1.167, 1.0 };
+                double fontSize = FontHandler.GetFontSize() * headerMultipliers[Math.Min(headerLevel, 6) - 1];
                 
                 paragraph.FontSize = fontSize;
                 paragraph.FontWeight = FontWeights.Bold;

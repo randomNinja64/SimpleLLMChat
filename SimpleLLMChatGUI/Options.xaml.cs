@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
+using Newtonsoft.Json.Linq;
 
 namespace SimpleLLMChatGUI
 {
@@ -27,7 +28,7 @@ namespace SimpleLLMChatGUI
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private readonly List<string> _availableTools = new List<string> { "copy_file", "delete_file", "download_file", "download_video", "extract_file", "list_directory", "move_file", "read_file", "read_website", "run_python_script", "run_shell_command", "run_web_search", "write_file" };
+        private readonly List<string> _availableTools;
         private readonly List<string> _systemFonts;
 
         public List<string> AvailableTools
@@ -124,6 +125,9 @@ namespace SimpleLLMChatGUI
             DataContext = this;
 
             _processHandler = processHandler;
+
+            // Discover available tools from manifests in the tools/ directory
+            _availableTools = LoadAvailableToolsFromManifests();
 
             // Load system fonts
             _systemFonts = Fonts.SystemFontFamilies
@@ -255,6 +259,49 @@ namespace SimpleLLMChatGUI
             };
 
             File.WriteAllLines(path, lines);
+        }
+
+        /// <summary>
+        /// Scans the tools/ directory (and one level of subdirectories) for *.json manifests
+        /// and returns a sorted list of all discovered tool names.
+        /// </summary>
+        private List<string> LoadAvailableToolsFromManifests()
+        {
+            var toolNames = new List<string>();
+            string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
+
+            if (!Directory.Exists(toolsDir))
+                return toolNames;
+
+            var jsonFiles = new List<string>();
+            jsonFiles.AddRange(Directory.GetFiles(toolsDir, "*.json"));
+            foreach (string subDir in Directory.GetDirectories(toolsDir))
+                jsonFiles.AddRange(Directory.GetFiles(subDir, "*.json"));
+
+            foreach (string jsonFile in jsonFiles)
+            {
+                try
+                {
+                    string json = File.ReadAllText(jsonFile, System.Text.Encoding.UTF8);
+                    JObject manifest = JObject.Parse(json);
+                    JArray tools = manifest["tools"] as JArray;
+                    if (tools == null) continue;
+
+                    foreach (JObject tool in tools)
+                    {
+                        string name = (string)tool["name"];
+                        if (!string.IsNullOrEmpty(name) && !toolNames.Contains(name))
+                            toolNames.Add(name);
+                    }
+                }
+                catch
+                {
+                    // Skip malformed manifests
+                }
+            }
+
+            toolNames.Sort();
+            return toolNames;
         }
 
         private void ApplyToolSelectionToListBox(System.Windows.Controls.ListBox listBox, string toolsValue)
