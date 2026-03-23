@@ -83,10 +83,17 @@ namespace BuiltInTools
 
                 // Ensure directory exists
                 string directory = Path.GetDirectoryName(filename);
-                if (!FileHandler.EnsureDirectoryExists(directory, out int dirExitCode, out string dirError))
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
-                    exitCode = dirExitCode;
-                    return dirError;
+                    try
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+                    catch (Exception ex)
+                    {
+                        exitCode = 1;
+                        return $"Failed to create directory '{directory}': {ex.Message}";
+                    }
                 }
 
                 // Build curl arguments

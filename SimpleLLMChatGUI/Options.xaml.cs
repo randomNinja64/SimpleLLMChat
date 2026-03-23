@@ -278,13 +278,15 @@ namespace SimpleLLMChatGUI
 
             foreach (var group in groupedOptions)
             {
+                var groupPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+
                 var heading = new Label
                 {
                     Content = group.Key,
                     FontWeight = FontWeights.Bold,
-                    Margin = new Thickness(0, 2, 0, 0)
+                    Margin = new Thickness(0, 0, 0, 0)
                 };
-                ToolOptionsPanel.Children.Add(heading);
+                groupPanel.Children.Add(heading);
 
                 foreach (var opt in group)
                 {
@@ -300,7 +302,7 @@ namespace SimpleLLMChatGUI
                             Margin = new Thickness(0, 6, 0, 0)
                         };
                         checkBox.IsChecked = currentValue == "1" || string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
-                        ToolOptionsPanel.Children.Add(checkBox);
+                        groupPanel.Children.Add(checkBox);
                         _toolOptionControls[opt.Name] = checkBox;
                     }
                     else
@@ -311,11 +313,13 @@ namespace SimpleLLMChatGUI
                             Text = currentValue,
                             Height = 23
                         };
-                        ToolOptionsPanel.Children.Add(label);
-                        ToolOptionsPanel.Children.Add(textBox);
+                        groupPanel.Children.Add(label);
+                        groupPanel.Children.Add(textBox);
                         _toolOptionControls[opt.Name] = textBox;
                     }
                 }
+
+                ToolOptionsPanel.Children.Add(groupPanel);
             }
         }
 

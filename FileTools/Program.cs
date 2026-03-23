@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Text;
 
-namespace BuiltInTools
+namespace FileTools
 {
     internal class Program
     {
@@ -13,7 +13,7 @@ namespace BuiltInTools
 
             if (args.Length < 1)
             {
-                Console.Write("Usage: BuiltInTools.exe <tool_name>\nArguments JSON is read from stdin.");
+                Console.Write("Usage: FileTools.exe <tool_name>\nArguments JSON is read from stdin.");
                 return 1;
             }
 
@@ -60,49 +60,58 @@ namespace BuiltInTools
             {
                 switch (toolName)
                 {
-                    case "run_shell_command":
-                        {
-                            string command = ToolHelper.GetRequiredArg(argumentsJson, "command");
-                            output = ToolHelper.ExecuteProcess("cmd.exe", "/c " + command, out exitCode);
-                            break;
-                        }
-
-                    case "read_website":
-                        {
-                            string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            int maxContentLength = ToolHelper.GetConfigInt("maxwebcontentlength", 8000);
-                            output = WebTools.ReadWebsite(URL, maxContentLength, out exitCode);
-                            break;
-                        }
-
-                    case "run_web_search":
-                        {
-                            string query = ToolHelper.GetRequiredArg(argumentsJson, "query");
-                            string searxngInstance = ToolHelper.GetConfigString("searxnginstance");
-                            int maxSearchResults = ToolHelper.GetConfigInt("maxsearchresults", 20);
-                            output = WebTools.RunWebSearch(query, searxngInstance, maxSearchResults, out exitCode);
-                            break;
-                        }
-
-                    case "download_video":
-                        {
-                            string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            output = DownloadHandler.DownloadVideo(URL, out exitCode);
-                            break;
-                        }
-
-                    case "download_file":
+                    case "read_file":
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
-                            string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            output = DownloadHandler.DownloadFile(filename, URL, out exitCode);
+                            int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "offset")?.Trim() ?? "", out int offset);
+                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 8000);
+                            output = FileHandler.ReadFile(filename, maxContentLength, out exitCode, offset);
                             break;
                         }
 
-                    case "run_python_script":
+                    case "write_file":
                         {
-                            string scriptContent = ToolHelper.GetRequiredArg(argumentsJson, "script_content");
-                            output = PythonTools.RunPythonScript(scriptContent, out exitCode);
+                            string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
+                            string content = ToolHelper.JsonExtractString(argumentsJson, "content")?.Trim() ?? "";
+                            output = FileHandler.WriteFile(filename, content, out exitCode);
+                            break;
+                        }
+
+                    case "extract_file":
+                        {
+                            string archivePath = ToolHelper.GetRequiredArg(argumentsJson, "archive_path");
+                            string destinationPath = ToolHelper.GetRequiredArg(argumentsJson, "destination_path");
+                            output = FileHandler.ExtractFile(archivePath, destinationPath, out exitCode);
+                            break;
+                        }
+
+                    case "move_file":
+                        {
+                            string sourcePath = ToolHelper.GetRequiredArg(argumentsJson, "source_path");
+                            string destinationPath = ToolHelper.GetRequiredArg(argumentsJson, "destination_path");
+                            output = FileHandler.MoveFile(sourcePath, destinationPath, out exitCode);
+                            break;
+                        }
+
+                    case "copy_file":
+                        {
+                            string sourcePath = ToolHelper.GetRequiredArg(argumentsJson, "source_path");
+                            string destinationPath = ToolHelper.GetRequiredArg(argumentsJson, "destination_path");
+                            output = FileHandler.CopyFile(sourcePath, destinationPath, out exitCode);
+                            break;
+                        }
+
+                    case "delete_file":
+                        {
+                            string filePath = ToolHelper.GetRequiredArg(argumentsJson, "file_path");
+                            output = FileHandler.DeleteFile(filePath, out exitCode);
+                            break;
+                        }
+
+                    case "list_directory":
+                        {
+                            string directoryPath = ToolHelper.GetRequiredArg(argumentsJson, "directory_path");
+                            output = FileHandler.ListDirectory(directoryPath, out exitCode);
                             break;
                         }
 

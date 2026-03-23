@@ -4,10 +4,10 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+    <ProjectGuid>{B2C3D4E5-F6A7-8901-BCDE-F12345678901}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>BuiltInTools</RootNamespace>
-    <AssemblyName>BuiltInTools</AssemblyName>
+    <RootNamespace>FileTools</RootNamespace>
+    <AssemblyName>FileTools</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -38,23 +38,18 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="..\.\Shared\ToolHelper.cs">
       <Link>Shared\ToolHelper.cs</Link>
     </Compile>
-    <Compile Include="WebTools.cs" />
-    <Compile Include="SearchHandler.cs" />
-    <Compile Include="DownloadHandler.cs" />
-    <Compile Include="PythonTools.cs" />
+    <Compile Include="FileHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="BuiltInTools.json">
+    <None Include="FileTools.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
