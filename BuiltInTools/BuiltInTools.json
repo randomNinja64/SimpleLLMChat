@@ -1,4 +1,5 @@
 {
+    "name": "Built-in Tools",
     "executable": "BuiltInTools.exe",
     "options": [
         { "name": "maxFileContentLength", "label": "Maximum Processing Length for File Content", "type": "int", "default": "8000" },

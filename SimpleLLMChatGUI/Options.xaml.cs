@@ -261,7 +261,7 @@ namespace SimpleLLMChatGUI
 
         /// <summary>
         /// Builds dynamic UI controls in ToolOptionsPanel from manifest-registered options,
-        /// listed alphabetically by label.
+        /// grouped by manifest source and sorted alphabetically by label within each group.
         /// </summary>
         private void BuildToolOptionsUI(ConfigHandler config)
         {
@@ -271,20 +271,33 @@ namespace SimpleLLMChatGUI
             if (_toolOptions.Count == 0)
                 return;
 
-            _toolOptions.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
+            var groupedOptions = _toolOptions
+                .OrderBy(opt => opt.Source ?? "Tools", StringComparer.OrdinalIgnoreCase)
+                .ThenBy(opt => opt.Label, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var opt in _toolOptions)
+            foreach (var group in groupedOptions)
             {
-                // Read current value from config, falling back to manifest default
-                string configValue = config.GetConfigString(opt.Name);
-                string currentValue = configValue ?? opt.Default;
+                var heading = new Label
+                {
+                    Content = group.Key,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 2, 0, 0)
+                };
+                ToolOptionsPanel.Children.Add(heading);
+
+                foreach (var opt in group)
+                {
+                    // Read current value from config, falling back to manifest default
+                    string configValue = config.GetConfigString(opt.Name);
+                    string currentValue = configValue ?? opt.Default;
 
                     if (opt.Type == "bool")
                     {
                         var checkBox = new CheckBox
                         {
                             Content = opt.Label,
-                            Margin = new Thickness(0, 10, 0, 0)
+                            Margin = new Thickness(0, 6, 0, 0)
                         };
                         checkBox.IsChecked = currentValue == "1" || string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
                         ToolOptionsPanel.Children.Add(checkBox);
@@ -301,6 +314,7 @@ namespace SimpleLLMChatGUI
                         ToolOptionsPanel.Children.Add(label);
                         ToolOptionsPanel.Children.Add(textBox);
                         _toolOptionControls[opt.Name] = textBox;
+                    }
                 }
             }
         }
