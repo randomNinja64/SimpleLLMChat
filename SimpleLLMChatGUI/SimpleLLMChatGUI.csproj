@@ -84,6 +84,9 @@
     <Compile Include="..\Shared\ConfigHandler.cs">
       <Link>Shared\ConfigHandler.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\ManifestScanner.cs">
+      <Link>Shared\ManifestScanner.cs</Link>
+    </Compile>
     <Compile Include="ToolOptionsRegistry.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

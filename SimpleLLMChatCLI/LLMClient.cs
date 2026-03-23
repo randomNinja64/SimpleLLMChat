@@ -478,21 +478,12 @@ public class LLMClient
                                         JObject function = (JObject)call["function"];
 
                                         if (!partialToolCalls.ContainsKey(index))
-                                        {
-                                            partialToolCalls[index] = new ToolRegistry.ToolCall
-                                            {
-                                                Id = "",
-                                                Name = "",
-                                                Arguments = ""
-                                            };
-                                        }
+                                            partialToolCalls[index] = new ToolRegistry.ToolCall();
 
-                                        var temp = partialToolCalls[index];
+                                        var tc = partialToolCalls[index];
 
                                         if (!string.IsNullOrEmpty(id))
-                                        {
-                                            temp.Id = id;
-                                        }
+                                            tc.Id = id;
 
                                         if (function != null)
                                         {
@@ -500,17 +491,11 @@ public class LLMClient
                                             string argsChunk = (string)function["arguments"];
 
                                             if (!string.IsNullOrEmpty(name))
-                                            {
-                                                temp.Name = name;
-                                            }
+                                                tc.Name = name;
 
                                             if (!string.IsNullOrEmpty(argsChunk))
-                                            {
-                                                temp.Arguments += argsChunk;
-                                            }
+                                                tc.Arguments += argsChunk;
                                         }
-
-                                        partialToolCalls[index] = temp;
                                     }
                                 }
                             }

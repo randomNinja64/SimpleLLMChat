@@ -314,15 +314,7 @@ namespace SimpleLLMChatGUI
             var toolNames = new List<string>();
             string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
 
-            if (!Directory.Exists(toolsDir))
-                return toolNames;
-
-            var jsonFiles = new List<string>();
-            jsonFiles.AddRange(Directory.GetFiles(toolsDir, "*.json"));
-            foreach (string subDir in Directory.GetDirectories(toolsDir))
-                jsonFiles.AddRange(Directory.GetFiles(subDir, "*.json"));
-
-            foreach (string jsonFile in jsonFiles)
+            foreach (string jsonFile in ManifestScanner.GetManifestFiles(toolsDir))
             {
                 try
                 {

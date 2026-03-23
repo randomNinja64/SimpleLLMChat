@@ -10,7 +10,7 @@ namespace SimpleLLMChatCLI
 {
     public class ToolRegistry
     {
-        public struct ToolCall
+        public class ToolCall
         {
             public string Id;
             public string Name;
@@ -21,6 +21,13 @@ namespace SimpleLLMChatCLI
                 Id = id;
                 Name = name;
                 Arguments = arguments;
+            }
+
+            public ToolCall()
+            {
+                Id = "";
+                Name = "";
+                Arguments = "";
             }
         }
 
@@ -58,11 +65,7 @@ namespace SimpleLLMChatCLI
         /// </summary>
         public void LoadToolsFromDirectory(string toolsDir)
         {
-            if (!Directory.Exists(toolsDir))
-                return;
-
-            // Load manifests from the tools directory itself
-            foreach (string jsonFile in Directory.GetFiles(toolsDir, "*.json"))
+            foreach (string jsonFile in ManifestScanner.GetManifestFiles(toolsDir))
             {
                 try
                 {
@@ -71,22 +74,6 @@ namespace SimpleLLMChatCLI
                 catch
                 {
                     // Skip malformed manifests
-                }
-            }
-
-            // Load manifests from subdirectories (one level deep)
-            foreach (string subDir in Directory.GetDirectories(toolsDir))
-            {
-                foreach (string jsonFile in Directory.GetFiles(subDir, "*.json"))
-                {
-                    try
-                    {
-                        LoadManifest(jsonFile);
-                    }
-                    catch
-                    {
-                        // Skip malformed manifests
-                    }
                 }
             }
         }
