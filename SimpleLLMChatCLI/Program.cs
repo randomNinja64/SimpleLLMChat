@@ -37,13 +37,13 @@ namespace SimpleLLMChatCLI
             LLMClient client = new LLMClient(Config, registry);
 
             // Get enabled tools
-            List<string> enabledTools = Config.GetEnabledTools();
+            List<string> enabledTools = Config.GetConfigList("tools");
 
             // Get tools requiring approval
-            List<string> toolsRequiringApproval = Config.GetToolsRequiringApproval();
+            List<string> toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
 
             // Get show tool output setting
-            bool showToolOutput = Config.GetShowToolOutput();
+            bool showToolOutput = Config.GetConfigBool("showtooloutput");
 
             // Conversation storage
             List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
@@ -118,7 +118,7 @@ namespace SimpleLLMChatCLI
                         conversation,
                         textPrompt,
                         base64Image,
-                        Config.GetAssistantName(),
+                        Config.GetConfigValue("assistantname"),
                         enabledTools,
                         toolsRequiringApproval,
                         outputOnly,
@@ -202,7 +202,7 @@ namespace SimpleLLMChatCLI
                 client.ProcessConversation(conversation,
                                 textPrompt,
                                 imageBase64,
-                                Config.GetAssistantName(),
+                                Config.GetConfigValue("assistantname"),
                                 enabledTools,
                                 toolsRequiringApproval,
                                 false,

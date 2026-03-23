@@ -102,7 +102,7 @@ namespace SimpleLLMChatGUI
 
         private bool IsMarkdownParsingEnabled()
         {
-            return App.Config.GetMarkdownParsing();
+            return App.Config.GetConfigBool("markdownparsing", true);
         }
 
         private void LoadAndApplyFontSize()

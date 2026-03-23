@@ -17,7 +17,7 @@ namespace SimpleLLMChatGUI
             var defaultFont = SystemFonts.MessageFontFamily;
 
             // Use default font if no custom font specified
-            string fontFamilyName = App.Config.GetCustomFontFamily();
+            string fontFamilyName = App.Config.GetConfigValue("customfontfamily");
             if (string.IsNullOrWhiteSpace(fontFamilyName) ||
                 fontFamilyName.Equals("Default", StringComparison.OrdinalIgnoreCase))
             {
@@ -49,7 +49,7 @@ namespace SimpleLLMChatGUI
 
         public static int GetFontSize()
         {
-            return App.Config.GetFontSize();
+            return App.Config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
         }
 
         public static void ApplyFontSizeToControl(Control control, int fontSize)

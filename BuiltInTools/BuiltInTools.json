@@ -1,5 +1,11 @@
 {
     "executable": "BuiltInTools.exe",
+    "options": [
+        { "name": "maxFileContentLength", "label": "Maximum Processing Length for File Content", "type": "int", "default": "8000" },
+        { "name": "maxWebContentLength", "label": "Maximum Processing Length for Web Content", "type": "int", "default": "8000" },
+        { "name": "maxSearchResults", "label": "Maximum Search Results", "type": "int", "default": "20" },
+        { "name": "searxNGInstance", "label": "SearxNG Instance (optional, must support JSON API)", "type": "string", "default": "" }
+    ],
     "tools": [
         {
             "name": "run_shell_command",
@@ -10,7 +16,7 @@
         },
         {
             "name": "read_website",
-            "description": "Browse to a specific URL/web page and return its HTML content.",
+            "description": "Browse to a specific URL/web page and return its HTML content. Always reads up to {config.maxWebContentLength} characters.",
             "parameters": [
                 { "name": "URL", "type": "string", "description": "The URL of the web page to get the content of.", "required": true }
             ]
@@ -39,10 +45,10 @@
         },
         {
             "name": "read_file",
-            "description": "Read the contents of a local file and return it as a string. Always reads up to {config.maxContentLength} characters. Use the offset parameter to read different parts of large files.",
+            "description": "Read the contents of a local file and return it as a string. Always reads up to {config.maxFileContentLength} characters. Use the offset parameter to read different parts of large files.",
             "parameters": [
                 { "name": "filename", "type": "string", "description": "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
-                { "name": "offset", "type": "string", "description": "Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {config.maxContentLength} reads characters {config.maxContentLength}-{config.maxContentLength*2}.", "required": false }
+                { "name": "offset", "type": "string", "description": "Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {config.maxFileContentLength} reads characters {config.maxFileContentLength}-{config.maxFileContentLength*2}.", "required": false }
             ]
         },
         {

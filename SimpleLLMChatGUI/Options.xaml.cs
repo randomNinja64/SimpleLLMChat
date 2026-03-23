@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using Newtonsoft.Json.Linq;
 
@@ -18,10 +19,7 @@ namespace SimpleLLMChatGUI
         private string _assistantName;
         private bool _showToolOutput;
         private bool _showReasoningOutput;
-        private int _maxContentLength;
-        private int _maxSearchResults;
         private bool _markdownParsing;
-        private string _searxngInstance;
         private string _customFontFamily;
         private int _chatFontSize;
         private ProcessHandler _processHandler;
@@ -30,6 +28,10 @@ namespace SimpleLLMChatGUI
 
         private readonly List<string> _availableTools;
         private readonly List<string> _systemFonts;
+
+        // Dynamic tool options loaded from manifests
+        private List<ToolOptionDefinition> _toolOptions;
+        private readonly Dictionary<string, FrameworkElement> _toolOptionControls = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
 
         public List<string> AvailableTools
         {
@@ -83,28 +85,10 @@ namespace SimpleLLMChatGUI
             set { _showReasoningOutput = value; OnPropertyChanged(nameof(ShowReasoningOutput)); }
         }
 
-        public int MaxContentLength
-        {
-            get { return _maxContentLength; }
-            set { _maxContentLength = value; OnPropertyChanged(nameof(MaxContentLength)); }
-        }
-
-        public int MaxSearchResults
-        {
-            get { return _maxSearchResults; }
-            set { _maxSearchResults = value; OnPropertyChanged(nameof(MaxSearchResults)); }
-        }
-
         public bool MarkdownParsing
         {
             get { return _markdownParsing; }
             set { _markdownParsing = value; OnPropertyChanged(nameof(MarkdownParsing)); }
-        }
-
-        public string SearxNGInstance
-        {
-            get { return _searxngInstance; }
-            set { _searxngInstance = value; OnPropertyChanged(nameof(SearxNGInstance)); }
         }
 
         public string CustomFontFamily
@@ -129,6 +113,10 @@ namespace SimpleLLMChatGUI
             // Discover available tools from manifests in the tools/ directory
             _availableTools = LoadAvailableToolsFromManifests();
 
+            // Discover tool options from manifests
+            string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
+            _toolOptions = ToolOptionsRegistry.LoadOptionsFromDirectory(toolsDir);
+
             // Load system fonts
             _systemFonts = Fonts.SystemFontFamilies
                 .Select(f => f.Source)
@@ -142,13 +130,10 @@ namespace SimpleLLMChatGUI
             Model = "";
             SysPrompt = "";
             AssistantName = "";
-            ShowToolOutput = true; // Default to showing tool outputs
-            ShowReasoningOutput = true; // Default to showing reasoning output
-            MaxContentLength = AppConstants.DefaultMaxContentLength;
-            MaxSearchResults = AppConstants.DefaultMaxSearchResults;
-            MarkdownParsing = true; // Default to enabling markdown parsing
-            SearxNGInstance = ""; // Default to empty
-            CustomFontFamily = ""; // Default to empty (use system default)
+            ShowToolOutput = true;
+            ShowReasoningOutput = true;
+            MarkdownParsing = true;
+            CustomFontFamily = "";
             ChatFontSize = AppConstants.DefaultChatFontSize;
         }
 
@@ -187,30 +172,30 @@ namespace SimpleLLMChatGUI
             FontHandler.ApplyFontToWindow(this);
 
             var config = App.Config;
-            ServerURL = config.GetLLMEndpoint();
-            ApiKey = config.GetApiKey();
-            Model = config.GetModel();
-            SysPrompt = config.GetSysPrompt().Trim('"');
-            AssistantName = config.GetAssistantName();
-            ShowToolOutput = config.GetShowToolOutput();
-            ShowReasoningOutput = config.GetShowReasoningOutput();
-            MaxContentLength = config.GetMaxContentLength();
-            MaxSearchResults = config.GetMaxSearchResults();
-            MarkdownParsing = config.GetMarkdownParsing();
-            SearxNGInstance = config.GetSearxNGInstance();
-            CustomFontFamily = config.GetCustomFontFamily();
-            ChatFontSize = config.GetFontSize();
+            ServerURL = config.GetConfigValue("llmserver");
+            ApiKey = config.GetConfigValue("apikey");
+            Model = config.GetConfigValue("model");
+            SysPrompt = config.GetConfigValue("sysprompt").Trim('"');
+            AssistantName = config.GetConfigValue("assistantname");
+            ShowToolOutput = config.GetConfigBool("showtooloutput");
+            ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
+            MarkdownParsing = config.GetConfigBool("markdownparsing", true);
+            CustomFontFamily = config.GetConfigValue("customfontfamily");
+            ChatFontSize = config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
 
-            var enabledTools = config.GetEnabledTools();
+            var enabledTools = config.GetConfigList("tools");
             if (enabledTools.Count > 0)
                 ApplyToolSelectionToListBox(ToolsListBox, string.Join(",", enabledTools));
 
-            var approvalTools = config.GetToolsRequiringApproval();
+            var approvalTools = config.GetConfigList("toolsrequiringapproval");
             if (approvalTools.Count > 0)
                 ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, string.Join(",", approvalTools));
 
             // Sync password box manually (not bound)
             ApiKeyPasswordBox.Password = ApiKey;
+
+            // Build dynamic tool options UI and populate values
+            BuildToolOptionsUI(config);
         }
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -246,11 +231,8 @@ namespace SimpleLLMChatGUI
                 "customfontfamily=" + CustomFontFamily,
                 "fontsize=" + ChatFontSize,
                 "llmserver=" + ServerURL,
-                "maxcontentlength=" + MaxContentLength,
-                "maxsearchresults=" + MaxSearchResults,
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
                 "model=" + Model,
-                "searxnginstance=" + SearxNGInstance,
                 "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
                 "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
@@ -258,7 +240,69 @@ namespace SimpleLLMChatGUI
                 "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };
 
+            // Save dynamic tool options from manifests
+            foreach (var opt in _toolOptions)
+            {
+                string value = opt.Default;
+                FrameworkElement control;
+                if (_toolOptionControls.TryGetValue(opt.Name, out control))
+                {
+                    if (opt.Type == "bool" && control is CheckBox cb)
+                        value = cb.IsChecked == true ? "1" : "0";
+                    else if (control is TextBox tb)
+                        value = tb.Text;
+                }
+                lines.Add(opt.Name.ToLowerInvariant() + "=" + value);
+            }
+
+            lines.Sort(StringComparer.OrdinalIgnoreCase);
             File.WriteAllLines(path, lines);
+        }
+
+        /// <summary>
+        /// Builds dynamic UI controls in ToolOptionsPanel from manifest-registered options,
+        /// listed alphabetically by label.
+        /// </summary>
+        private void BuildToolOptionsUI(ConfigHandler config)
+        {
+            ToolOptionsPanel.Children.Clear();
+            _toolOptionControls.Clear();
+
+            if (_toolOptions.Count == 0)
+                return;
+
+            _toolOptions.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var opt in _toolOptions)
+            {
+                // Read current value from config, falling back to manifest default
+                string configValue = config.GetConfigString(opt.Name);
+                string currentValue = configValue ?? opt.Default;
+
+                    if (opt.Type == "bool")
+                    {
+                        var checkBox = new CheckBox
+                        {
+                            Content = opt.Label,
+                            Margin = new Thickness(0, 10, 0, 0)
+                        };
+                        checkBox.IsChecked = currentValue == "1" || string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
+                        ToolOptionsPanel.Children.Add(checkBox);
+                        _toolOptionControls[opt.Name] = checkBox;
+                    }
+                    else
+                    {
+                        var label = new Label { Content = opt.Label + ":" };
+                        var textBox = new TextBox
+                        {
+                            Text = currentValue,
+                            Height = 23
+                        };
+                        ToolOptionsPanel.Children.Add(label);
+                        ToolOptionsPanel.Children.Add(textBox);
+                        _toolOptionControls[opt.Name] = textBox;
+                }
+            }
         }
 
         /// <summary>

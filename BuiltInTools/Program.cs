@@ -70,7 +70,7 @@ namespace BuiltInTools
                     case "read_website":
                         {
                             string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            int maxContentLength = ToolHelper.GetConfigInt("maxcontentlength", 8000);
+                            int maxContentLength = ToolHelper.GetConfigInt("maxwebcontentlength", 8000);
                             output = WebTools.ReadWebsite(URL, maxContentLength, out exitCode);
                             break;
                         }
@@ -103,7 +103,7 @@ namespace BuiltInTools
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
                             int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "offset")?.Trim() ?? "", out int offset);
-                            int maxContentLength = ToolHelper.GetConfigInt("maxcontentlength", 8000);
+                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 8000);
                             output = FileHandler.ReadFile(filename, maxContentLength, out exitCode, offset);
                             break;
                         }

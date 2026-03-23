@@ -42,6 +42,9 @@ namespace SimpleLLMChatCLI
 
         private readonly Dictionary<string, ToolDefinition> tools = new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase);
 
+        // Default values for options declared in manifests, keyed by lowercase name
+        private readonly Dictionary<string, string> optionDefaults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // Config values to pass to tool executables
         private readonly ConfigHandler config;
 
@@ -128,6 +131,19 @@ namespace SimpleLLMChatCLI
             JArray toolsArray = manifest["tools"] as JArray;
             if (toolsArray == null)
                 return;
+
+            // Load option defaults from manifest
+            JArray optionsArray = manifest["options"] as JArray;
+            if (optionsArray != null)
+            {
+                foreach (JObject optObj in optionsArray)
+                {
+                    string optName = (string)optObj["name"];
+                    string optDefault = (string)optObj["default"];
+                    if (!string.IsNullOrEmpty(optName) && optDefault != null)
+                        optionDefaults[optName] = optDefault;
+                }
+            }
 
             foreach (JObject toolObj in toolsArray)
             {
@@ -240,13 +256,12 @@ namespace SimpleLLMChatCLI
                 JObject stdinPayload = new JObject();
                 stdinPayload["arguments"] = string.IsNullOrWhiteSpace(arguments) ? new JObject() : JToken.Parse(arguments);
 
-                // Pass relevant config to the tool
+                // Pass all config values to the tool, with manifest defaults as fallback
                 JObject configObj = new JObject();
-                configObj["maxcontentlength"] = config.GetMaxContentLength().ToString();
-                configObj["maxsearchresults"] = config.GetMaxSearchResults().ToString();
-                string searxng = config.GetSearxNGInstance();
-                if (!string.IsNullOrEmpty(searxng))
-                    configObj["searxnginstance"] = searxng;
+                foreach (var kvp in optionDefaults)
+                    configObj[kvp.Key] = kvp.Value;
+                foreach (var kvp in config.GetAllValues())
+                    configObj[kvp.Key] = kvp.Value;
                 stdinPayload["config"] = configObj;
 
                 string stdinData = stdinPayload.ToString(Newtonsoft.Json.Formatting.None);

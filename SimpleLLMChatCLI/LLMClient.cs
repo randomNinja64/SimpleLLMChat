@@ -96,8 +96,8 @@ public class LLMClient
                 Console.Write(assistantName + ": ");
             }
 
-            Action<string> onReasoningChunk = (!outputOnly && config.GetShowReasoningOutput()) ? (Action<string>)Console.Write : null;
-            Action<int> onReasoningSummary = (!outputOnly && !config.GetShowReasoningOutput()) ?
+            Action<string> onReasoningChunk = (!outputOnly && config.GetConfigBool("showreasoningoutput")) ? (Action<string>)Console.Write : null;
+            Action<int> onReasoningSummary = (!outputOnly && !config.GetConfigBool("showreasoningoutput")) ?
                 (Action<int>)(s => Console.WriteLine("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]")) : null;
             LLMCompletionResponse response = sendMessages(conversation, enabledTools, onReasoningChunk, onReasoningSummary);
 
@@ -317,7 +317,7 @@ public class LLMClient
         // Build payload
         JObject payload = new JObject
         {
-            ["model"] = config.GetModel()
+            ["model"] = config.GetConfigValue("model")
         };
 
         // Messages
@@ -327,7 +327,7 @@ public class LLMClient
         JObject systemMsg = new JObject
         {
             ["role"] = "system",
-            ["content"] = config.GetSysPrompt()
+            ["content"] = config.GetConfigValue("sysprompt")
         };
         messages.Add(systemMsg);
 
@@ -366,10 +366,10 @@ public class LLMClient
 
         try
         {
-            var request = (HttpWebRequest)WebRequest.Create($"{config.GetLLMEndpoint()}/v1/chat/completions");
+            var request = (HttpWebRequest)WebRequest.Create($"{config.GetConfigValue("llmserver")}/v1/chat/completions");
             request.Method = "POST";
             request.ContentType = "application/json";
-            request.Headers.Add("Authorization", "Bearer " + config.GetApiKey());
+            request.Headers.Add("Authorization", "Bearer " + config.GetConfigValue("apikey"));
 
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
             request.ContentLength = payloadBytes.Length;
