@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Text;
 
-namespace BuiltInTools
+namespace ShellTools
 {
     internal class Program
     {
@@ -14,7 +14,7 @@ namespace BuiltInTools
 
             if (args.Length < 1)
             {
-                Console.Write("Usage: BuiltInTools.exe <tool_name>\nArguments JSON is read from stdin.");
+                Console.Write("Usage: ShellTools.exe <tool_name>\nArguments JSON is read from stdin.");
                 return 1;
             }
 

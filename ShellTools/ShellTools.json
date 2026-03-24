@@ -1,6 +1,6 @@
 {
-    "name": "Built-in Tools",
-    "executable": "BuiltInTools.exe",
+    "name": "Shell Tools",
+    "executable": "ShellTools.exe",
     "tools": [
         {
             "name": "run_shell_command",
@@ -8,6 +8,6 @@
             "parameters": [
                 { "name": "command", "type": "string", "description": "Full command line to execute. Keep it short and avoid interactive programs.", "required": true }
             ]
-        },
+        }
     ]
 }

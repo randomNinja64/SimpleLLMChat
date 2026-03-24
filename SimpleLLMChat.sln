@@ -7,13 +7,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatGUI", "SimpleL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatCLI", "SimpleLLMChatCLI\SimpleLLMChatCLI.csproj", "{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuiltInTools", "BuiltInTools\BuiltInTools.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileTools", "FileTools\FileTools.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebTools", "WebTools\WebTools.csproj", "{C3D4E5F6-A7B8-9012-CDEF-234567890123}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PythonTools", "PythonTools\PythonTools.csproj", "{D4E5F6A7-B8C9-0123-DEF0-345678901234}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShellTools", "ShellTools\ShellTools.csproj", "{E5F6A7B8-C9D0-1234-EF01-456789012345}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,18 +47,6 @@ Global
 		{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}.Release|Win32.Build.0 = Release|Any CPU
 		{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}.Release|x86.ActiveCfg = Release|Any CPU
 		{7CC8B200-8346-44E4-A0B4-AA64E26DF2F8}.Release|x86.Build.0 = Release|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Win32.ActiveCfg = Debug|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Win32.Build.0 = Debug|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x86.Build.0 = Debug|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Win32.ActiveCfg = Release|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Win32.Build.0 = Release|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.ActiveCfg = Release|Any CPU
-		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.Build.0 = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Debug|Win32.ActiveCfg = Debug|Any CPU
@@ -95,6 +83,18 @@ Global
 		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|Win32.Build.0 = Release|Any CPU
 		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|x86.ActiveCfg = Release|Any CPU
 		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|x86.Build.0 = Release|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Debug|Win32.Build.0 = Debug|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Debug|x86.Build.0 = Debug|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Release|Win32.ActiveCfg = Release|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Release|Win32.Build.0 = Release|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Release|x86.ActiveCfg = Release|Any CPU
+		{E5F6A7B8-C9D0-1234-EF01-456789012345}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
