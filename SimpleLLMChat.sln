@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuiltInTools", "BuiltInTool
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileTools", "FileTools\FileTools.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebTools", "WebTools\WebTools.csproj", "{C3D4E5F6-A7B8-9012-CDEF-234567890123}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -67,6 +69,18 @@ Global
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|Win32.Build.0 = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x86.ActiveCfg = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x86.Build.0 = Release|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Debug|Win32.Build.0 = Debug|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Debug|x86.Build.0 = Debug|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|Win32.ActiveCfg = Release|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|Win32.Build.0 = Release|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|x86.ActiveCfg = Release|Any CPU
+		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

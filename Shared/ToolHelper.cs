@@ -2,6 +2,8 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Reflection;
 using System.Text;
 
 /// <summary>
@@ -9,7 +11,26 @@ using System.Text;
 /// </summary>
 public static class ToolHelper
 {
-    public const string USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36";
+    // Loads option defaults from the manifest file sitting next to the executable.
+    // Must be called before stdin config is parsed so that stdin values take precedence.
+    public static void LoadManifestDefaults()
+    {
+        try
+        {
+            string manifestPath = Path.ChangeExtension(
+                Assembly.GetEntryAssembly().Location, ".json");
+            if (!File.Exists(manifestPath)) return;
+            JObject manifest = JObject.Parse(File.ReadAllText(manifestPath));
+            foreach (JToken opt in manifest["options"] ?? new JArray())
+            {
+                string name = opt["name"]?.ToString();
+                string def  = opt["default"]?.ToString();
+                if (!string.IsNullOrEmpty(name) && def != null)
+                    Config[name] = def;
+            }
+        }
+        catch { }
+    }
 
     // Config values passed via the "config" key in stdin JSON
     public static Dictionary<string, string> Config = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

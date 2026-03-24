@@ -10,6 +10,7 @@ namespace FileTools
         {
             Console.InputEncoding = Encoding.UTF8;
             Console.OutputEncoding = Encoding.UTF8;
+            ToolHelper.LoadManifestDefaults();
 
             if (args.Length < 1)
             {

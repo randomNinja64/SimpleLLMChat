@@ -1,9 +1,9 @@
 using System;
 using System.Text.RegularExpressions;
 
-namespace BuiltInTools
+namespace WebTools
 {
-    public static class WebTools
+    public static class WebBrowser
     {
         public static string ReadWebsite(string URL, int maxContentLength, out int exitCode)
         {
@@ -12,10 +12,7 @@ namespace BuiltInTools
             try
             {
                 // Build curl command arguments
-                string arguments = "-s -L \"" + URL + "\" " +
-                                   "-H \"User-Agent: " + ToolHelper.USER_AGENT + "\"";
-
-                html = ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
+                html = CurlHelper.Execute(URL, out exitCode, combineErrorOutput: false);
 
                 // Strip out DOCTYPE, <script> and <style> blocks
                 html = Regex.Replace(html, @"<!DOCTYPE[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);

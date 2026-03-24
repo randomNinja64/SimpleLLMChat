@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Text;
 
-namespace BuiltInTools
+namespace WebTools
 {
     internal class Program
     {
@@ -14,7 +14,7 @@ namespace BuiltInTools
 
             if (args.Length < 1)
             {
-                Console.Write("Usage: BuiltInTools.exe <tool_name>\nArguments JSON is read from stdin.");
+                Console.Write("Usage: WebTools.exe <tool_name>\nArguments JSON is read from stdin.");
                 return 1;
             }
 
@@ -61,17 +61,35 @@ namespace BuiltInTools
             {
                 switch (toolName)
                 {
-                    case "run_shell_command":
+                    case "read_website":
                         {
-                            string command = ToolHelper.GetRequiredArg(argumentsJson, "command");
-                            output = ToolHelper.ExecuteProcess("cmd.exe", "/c " + command, out exitCode);
+                            string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
+                            int maxContentLength = ToolHelper.GetConfigInt("maxwebcontentlength", 8000);
+                            output = WebBrowser.ReadWebsite(URL, maxContentLength, out exitCode);
                             break;
                         }
 
-                    case "run_python_script":
+                    case "run_web_search":
                         {
-                            string scriptContent = ToolHelper.GetRequiredArg(argumentsJson, "script_content");
-                            output = PythonTools.RunPythonScript(scriptContent, out exitCode);
+                            string query = ToolHelper.GetRequiredArg(argumentsJson, "query");
+                            string searxngInstance = ToolHelper.GetConfigString("searxnginstance");
+                            int maxSearchResults = ToolHelper.GetConfigInt("maxsearchresults", 20);
+                            output = WebBrowser.RunWebSearch(query, searxngInstance, maxSearchResults, out exitCode);
+                            break;
+                        }
+
+                    case "download_video":
+                        {
+                            string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
+                            output = DownloadHandler.DownloadVideo(URL, out exitCode);
+                            break;
+                        }
+
+                    case "download_file":
+                        {
+                            string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
+                            string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
+                            output = DownloadHandler.DownloadFile(filename, URL, out exitCode);
                             break;
                         }
 

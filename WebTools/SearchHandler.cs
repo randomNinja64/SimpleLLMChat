@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
 
-namespace BuiltInTools
+namespace WebTools
 {
     public static class SearchHandler
     {
@@ -20,9 +20,7 @@ namespace BuiltInTools
             // Execute curl request
             try
             {
-                string headerArgs = string.Concat(System.Array.ConvertAll(headers, h => $" -H \"{h}\""));
-                string arguments = $"-s -L \"{url}\" -H \"User-Agent: {ToolHelper.USER_AGENT}\"{headerArgs}";
-                response = ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
+                response = CurlHelper.Execute(url, out exitCode, combineErrorOutput: false, extraHeaders: headers);
             }
             catch (Exception ex)
             {

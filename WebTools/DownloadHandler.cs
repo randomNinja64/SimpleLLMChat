@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace BuiltInTools
+namespace WebTools
 {
     public static class DownloadHandler
     {
@@ -97,13 +97,8 @@ namespace BuiltInTools
                 }
 
                 // Build curl arguments
-                string arguments =
-                    "-L -s " +
-                    "-H \"User-Agent: " + ToolHelper.USER_AGENT + "\" " +
-                    "-o \"" + filename + "\" " +
-                    "\"" + URL + "\"";
-
-                string output = ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode);
+                string output = CurlHelper.Execute(URL, out exitCode,
+                    extraFlags: "-o \"" + filename + "\"");
 
                 if (exitCode != 0)
                 {
@@ -130,12 +125,8 @@ namespace BuiltInTools
             try
             {
                 // Build curl HEAD request arguments
-                string arguments =
-                    "-I -L -s " +
-                    "-H \"User-Agent: " + ToolHelper.USER_AGENT + "\" " +
-                    "\"" + URL + "\"";
-
-                string headers = ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput: false);
+                string headers = CurlHelper.Execute(URL, out exitCode,
+                    extraFlags: "-I", combineErrorOutput: false);
 
                 if (exitCode != 0)
                 {
