@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Text;
 
-namespace BuiltInTools
+namespace PythonTools
 {
     internal class Program
     {
@@ -14,7 +14,7 @@ namespace BuiltInTools
 
             if (args.Length < 1)
             {
-                Console.Write("Usage: BuiltInTools.exe <tool_name>\nArguments JSON is read from stdin.");
+                Console.Write("Usage: PythonTools.exe <tool_name>\nArguments JSON is read from stdin.");
                 return 1;
             }
 
@@ -61,10 +61,10 @@ namespace BuiltInTools
             {
                 switch (toolName)
                 {
-                    case "run_shell_command":
+                    case "run_python_script":
                         {
-                            string command = ToolHelper.GetRequiredArg(argumentsJson, "command");
-                            output = ToolHelper.ExecuteProcess("cmd.exe", "/c " + command, out exitCode);
+                            string scriptContent = ToolHelper.GetRequiredArg(argumentsJson, "script_content");
+                            output = PythonRunner.RunPythonScript(scriptContent, out exitCode);
                             break;
                         }
 

@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileTools", "FileTools\File
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebTools", "WebTools\WebTools.csproj", "{C3D4E5F6-A7B8-9012-CDEF-234567890123}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PythonTools", "PythonTools\PythonTools.csproj", "{D4E5F6A7-B8C9-0123-DEF0-345678901234}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -81,6 +83,18 @@ Global
 		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|Win32.Build.0 = Release|Any CPU
 		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|x86.ActiveCfg = Release|Any CPU
 		{C3D4E5F6-A7B8-9012-CDEF-234567890123}.Release|x86.Build.0 = Release|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Debug|Win32.Build.0 = Debug|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Debug|x86.Build.0 = Debug|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|Win32.ActiveCfg = Release|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|Win32.Build.0 = Release|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|x86.ActiveCfg = Release|Any CPU
+		{D4E5F6A7-B8C9-0123-DEF0-345678901234}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

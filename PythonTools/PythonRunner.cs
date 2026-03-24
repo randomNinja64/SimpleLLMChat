@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using System.Text;
 
-namespace BuiltInTools
+namespace PythonTools
 {
-    public static class PythonTools
+    public static class PythonRunner
     {
         public static string RunPythonScript(string scriptContent, out int exitCode)
         {
