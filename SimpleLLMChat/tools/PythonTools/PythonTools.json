@@ -1,0 +1,13 @@
+{
+    "name": "Python Tools",
+    "executable": "PythonTools.exe",
+    "tools": [
+        {
+            "name": "run_python_script",
+            "description": "Create and execute a Python script. The script is created as a temporary file, executed, and then automatically deleted.",
+            "parameters": [
+                { "name": "script_content", "type": "string", "description": "The complete Python script code to execute. Should be valid Python syntax.", "required": true }
+            ]
+        }
+    ]
+}

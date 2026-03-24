@@ -1,0 +1,63 @@
+{
+    "name": "File Tools",
+    "executable": "FileTools.exe",
+    "options": [
+        { "name": "maxFileContentLength", "label": "Maximum Processing Length for File Content", "type": "int", "default": "8000" }
+    ],
+    "tools": [
+        {
+            "name": "read_file",
+            "description": "Read the contents of a local file and return it as a string. Always reads up to {config.maxFileContentLength} characters. Use the offset parameter to read different parts of large files.",
+            "parameters": [
+                { "name": "filename", "type": "string", "description": "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "offset", "type": "string", "description": "Optional. Character offset to start reading from (default: 0). Use this to read different parts of large files. For example, offset {config.maxFileContentLength} reads characters {config.maxFileContentLength}-{config.maxFileContentLength*2}.", "required": false }
+            ]
+        },
+        {
+            "name": "write_file",
+            "description": "Write the given content to a local file, creating or overwriting it.",
+            "parameters": [
+                { "name": "filename", "type": "string", "description": "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "content", "type": "string", "description": "The content to write into the file.", "required": true }
+            ]
+        },
+        {
+            "name": "extract_file",
+            "description": "Extract an archive file using 7za.exe to a specified destination directory.",
+            "parameters": [
+                { "name": "archive_path", "type": "string", "description": "The full path of the archive file to extract. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "destination_path", "type": "string", "description": "The full path of the destination directory where files will be extracted. Directory will be created if it doesn't exist. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "move_file",
+            "description": "Move or rename a file from one location to another. Destination directory will be created if it doesn't exist.",
+            "parameters": [
+                { "name": "source_path", "type": "string", "description": "The full path of the file to move. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "destination_path", "type": "string", "description": "The full path where the file should be moved to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "copy_file",
+            "description": "Copy a file from one location to another. Destination directory will be created if it doesn't exist.",
+            "parameters": [
+                { "name": "source_path", "type": "string", "description": "The full path of the file to copy. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                { "name": "destination_path", "type": "string", "description": "The full path where the file should be copied to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "delete_file",
+            "description": "Delete a file from the file system. Use with caution as this operation cannot be undone.",
+            "parameters": [
+                { "name": "file_path", "type": "string", "description": "The full path of the file to delete. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        },
+        {
+            "name": "list_directory",
+            "description": "List all files and subdirectories in a given directory.",
+            "parameters": [
+                { "name": "directory_path", "type": "string", "description": "The full path of the directory to list. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true }
+            ]
+        }
+    ]
+}

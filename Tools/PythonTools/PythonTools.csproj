@@ -4,10 +4,10 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{E5F6A7B8-C9D0-1234-EF01-456789012345}</ProjectGuid>
+    <ProjectGuid>{D4E5F6A7-B8C9-0123-DEF0-345678901234}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>ShellTools</RootNamespace>
-    <AssemblyName>ShellTools</AssemblyName>
+    <RootNamespace>PythonTools</RootNamespace>
+    <AssemblyName>PythonTools</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -34,21 +34,20 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.13.0.4\lib\net40\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\packages\Newtonsoft.Json.13.0.4\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="..\.\Shared\ToolHelper.cs">
-      <Link>Shared\ToolHelper.cs</Link>
-    </Compile>
+    <Compile Include="..\ToolHelper.cs" />
+    <Compile Include="PythonRunner.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="ShellTools.json">
+    <None Include="PythonTools.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
