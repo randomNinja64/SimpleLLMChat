@@ -273,6 +273,7 @@ namespace SimpleLLMChatGUI
 
             var groupedOptions = _toolOptions
                 .OrderBy(opt => opt.Source ?? "Tools", StringComparer.OrdinalIgnoreCase)
+                .ThenBy(opt => opt.Type == "bool" ? 1 : 0)
                 .ThenBy(opt => opt.Label, StringComparer.OrdinalIgnoreCase)
                 .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase);
 
@@ -288,34 +289,38 @@ namespace SimpleLLMChatGUI
                 };
                 groupPanel.Children.Add(heading);
 
-                foreach (var opt in group)
+                var textOpts = group.Where(o => o.Type != "bool").ToList();
+                var boolOpts = group.Where(o => o.Type == "bool").ToList();
+
+                foreach (var opt in textOpts)
                 {
-                    // Read current value from config, falling back to manifest default
                     string configValue = config.GetConfigString(opt.Name);
                     string currentValue = configValue ?? opt.Default;
+                    var label = new Label { Content = opt.Label + ":" };
+                    var textBox = new TextBox { Text = currentValue, Height = 23 };
+                    groupPanel.Children.Add(label);
+                    groupPanel.Children.Add(textBox);
+                    _toolOptionControls[opt.Name] = textBox;
+                }
 
-                    if (opt.Type == "bool")
+                if (boolOpts.Count > 0)
+                {
+                    // Spacer between textbox group and checkbox group
+                    if (textOpts.Count > 0)
+                        groupPanel.Children.Add(new Border { Height = 8 });
+
+                    foreach (var opt in boolOpts)
                     {
+                        string configValue = config.GetConfigString(opt.Name);
+                        string currentValue = configValue ?? opt.Default;
                         var checkBox = new CheckBox
                         {
                             Content = opt.Label,
-                            Margin = new Thickness(0, 6, 0, 0)
+                            Margin = new Thickness(0, 4, 0, 0)
                         };
                         checkBox.IsChecked = currentValue == "1" || string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
                         groupPanel.Children.Add(checkBox);
                         _toolOptionControls[opt.Name] = checkBox;
-                    }
-                    else
-                    {
-                        var label = new Label { Content = opt.Label + ":" };
-                        var textBox = new TextBox
-                        {
-                            Text = currentValue,
-                            Height = 23
-                        };
-                        groupPanel.Children.Add(label);
-                        groupPanel.Children.Add(textBox);
-                        _toolOptionControls[opt.Name] = textBox;
                     }
                 }
 
