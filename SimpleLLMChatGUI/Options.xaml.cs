@@ -175,7 +175,7 @@ namespace SimpleLLMChatGUI
             ServerURL = config.GetConfigValue("llmserver");
             ApiKey = config.GetConfigValue("apikey");
             Model = config.GetConfigValue("model");
-            SysPrompt = config.GetConfigValue("sysprompt").Trim('"');
+            SysPrompt = config.GetConfigValue("sysprompt").Trim('"').Replace("\\n", "\n");
             AssistantName = config.GetConfigValue("assistantname");
             ShowToolOutput = config.GetConfigBool("showtooloutput");
             ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
@@ -235,7 +235,7 @@ namespace SimpleLLMChatGUI
                 "model=" + Model,
                 "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
-                "sysprompt=\"" + SysPrompt + "\"", // keep quotes around prompt
+                "sysprompt=\"" + SysPrompt.Replace("\n", "\\n").Replace("\r", "") + "\"", // keep quotes around prompt; newlines escaped as \n
                 "tools=" + string.Join(",", selectedTools),
                 "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };
