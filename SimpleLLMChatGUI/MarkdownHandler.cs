@@ -75,9 +75,8 @@ namespace SimpleLLMChatGUI
                 // Skip processing if we're inside an excluded region
                 if (activeBacktickFenceLength > 0 || insideThinkTag)
                 {
-                    if (activeBacktickFenceLength > 0)
-                    {
-                        ApplyCodeBlockStyle(paragraph);
+                    if (activeBacktickFenceLength > 0){
+                        paragraph.Background = codeBlockBrush;
                     }
                     continue;
                 }
