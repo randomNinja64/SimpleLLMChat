@@ -20,11 +20,12 @@ namespace SimpleLLMChatGUI
         private static readonly Regex ItalicPattern = new Regex(@"(?<![a-zA-Z0-9_])(?<!\*)\*(.+?)\*(?![a-zA-Z0-9_])(?!\*)|(?<![a-zA-Z0-9_])(?<!_)_(.+?)_(?![a-zA-Z0-9_])(?!_)", RegexOptions.Compiled);
         private static readonly Regex StrikethroughPattern = new Regex(@"~~(.+?)~~", RegexOptions.Compiled);
         private static readonly Regex InlineCodePattern = new Regex(@"`([^`]+)`", RegexOptions.Compiled);
+        private static readonly Regex HorizontalRulePattern = new Regex(@"^(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$", RegexOptions.Compiled);
+        private static readonly Regex BacktickFencePattern = new Regex(@"^(`{3,})([^`]*)$", RegexOptions.Compiled);
 
         public static void processMarkdown(RichTextBox chatOutput)
         {
-            bool insideCodeBlock = false;
-            bool insideFourBacktickBlock = false;
+            int activeBacktickFenceLength = 0;
             bool insideThinkTag = false;
 
             // Process each paragraph in order
@@ -32,53 +33,54 @@ namespace SimpleLLMChatGUI
             {
                 string paragraphText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text;
 
-                // Check for 4-backtick code block markers first (more specific)
-                // A code block delimiter must start with backticks (or be just backticks after trimming)
                 string trimmedText = paragraphText.Trim();
-                if (trimmedText.StartsWith("````") || trimmedText == "````")
+                if (TryParseBacktickFence(trimmedText, out int fenceLength, out bool hasInfoString))
                 {
-                    insideFourBacktickBlock = !insideFourBacktickBlock;
-                    // Remove the entire line containing the ```` marker
-                    paragraph.Inlines.Clear();
-                    continue;
-                }
+                    if (activeBacktickFenceLength == 0)
+                    {
+                        // Opening fence can include an optional language/info string.
+                        activeBacktickFenceLength = fenceLength;
+                        paragraph.Inlines.Clear();
+                        continue;
+                    }
 
-                // Check for 3-backtick code block markers
-                // A code block delimiter must start with ``` (optionally followed by language identifier)
-                // or be exactly ``` (closing delimiter)
-                if (trimmedText.StartsWith("```") || trimmedText == "```")
-                {
-                    insideCodeBlock = !insideCodeBlock;
-                    // Remove the entire line containing the ``` marker
-                    paragraph.Inlines.Clear();
-                    continue;
+                    // Closing fence must be backticks only and at least the opening fence length.
+                    if (!hasInfoString && fenceLength >= activeBacktickFenceLength)
+                    {
+                        activeBacktickFenceLength = 0;
+                        paragraph.Inlines.Clear();
+                        continue;
+                    }
                 }
 
                 // Check for think tag markers (case-insensitive)
-                if (paragraphText.IndexOf("<think>", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                if (paragraphText.IndexOf("<think>", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     insideThinkTag = true;
                     continue;
                 }
-                if (paragraphText.IndexOf("</think>", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                if (paragraphText.IndexOf("</think>", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     insideThinkTag = false;
                     continue;
                 }
 
                 // Skip processing if we're inside an excluded region
-                if (insideCodeBlock || insideFourBacktickBlock || insideThinkTag)
+                if (activeBacktickFenceLength > 0 || insideThinkTag)
                 {
-                    // Style code block paragraphs with code block background color
-                    if (insideCodeBlock)
+                    if (activeBacktickFenceLength > 0)
                     {
-                        paragraph.Background = Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
+                        ApplyCodeBlockStyle(paragraph);
                     }
                     continue;
                 }
 
+                // Process horizontal rules as paragraph-level separators
+                if (ProcessHorizontalRule(paragraph, trimmedText))
+                    continue;
+
                 // Process headers first (paragraph-level formatting)
-                ProcessHeaders(paragraph);
+                ProcessHeaders(paragraph, trimmedText);
 
                 // Process inline code blocks first to split them out
                 ProcessInlineCodeBlocks(paragraph);
@@ -87,8 +89,8 @@ namespace SimpleLLMChatGUI
                 var formattingProcessors = new[]
                 {
                     new FormattingProcessor(BoldItalicPattern, match => new Run(match.Groups[2].Value) { FontWeight = FontWeights.Bold, FontStyle = FontStyles.Italic }),
-                    new FormattingProcessor(BoldPattern, match => new Run(!string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value) { FontWeight = FontWeights.Bold }),
-                    new FormattingProcessor(ItalicPattern, match => new Run(!string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value) { FontStyle = FontStyles.Italic }),
+                    new FormattingProcessor(BoldPattern, match => new Run(FirstCapturedGroup(match)) { FontWeight = FontWeights.Bold }),
+                    new FormattingProcessor(ItalicPattern, match => new Run(FirstCapturedGroup(match)) { FontStyle = FontStyles.Italic }),
                     new FormattingProcessor(StrikethroughPattern, match => new Run(match.Groups[1].Value) { TextDecorations = TextDecorations.Strikethrough })
                 };
 
@@ -102,12 +104,9 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        private static void ProcessHeaders(Paragraph paragraph)
+        private static void ProcessHeaders(Paragraph paragraph, string trimmedText)
         {
-            string paragraphText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text.Trim();
-            
-            // Check if this paragraph is a header
-            Match headerMatch = HeaderPattern.Match(paragraphText);
+            Match headerMatch = HeaderPattern.Match(trimmedText);
             if (headerMatch.Success)
             {
                 int headerLevel = headerMatch.Groups[1].Value.Length; // Number of # characters
@@ -133,39 +132,66 @@ namespace SimpleLLMChatGUI
                 if (!InlineCodePattern.IsMatch(run.Text) || !(run.Parent is Paragraph parent))
                     continue;
 
-                var codeMatches = InlineCodePattern.Matches(run.Text);
-                var newInlines = new List<Inline>();
-                int lastIndex = 0;
-
-                foreach (Match codeMatch in codeMatches)
+                var newInlines = BuildInlines(run.Text, InlineCodePattern.Matches(run.Text), match =>
                 {
-                    // Text before code block
-                    if (codeMatch.Index > lastIndex)
-                        newInlines.Add(new Run(run.Text.Substring(lastIndex, codeMatch.Index - lastIndex)));
+                    var codeSpan = new Span(new Run(match.Groups[1].Value));
+                    codeSpan.Background = GetCodeBlockBrush();
+                    return codeSpan;
+                });
 
-                    // Code block (unformatted, just the content without backticks)
-                    // Wrap in Span with code block background color for emphasis
-                    var codeRun = new Run(codeMatch.Groups[1].Value);
-                    var codeSpan = new Span(codeRun);
-                    codeSpan.Background = Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
-                    newInlines.Add(codeSpan);
-                    lastIndex = codeMatch.Index + codeMatch.Length;
-                }
-
-                // Remaining text
-                if (lastIndex < run.Text.Length)
-                    newInlines.Add(new Run(run.Text.Substring(lastIndex)));
-
-                // Replace original run
                 foreach (var inline in newInlines)
                     parent.Inlines.InsertBefore(run, inline);
                 parent.Inlines.Remove(run);
             }
         }
 
-        private static void ApplyFormatting(Run run, Regex pattern, Func<Match, Run> createFormattedRun)
+        private static bool ProcessHorizontalRule(Paragraph paragraph, string trimmedText)
         {
-            // Skip formatting if run contains inline code blocks (these should already be split out)
+            if (!HorizontalRulePattern.IsMatch(trimmedText))
+                return false;
+
+            Brush separatorBrush = paragraph.Foreground
+                ?? (Application.Current?.MainWindow?.Foreground as Brush)
+                ?? SystemColors.ControlTextBrush;
+
+            paragraph.Inlines.Clear();
+            paragraph.Margin = new Thickness(0, 3, 0, 3);
+            paragraph.BorderBrush = separatorBrush;
+            paragraph.BorderThickness = new Thickness(0, 1, 0, 0);
+            paragraph.Padding = new Thickness(0);
+            paragraph.LineHeight = 1;
+            paragraph.FontSize = 1;
+            paragraph.Inlines.Add(new Run(" "));
+
+            return true;
+        }
+
+        private static bool TryParseBacktickFence(string trimmedText, out int fenceLength, out bool hasInfoString)
+        {
+            fenceLength = 0;
+            hasInfoString = false;
+
+            Match match = BacktickFencePattern.Match(trimmedText);
+            if (!match.Success)
+                return false;
+
+            fenceLength = match.Groups[1].Value.Length;
+            hasInfoString = !string.IsNullOrWhiteSpace(match.Groups[2].Value);
+            return true;
+        }
+
+        private static Brush GetCodeBlockBrush()
+        {
+            return Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
+        }
+
+        private static void ApplyCodeBlockStyle(Paragraph paragraph)
+        {
+            paragraph.Background = GetCodeBlockBrush();
+        }
+
+        private static void ApplyFormatting(Run run, Regex pattern, Func<Match, Inline> createFormattedInline)
+        {
             if (InlineCodePattern.IsMatch(run.Text))
                 return;
 
@@ -173,7 +199,7 @@ namespace SimpleLLMChatGUI
             if (matches.Count == 0 || !(run.Parent is Paragraph parent))
                 return;
 
-            var newInlines = BuildInlines(run.Text, matches, createFormattedRun);
+            var newInlines = BuildInlines(run.Text, matches, createFormattedInline);
 
             // Replace original run with formatted inlines
             foreach (var inline in newInlines)
@@ -181,23 +207,25 @@ namespace SimpleLLMChatGUI
             parent.Inlines.Remove(run);
         }
 
-        private static List<Inline> BuildInlines(string text, MatchCollection matches, Func<Match, Run> createFormattedRun)
+        private static string FirstCapturedGroup(Match match)
+        {
+            return !string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value;
+        }
+
+        private static List<Inline> BuildInlines(string text, MatchCollection matches, Func<Match, Inline> createFormattedInline)
         {
             var inlines = new List<Inline>();
             int lastIndex = 0;
 
             foreach (Match match in matches)
             {
-                // Text before match
                 if (match.Index > lastIndex)
                     inlines.Add(new Run(text.Substring(lastIndex, match.Index - lastIndex)));
 
-                // Formatted text (without markers)
-                inlines.Add(createFormattedRun(match));
+                inlines.Add(createFormattedInline(match));
                 lastIndex = match.Index + match.Length;
             }
 
-            // Remaining text
             if (lastIndex < text.Length)
                 inlines.Add(new Run(text.Substring(lastIndex)));
 
@@ -207,9 +235,9 @@ namespace SimpleLLMChatGUI
         private class FormattingProcessor
         {
             public Regex Pattern { get; private set; }
-            public Func<Match, Run> CreateFormattedRun { get; private set; }
+            public Func<Match, Inline> CreateFormattedRun { get; private set; }
 
-            public FormattingProcessor(Regex pattern, Func<Match, Run> createFormattedRun)
+            public FormattingProcessor(Regex pattern, Func<Match, Inline> createFormattedRun)
             {
                 Pattern = pattern;
                 CreateFormattedRun = createFormattedRun;
