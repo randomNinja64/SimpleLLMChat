@@ -33,6 +33,7 @@ namespace SimpleLLMChatGUI
         {
             int activeBacktickFenceLength = 0;
             bool insideThinkTag = false;
+            Brush codeBlockBrush = GetCodeBlockBrush();
 
             // Process each paragraph in order
             foreach (var paragraph in chatOutput.Document.Blocks.OfType<Paragraph>().ToList())
@@ -89,30 +90,24 @@ namespace SimpleLLMChatGUI
                 ProcessHeaders(paragraph, trimmedText);
 
                 // Process inline code blocks first to split them out
-                ProcessInlineCodeBlocks(paragraph);
+                ReplaceInRuns(paragraph, InlineCodePattern, match =>
+                {
+                    var codeSpan = new Span(new Run(match.Groups[1].Value));
+                    codeSpan.Background = codeBlockBrush;
+                    return codeSpan;
+                });
 
                 // Process links before inline formatting so link text doesn't get formatted
-                ApplyLinkPattern(paragraph, LinkPattern, match =>
+                ReplaceInRuns(paragraph, LinkPattern, match =>
                     (Inline)CreateHyperlink(match.Groups[1].Value, match.Groups[2].Value.Trim()) ?? new Run(match.Value));
-                ApplyLinkPattern(paragraph, BareUrlPattern, match =>
+                ReplaceInRuns(paragraph, BareUrlPattern, match =>
                     (Inline)CreateHyperlink(match.Value, match.Value) ?? new Run(match.Value));
 
                 // Process formatting in order: bold italic, bold, italic, strikethrough
-                var formattingProcessors = new[]
-                {
-                    new FormattingProcessor(BoldItalicPattern, match => new Run(match.Groups[2].Value) { FontWeight = FontWeights.Bold, FontStyle = FontStyles.Italic }),
-                    new FormattingProcessor(BoldPattern, match => new Run(FirstCapturedGroup(match)) { FontWeight = FontWeights.Bold }),
-                    new FormattingProcessor(ItalicPattern, match => new Run(FirstCapturedGroup(match)) { FontStyle = FontStyles.Italic }),
-                    new FormattingProcessor(StrikethroughPattern, match => new Run(match.Groups[1].Value) { TextDecorations = TextDecorations.Strikethrough })
-                };
-
-                foreach (var processor in formattingProcessors)
-                {
-                    foreach (var run in paragraph.Inlines.OfType<Run>().ToList())
-                    {
-                        ApplyFormatting(run, processor.Pattern, processor.CreateFormattedRun);
-                    }
-                }
+                ReplaceInRuns(paragraph, BoldItalicPattern, match => new Run(match.Groups[2].Value) { FontWeight = FontWeights.Bold, FontStyle = FontStyles.Italic });
+                ReplaceInRuns(paragraph, BoldPattern, match => new Run(FirstCapturedGroup(match)) { FontWeight = FontWeights.Bold });
+                ReplaceInRuns(paragraph, ItalicPattern, match => new Run(FirstCapturedGroup(match)) { FontStyle = FontStyles.Italic });
+                ReplaceInRuns(paragraph, StrikethroughPattern, match => new Run(match.Groups[1].Value) { TextDecorations = TextDecorations.Strikethrough });
             }
         }
 
@@ -137,27 +132,7 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        private static void ProcessInlineCodeBlocks(Paragraph paragraph)
-        {
-            foreach (var run in paragraph.Inlines.OfType<Run>().ToList())
-            {
-                if (!InlineCodePattern.IsMatch(run.Text) || !(run.Parent is Paragraph parent))
-                    continue;
-
-                var newInlines = BuildInlines(run.Text, InlineCodePattern.Matches(run.Text), match =>
-                {
-                    var codeSpan = new Span(new Run(match.Groups[1].Value));
-                    codeSpan.Background = GetCodeBlockBrush();
-                    return codeSpan;
-                });
-
-                foreach (var inline in newInlines)
-                    parent.Inlines.InsertBefore(run, inline);
-                parent.Inlines.Remove(run);
-            }
-        }
-
-        private static void ApplyLinkPattern(Paragraph paragraph, Regex pattern, Func<Match, Inline> createInline)
+        private static void ReplaceInRuns(Paragraph paragraph, Regex pattern, Func<Match, Inline> createInline)
         {
             foreach (var run in paragraph.Inlines.OfType<Run>().ToList())
             {
@@ -247,28 +222,6 @@ namespace SimpleLLMChatGUI
             return Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
         }
 
-        private static void ApplyCodeBlockStyle(Paragraph paragraph)
-        {
-            paragraph.Background = GetCodeBlockBrush();
-        }
-
-        private static void ApplyFormatting(Run run, Regex pattern, Func<Match, Inline> createFormattedInline)
-        {
-            if (InlineCodePattern.IsMatch(run.Text))
-                return;
-
-            var matches = pattern.Matches(run.Text);
-            if (matches.Count == 0 || !(run.Parent is Paragraph parent))
-                return;
-
-            var newInlines = BuildInlines(run.Text, matches, createFormattedInline);
-
-            // Replace original run with formatted inlines
-            foreach (var inline in newInlines)
-                parent.Inlines.InsertBefore(run, inline);
-            parent.Inlines.Remove(run);
-        }
-
         private static string FirstCapturedGroup(Match match)
         {
             return !string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value;
@@ -294,16 +247,5 @@ namespace SimpleLLMChatGUI
             return inlines;
         }
 
-        private class FormattingProcessor
-        {
-            public Regex Pattern { get; private set; }
-            public Func<Match, Inline> CreateFormattedRun { get; private set; }
-
-            public FormattingProcessor(Regex pattern, Func<Match, Inline> createFormattedRun)
-            {
-                Pattern = pattern;
-                CreateFormattedRun = createFormattedRun;
-            }
-        }
     }
 }
