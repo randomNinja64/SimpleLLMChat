@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace SimpleLLMChatGUI
 {
@@ -20,6 +24,8 @@ namespace SimpleLLMChatGUI
         private static readonly Regex ItalicPattern = new Regex(@"(?<![a-zA-Z0-9_])(?<!\*)\*(.+?)\*(?![a-zA-Z0-9_])(?!\*)|(?<![a-zA-Z0-9_])(?<!_)_(.+?)_(?![a-zA-Z0-9_])(?!_)", RegexOptions.Compiled);
         private static readonly Regex StrikethroughPattern = new Regex(@"~~(.+?)~~", RegexOptions.Compiled);
         private static readonly Regex InlineCodePattern = new Regex(@"`([^`]+)`", RegexOptions.Compiled);
+        private static readonly Regex LinkPattern = new Regex(@"\[([^\[\]]+)\]\(([^()]+)\)", RegexOptions.Compiled);
+        private static readonly Regex BareUrlPattern = new Regex(@"https?://[^\s<>""'()\[\]{}]+(?<![.,;:!?])", RegexOptions.Compiled);
         private static readonly Regex HorizontalRulePattern = new Regex(@"^(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$", RegexOptions.Compiled);
         private static readonly Regex BacktickFencePattern = new Regex(@"^(`{3,})([^`]*)$", RegexOptions.Compiled);
 
@@ -85,6 +91,12 @@ namespace SimpleLLMChatGUI
                 // Process inline code blocks first to split them out
                 ProcessInlineCodeBlocks(paragraph);
 
+                // Process links before inline formatting so link text doesn't get formatted
+                ApplyLinkPattern(paragraph, LinkPattern, match =>
+                    (Inline)CreateHyperlink(match.Groups[1].Value, match.Groups[2].Value.Trim()) ?? new Run(match.Value));
+                ApplyLinkPattern(paragraph, BareUrlPattern, match =>
+                    (Inline)CreateHyperlink(match.Value, match.Value) ?? new Run(match.Value));
+
                 // Process formatting in order: bold italic, bold, italic, strikethrough
                 var formattingProcessors = new[]
                 {
@@ -142,6 +154,56 @@ namespace SimpleLLMChatGUI
                 foreach (var inline in newInlines)
                     parent.Inlines.InsertBefore(run, inline);
                 parent.Inlines.Remove(run);
+            }
+        }
+
+        private static void ApplyLinkPattern(Paragraph paragraph, Regex pattern, Func<Match, Inline> createInline)
+        {
+            foreach (var run in paragraph.Inlines.OfType<Run>().ToList())
+            {
+                if (!pattern.IsMatch(run.Text) || !(run.Parent is Paragraph parent))
+                    continue;
+
+                var newInlines = BuildInlines(run.Text, pattern.Matches(run.Text), createInline);
+
+                foreach (var inline in newInlines)
+                    parent.Inlines.InsertBefore(run, inline);
+                parent.Inlines.Remove(run);
+            }
+        }
+
+        private static Hyperlink CreateHyperlink(string displayText, string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+                return null;
+
+            var hyperlink = new Hyperlink(new Run(displayText))
+            {
+                NavigateUri = uri,
+                Foreground = Application.Current.Resources["ChatTextColorBrush"] as Brush ?? SystemColors.ControlTextBrush,
+                Cursor = Cursors.Hand
+            };
+            AttachTooltip(hyperlink, uri.AbsoluteUri);
+            hyperlink.PreviewMouseLeftButtonDown += OnHyperlinkClick;
+            return hyperlink;
+        }
+
+        private static void AttachTooltip(Hyperlink hyperlink, string text)
+        {
+            var tooltip = new ToolTip { Content = text, Placement = PlacementMode.Mouse };
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            timer.Tick += (s, _) => { timer.Stop(); tooltip.IsOpen = true; };
+            hyperlink.MouseEnter += (s, _) => timer.Start();
+            hyperlink.MouseLeave += (s, _) => { timer.Stop(); tooltip.IsOpen = false; };
+        }
+
+        private static void OnHyperlinkClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is Hyperlink hyperlink && hyperlink.NavigateUri != null)
+            {
+                Process.Start(new ProcessStartInfo(hyperlink.NavigateUri.AbsoluteUri) { UseShellExecute = true });
+                e.Handled = true;
             }
         }
 
