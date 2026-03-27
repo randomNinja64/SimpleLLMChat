@@ -151,6 +151,19 @@ namespace SimpleLLMChatGUI
             Close();
         }
 
+        private static string EscapePromptForStorage(string prompt)
+        {
+            if (string.IsNullOrEmpty(prompt))
+                return string.Empty;
+
+            // Escape backslashes first, then other special characters
+            return prompt.Replace("\\", "\\\\")
+                        .Replace("\r\n", "\\n")  // Windows line endings
+                        .Replace("\n", "\\n")      // Unix line endings
+                        .Replace("\r", "\\r")      // Mac line endings
+                        .Replace("\t", "\\t");      // Tabs
+        }
+
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
@@ -175,7 +188,7 @@ namespace SimpleLLMChatGUI
             ServerURL = config.GetConfigValue("llmserver");
             ApiKey = config.GetConfigValue("apikey");
             Model = config.GetConfigValue("model");
-            SysPrompt = config.GetConfigValue("sysprompt").Trim('"').Replace("\\n", "\n");
+            SysPrompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"));
             AssistantName = config.GetConfigValue("assistantname");
             ShowToolOutput = config.GetConfigBool("showtooloutput");
             ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
@@ -235,7 +248,7 @@ namespace SimpleLLMChatGUI
                 "model=" + Model,
                 "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
-                "sysprompt=\"" + SysPrompt.Replace("\n", "\\n").Replace("\r", "") + "\"", // keep quotes around prompt; newlines escaped as \n
+                "sysprompt=\"" + EscapePromptForStorage(SysPrompt) + "\"", // keep quotes around prompt; escape sequences encoded
                 "tools=" + string.Join(",", selectedTools),
                 "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };

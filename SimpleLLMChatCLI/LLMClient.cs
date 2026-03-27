@@ -327,7 +327,7 @@ public class LLMClient
         JObject systemMsg = new JObject
         {
             ["role"] = "system",
-            ["content"] = config.GetConfigValue("sysprompt")
+            ["content"] = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"))
         };
         messages.Add(systemMsg);
 

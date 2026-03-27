@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 /// <summary>
 /// Shared configuration handler for both CLI and GUI projects.
@@ -66,6 +67,25 @@ public class ConfigHandler
     {
         string val = GetConfigValue(key);
         return string.IsNullOrEmpty(val) ? null : val;
+    }
+
+    /// <summary>
+    /// Decodes stored prompts by removing outer wrapping quotes and unescaping all C-style escape sequences.
+    /// Preserves inner/trailing quotes verbatim.
+    /// </summary>
+    public static string DecodeStoredPrompt(string storedPrompt)
+    {
+        if (storedPrompt == null)
+            return string.Empty;
+
+        // Remove only the outer wrapping quotes; preserve inner/trailing quotes verbatim.
+        if (storedPrompt.Length >= 2 && storedPrompt[0] == '"' && storedPrompt[storedPrompt.Length - 1] == '"')
+        {
+            storedPrompt = storedPrompt.Substring(1, storedPrompt.Length - 2);
+        }
+
+        // Unescape all C-style escape sequences (\n, \t, \r, \\, etc.)
+        return Regex.Unescape(storedPrompt);
     }
 
     /// <summary>
