@@ -383,154 +383,14 @@ public class LLMClient
             using (var responseStream = httpResponse.GetResponseStream())
             using (var reader = new StreamReader(responseStream, Encoding.UTF8))
             {
-                string line;
-                StringBuilder output = new StringBuilder();
-                bool inReasoning = false;
-                bool firstContent = true;
-                DateTime reasoningStart = DateTime.MinValue;
-
-                // ✅ accumulate tool call argument chunks across deltas
-                Dictionary<int, ToolRegistry.ToolCall> partialToolCalls = new Dictionary<int, ToolRegistry.ToolCall>();
-
-                while ((line = reader.ReadLine()) != null)
-                {
-                    if (line.StartsWith("data: "))
-                    {
-                        string jsonPart = line.Substring(6);
-                        if (jsonPart == "[DONE]") break;
-
-                        // Check if this is an error response
-                        if (jsonPart.Contains("\"error\""))
-                        {
-                            Console.Write("[API Error] " + jsonPart.Trim() + "\n");
-                            continue;
-                        }
-
-
-                        try
-                        {
-                            JObject obj = JObject.Parse(jsonPart);
-                            JArray choices = (JArray)obj["choices"];
-                            if (choices == null) continue;
-
-                            foreach (JObject choice in choices)
-                            {
-                                string reasoningChunk = (string)choice["delta"]?["reasoning_content"]
-                                    ?? (string)choice["delta"]?["reasoning"];
-                                if (!string.IsNullOrEmpty(reasoningChunk))
-                                {
-                                    if (onReasoningChunk != null)
-                                    {
-                                        if (!inReasoning)
-                                        {
-                                            Console.Write("[thinking]\n");
-                                            inReasoning = true;
-                                        }
-                                        onReasoningChunk(reasoningChunk);
-                                    }
-                                    else if (!inReasoning)
-                                    {
-                                        reasoningStart = DateTime.UtcNow;
-                                        inReasoning = true;
-                                    }
-                                }
-
-                                string content = (string)choice["delta"]?["content"];
-                                if (!string.IsNullOrEmpty(content))
-                                {
-                                    if (inReasoning && onReasoningChunk != null)
-                                    {
-                                        Console.Write("\n[/thinking]");
-                                        Console.WriteLine();
-                                        Console.WriteLine();
-                                        inReasoning = false;
-                                        firstContent = true;
-                                    }
-                                    else if (inReasoning)
-                                    {
-                                        int seconds = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
-                                        completionResponse.ReasoningSeconds = seconds;
-                                        if (onReasoningSummary != null)
-                                            onReasoningSummary(seconds);
-                                        inReasoning = false;
-                                    }
-                                    if (firstContent)
-                                    {
-                                        content = content.TrimStart('\n');
-                                        if (content.Length == 0) continue;
-                                        firstContent = false;
-                                    }
-                                    Console.Write(content);
-                                    output.Append(content);
-                                }
-
-                                string finishReason = (string)choice["finish_reason"];
-                                if (!string.IsNullOrEmpty(finishReason))
-                                    completionResponse.FinishReason = finishReason;
-
-                                JArray toolCalls = (JArray)choice["delta"]?["tool_calls"];
-                                if (toolCalls != null)
-                                {
-                                    foreach (JObject call in toolCalls)
-                                    {
-                                        int index = call["index"]?.Value<int>() ?? 0;
-                                        string id = (string)call["id"];
-                                        JObject function = (JObject)call["function"];
-
-                                        if (!partialToolCalls.ContainsKey(index))
-                                            partialToolCalls[index] = new ToolRegistry.ToolCall();
-
-                                        var tc = partialToolCalls[index];
-
-                                        if (!string.IsNullOrEmpty(id))
-                                            tc.Id = id;
-
-                                        if (function != null)
-                                        {
-                                            string name = (string)function["name"];
-                                            string argsChunk = (string)function["arguments"];
-
-                                            if (!string.IsNullOrEmpty(name))
-                                                tc.Name = name;
-
-                                            if (!string.IsNullOrEmpty(argsChunk))
-                                                tc.Arguments += argsChunk;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            // ignore malformed JSON fragments
-                        }
-                    }
-                }
-
-                // Close reasoning block if stream ended while still inside one
-                if (inReasoning && onReasoningChunk != null)
-                {
-                    Console.Write("\n[/thinking]");
-                    Console.WriteLine();
-                    Console.WriteLine();
-                }
-                else if (inReasoning)
-                {
-                    int seconds = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
-                    completionResponse.ReasoningSeconds = seconds;
-                    if (onReasoningSummary != null)
-                        onReasoningSummary(seconds);
-                }
-
-                // finalize tool calls after stream ends
-                completionResponse.ToolCalls.AddRange(partialToolCalls.Values);
-                completionResponse.Content = output.ToString();
+                completionResponse = SseStreamParser.Parse(reader, onReasoningChunk, onReasoningSummary);
             }
         }
-        catch (WebException webEx)
+        catch (Exception ex)
         {
             string reason;
-            if (webEx.Response is HttpWebResponse errorResponse)
+            WebException webEx = ex as WebException;
+            if (webEx != null && webEx.Response is HttpWebResponse errorResponse)
             {
                 using (var errorStream = errorResponse.GetResponseStream())
                 using (var errorReader = new StreamReader(errorStream, Encoding.UTF8))
@@ -541,17 +401,30 @@ public class LLMClient
             }
             else
             {
-                reason = webEx.Message;
+                reason = ex.Message;
             }
+
+            if ((config.GetConfigValue("llmserver") ?? "").StartsWith("https:", StringComparison.OrdinalIgnoreCase) && IsTlsFailure(ex))
+                return CurlClient.SendRequest(config.GetConfigValue("llmserver"), config.GetConfigValue("apikey"), payload, onReasoningChunk, onReasoningSummary);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }
-        catch (Exception ex)
-        {
-            return new LLMCompletionResponse(ex.Message, null, "request_failed");
-        }
 
         return completionResponse;
+    }
+
+    private static bool IsTlsFailure(Exception ex)
+    {
+        WebException webEx = ex as WebException;
+        if (webEx != null)
+            return webEx.Status == WebExceptionStatus.SecureChannelFailure
+                || webEx.Status == WebExceptionStatus.TrustFailure
+                || webEx.Status == WebExceptionStatus.ConnectFailure
+                || (webEx.InnerException != null && webEx.InnerException.GetType().Name.Contains("Authentication"));
+
+        return ex.GetType().Name.Contains("Authentication")
+            || ex.GetType().Name.Contains("Security")
+            || (ex.InnerException != null && ex.InnerException.GetType().Name.Contains("Authentication"));
     }
 }
 }

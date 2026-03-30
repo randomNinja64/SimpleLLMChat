@@ -50,7 +50,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ImageHandler.cs" />
+    <Compile Include="CurlClient.cs" />
     <Compile Include="LLMClient.cs" />
+    <Compile Include="SseStreamParser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ToolRegistry.cs" />
