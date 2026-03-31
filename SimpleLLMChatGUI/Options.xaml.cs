@@ -33,6 +33,7 @@ namespace SimpleLLMChatGUI
         // Dynamic tool options loaded from manifests
         private List<ToolOptionDefinition> _toolOptions;
         private readonly Dictionary<string, FrameworkElement> _toolOptionControls = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
+        private List<ScrollViewer> _toolGroupPages = new List<ScrollViewer>();
 
         public List<string> AvailableTools
         {
@@ -187,6 +188,29 @@ namespace SimpleLLMChatGUI
             colorsForm.ShowDialog();
         }
 
+        private void CategoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (AppearancePage == null) return;
+
+            AppearancePage.Visibility = Visibility.Collapsed;
+            SystemPage.Visibility = Visibility.Collapsed;
+            ToolsPage.Visibility = Visibility.Collapsed;
+            foreach (var page in _toolGroupPages)
+                page.Visibility = Visibility.Collapsed;
+
+            switch (CategoryListBox.SelectedIndex)
+            {
+                case 0: AppearancePage.Visibility = Visibility.Visible; break;
+                case 1: SystemPage.Visibility = Visibility.Visible; break;
+                case 2: ToolsPage.Visibility = Visibility.Visible; break;
+                default:
+                    int toolIdx = CategoryListBox.SelectedIndex - 3;
+                    if (toolIdx >= 0 && toolIdx < _toolGroupPages.Count)
+                        _toolGroupPages[toolIdx].Visibility = Visibility.Visible;
+                    break;
+            }
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             // Apply custom font to this window
@@ -283,37 +307,43 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
-        /// Builds dynamic UI controls in ToolOptionsPanel from manifest-registered options,
-        /// grouped by manifest source and sorted alphabetically by label within each group.
+        /// Builds per-tool-group pages: one ListBoxItem and one ScrollViewer page per group,
+        /// added dynamically after the static Appearance/System/Tools entries.
         /// </summary>
         private void BuildToolOptionsUI(ConfigHandler config)
         {
-            ToolOptionsPanel.Children.Clear();
             _toolOptionControls.Clear();
+            _toolGroupPages.Clear();
 
             if (_toolOptions.Count == 0)
                 return;
 
             var groupedOptions = _toolOptions
-                .OrderBy(opt => opt.Source ?? "Tools", StringComparer.OrdinalIgnoreCase)
-                .ThenBy(opt => opt.Type == "bool" ? 1 : 0)
-                .ThenBy(opt => opt.Label, StringComparer.OrdinalIgnoreCase)
-                .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase);
+                .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
 
             foreach (var group in groupedOptions)
             {
-                var groupPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                // Add category item to ListBox
+                var listBoxItem = new ListBoxItem
+                {
+                    Content = group.Key
+                };
+                CategoryListBox.Items.Add(listBoxItem);
+
+                // Build page
+                var stackPanel = new StackPanel { Margin = new Thickness(8, 0, 8, 0) };
 
                 var heading = new Label
                 {
                     Content = group.Key,
                     FontWeight = FontWeights.Bold,
-                    Margin = new Thickness(0, 0, 0, 0)
+                    FontSize = 14
                 };
-                groupPanel.Children.Add(heading);
+                stackPanel.Children.Add(heading);
 
-                var textOpts = group.Where(o => o.Type != "bool").ToList();
-                var boolOpts = group.Where(o => o.Type == "bool").ToList();
+                var textOpts = group.Where(o => o.Type != "bool").OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase).ToList();
+                var boolOpts = group.Where(o => o.Type == "bool").OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase).ToList();
 
                 foreach (var opt in textOpts)
                 {
@@ -321,16 +351,15 @@ namespace SimpleLLMChatGUI
                     string currentValue = configValue ?? opt.Default;
                     var label = new Label { Content = opt.Label + ":" };
                     var textBox = new TextBox { Text = currentValue, Height = 23 };
-                    groupPanel.Children.Add(label);
-                    groupPanel.Children.Add(textBox);
+                    stackPanel.Children.Add(label);
+                    stackPanel.Children.Add(textBox);
                     _toolOptionControls[opt.Name] = textBox;
                 }
 
                 if (boolOpts.Count > 0)
                 {
-                    // Spacer between textbox group and checkbox group
                     if (textOpts.Count > 0)
-                        groupPanel.Children.Add(new Border { Height = 8 });
+                        stackPanel.Children.Add(new Border { Height = 8 });
 
                     foreach (var opt in boolOpts)
                     {
@@ -342,12 +371,21 @@ namespace SimpleLLMChatGUI
                             Margin = new Thickness(0, 4, 0, 0)
                         };
                         checkBox.IsChecked = currentValue == "1" || string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
-                        groupPanel.Children.Add(checkBox);
+                        stackPanel.Children.Add(checkBox);
                         _toolOptionControls[opt.Name] = checkBox;
                     }
                 }
 
-                ToolOptionsPanel.Children.Add(groupPanel);
+                var scrollViewer = new ScrollViewer
+                {
+                    Margin = new Thickness(0, 0, 0, 10),
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Visibility = Visibility.Collapsed,
+                    Content = stackPanel
+                };
+
+                ContentGrid.Children.Add(scrollViewer);
+                _toolGroupPages.Add(scrollViewer);
             }
         }
 
