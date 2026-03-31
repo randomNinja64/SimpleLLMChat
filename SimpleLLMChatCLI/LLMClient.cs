@@ -404,8 +404,11 @@ public class LLMClient
                 reason = ex.Message;
             }
 
-            if ((config.GetConfigValue("llmserver") ?? "").StartsWith("https:", StringComparison.OrdinalIgnoreCase) && IsTlsFailure(ex))
-                return CurlClient.SendRequest(config.GetConfigValue("llmserver"), config.GetConfigValue("apikey"), payload, onReasoningChunk, onReasoningSummary);
+            // Try curl fallback for HTTPS connection errors
+            string serverUrl = config.GetConfigValue("llmserver") ?? "";
+            string curlPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "curl.exe");
+            if (serverUrl.StartsWith("https:", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(curlPath) && ShouldFallbackToCurl(ex))
+                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, onReasoningChunk, onReasoningSummary);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }
@@ -413,18 +416,24 @@ public class LLMClient
         return completionResponse;
     }
 
-    private static bool IsTlsFailure(Exception ex)
+    private static bool ShouldFallbackToCurl(Exception ex)
     {
         WebException webEx = ex as WebException;
         if (webEx != null)
             return webEx.Status == WebExceptionStatus.SecureChannelFailure
                 || webEx.Status == WebExceptionStatus.TrustFailure
                 || webEx.Status == WebExceptionStatus.ConnectFailure
+                || webEx.Status == WebExceptionStatus.ConnectionClosed
+                || webEx.Status == WebExceptionStatus.SendFailure
+                || webEx.Status == WebExceptionStatus.ReceiveFailure
+                || webEx.Status == WebExceptionStatus.Timeout
+                || webEx.Status == WebExceptionStatus.ServerProtocolViolation
                 || (webEx.InnerException != null && webEx.InnerException.GetType().Name.Contains("Authentication"));
 
         return ex.GetType().Name.Contains("Authentication")
             || ex.GetType().Name.Contains("Security")
-            || (ex.InnerException != null && ex.InnerException.GetType().Name.Contains("Authentication"));
+            || ex.GetType().Name.Contains("IOException")
+            || (ex.Message != null && ex.Message.Contains("connection"));
     }
 }
 }
