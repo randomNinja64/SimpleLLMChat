@@ -276,49 +276,85 @@ namespace SimpleLLMChatGUI
             var selectedTools = GetSelectedToolsFromListBox(ToolsListBox);
             var selectedToolsRequiringApproval = GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox);
 
-            var lines = new List<string>
+            var allLines = new List<string>();
+
+            // [Appearance]
+            var appearanceLines = new List<string>
             {
-                "apikey=" + ApiKey,
                 "assistantname=" + AssistantName,
                 "codeblockfontfamily=" + CodeFontFamily,
                 "customfontfamily=" + CustomFontFamily,
                 "fontsize=" + ChatFontSize,
-                "llmserver=" + ServerURL,
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
-                "model=" + Model,
                 "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
-                "sysprompt=\"" + EscapePromptForStorage(SysPrompt) + "\"", // keep quotes around prompt; escape sequences encoded
-                "tools=" + string.Join(",", selectedTools),
-                "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval)
             };
+            appearanceLines.Sort(StringComparer.OrdinalIgnoreCase);
+            allLines.Add("[Appearance]");
+            allLines.AddRange(appearanceLines);
 
-            // Save dynamic tool options from manifests
-            foreach (var opt in _toolOptions)
+            // [System]
+            var systemLines = new List<string>
             {
-                string value = opt.Default;
-                FrameworkElement control;
-                if (_toolOptionControls.TryGetValue(opt.Name, out control))
-                {
-                    if (opt.Type == "bool" && control is CheckBox cb)
-                        value = cb.IsChecked == true ? "1" : "0";
-                    else if (control is TextBox tb)
-                        value = tb.Text;
-                }
-                lines.Add(opt.Name.ToLowerInvariant() + "=" + value);
-            }
+                "apikey=" + ApiKey,
+                "llmserver=" + ServerURL,
+                "model=" + Model,
+                "sysprompt=\"" + EscapePromptForStorage(SysPrompt) + "\"", // keep quotes around prompt; escape sequences encoded
+            };
+            systemLines.Sort(StringComparer.OrdinalIgnoreCase);
+            allLines.Add(string.Empty);
+            allLines.Add("[System]");
+            allLines.AddRange(systemLines);
 
-            // Save per-tool timeouts
+            // [Tools]
+            var toolLines = new List<string>
+            {
+                "tools=" + string.Join(",", selectedTools),
+                "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval),
+            };
             foreach (var kvp in _toolTimeoutControls)
             {
                 string val = kvp.Value.Text.Trim();
                 int parsed;
                 if (!string.IsNullOrEmpty(val) && int.TryParse(val, out parsed) && parsed > 0)
-                    lines.Add("tooltimeout." + kvp.Key.ToLowerInvariant() + "=" + parsed);
+                    toolLines.Add("tooltimeout." + kvp.Key.ToLowerInvariant() + "=" + parsed);
+            }
+            toolLines.Sort(StringComparer.OrdinalIgnoreCase);
+            allLines.Add(string.Empty);
+            allLines.Add("[Tools]");
+            allLines.AddRange(toolLines);
+
+            // Dynamic tool option groups from manifests, one section per tool group
+            if (_toolOptions.Count > 0)
+            {
+                var groupedOptions = _toolOptions
+                    .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var group in groupedOptions)
+                {
+                    var groupLines = new List<string>();
+                    foreach (var opt in group)
+                    {
+                        string value = opt.Default;
+                        FrameworkElement control;
+                        if (_toolOptionControls.TryGetValue(opt.Name, out control))
+                        {
+                            if (opt.Type == "bool" && control is CheckBox cb)
+                                value = cb.IsChecked == true ? "1" : "0";
+                            else if (control is TextBox tb)
+                                value = tb.Text;
+                        }
+                        groupLines.Add(opt.Name.ToLowerInvariant() + "=" + value);
+                    }
+                    groupLines.Sort(StringComparer.OrdinalIgnoreCase);
+                    allLines.Add(string.Empty);
+                    allLines.Add("[" + group.Key + "]");
+                    allLines.AddRange(groupLines);
+                }
             }
 
-            lines.Sort(StringComparer.OrdinalIgnoreCase);
-            File.WriteAllLines(path, lines);
+            File.WriteAllLines(path, allLines);
         }
 
         /// <summary>
@@ -428,7 +464,7 @@ namespace SimpleLLMChatGUI
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
 
             foreach (string toolName in _availableTools)
             {
@@ -445,7 +481,7 @@ namespace SimpleLLMChatGUI
                 Grid.SetRow(label, rowIdx);
                 Grid.SetColumn(label, 0);
 
-                string configVal = config.GetConfigString("tooltimeout." + toolName.ToLowerInvariant()) ?? "";
+                string configVal = config.GetConfigString("tooltimeout." + toolName.ToLowerInvariant()) ?? "0";
                 var textBox = new TextBox
                 {
                     Text = configVal,
@@ -453,6 +489,16 @@ namespace SimpleLLMChatGUI
                     Margin = new Thickness(0, 2, 0, 2),
                     VerticalAlignment = VerticalAlignment.Center
                 };
+                textBox.PreviewTextInput += (s, e) => { e.Handled = !e.Text.All(char.IsDigit); };
+                DataObject.AddPastingHandler(textBox, (s, e) =>
+                {
+                    if (e.DataObject.GetDataPresent(DataFormats.Text))
+                    {
+                        string text = (string)e.DataObject.GetData(DataFormats.Text);
+                        if (!text.All(char.IsDigit)) e.CancelCommand();
+                    }
+                    else e.CancelCommand();
+                });
                 Grid.SetRow(textBox, rowIdx);
                 Grid.SetColumn(textBox, 1);
 
