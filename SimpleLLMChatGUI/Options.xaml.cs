@@ -38,6 +38,8 @@ namespace SimpleLLMChatGUI
         // Per-tool timeout controls (keyed by tool name)
         private readonly Dictionary<string, TextBox> _toolTimeoutControls = new Dictionary<string, TextBox>(StringComparer.OrdinalIgnoreCase);
 
+        private readonly string _toolsDir;
+
         public List<string> AvailableTools
         {
             get { return _availableTools; }
@@ -121,12 +123,13 @@ namespace SimpleLLMChatGUI
 
             _processHandler = processHandler;
 
+            _toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
+
             // Discover available tools from manifests in the tools/ directory
             _availableTools = LoadAvailableToolsFromManifests();
 
             // Discover tool options from manifests
-            string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
-            _toolOptions = ToolOptionsRegistry.LoadOptionsFromDirectory(toolsDir);
+            _toolOptions = ToolOptionsRegistry.LoadOptionsFromDirectory(_toolsDir);
 
             // Load system fonts
             _systemFonts = Fonts.SystemFontFamilies
@@ -234,11 +237,11 @@ namespace SimpleLLMChatGUI
 
             var enabledTools = config.GetConfigList("tools");
             if (enabledTools.Count > 0)
-                ApplyToolSelectionToListBox(ToolsListBox, string.Join(",", enabledTools));
+                ApplyToolSelectionToListBox(ToolsListBox, enabledTools);
 
             var approvalTools = config.GetConfigList("toolsrequiringapproval");
             if (approvalTools.Count > 0)
-                ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, string.Join(",", approvalTools));
+                ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, approvalTools);
 
             // Sync password box manually (not bound)
             ApiKeyPasswordBox.Password = ApiKey;
@@ -257,18 +260,10 @@ namespace SimpleLLMChatGUI
 
         private List<string> GetSelectedToolsFromListBox(System.Windows.Controls.ListBox listBox)
         {
-            var selectedTools = new List<string>();
-
-            foreach (var item in listBox.SelectedItems)
-            {
-                var toolName = item as string;
-                if (!string.IsNullOrWhiteSpace(toolName))
-                {
-                    selectedTools.Add(toolName);
-                }
-            }
-
-            return selectedTools;
+            return listBox.SelectedItems
+                .OfType<string>()
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList();
         }
 
         private void SaveIni(string path)
@@ -327,11 +322,7 @@ namespace SimpleLLMChatGUI
             // Dynamic tool option groups from manifests, one section per tool group
             if (_toolOptions.Count > 0)
             {
-                var groupedOptions = _toolOptions
-                    .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
-
-                foreach (var group in groupedOptions)
+                foreach (var group in GetToolOptionGroups())
                 {
                     var groupLines = new List<string>();
                     foreach (var opt in group)
@@ -369,11 +360,7 @@ namespace SimpleLLMChatGUI
             if (_toolOptions.Count == 0)
                 return;
 
-            var groupedOptions = _toolOptions
-                .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var group in groupedOptions)
+            foreach (var group in GetToolOptionGroups())
             {
                 // Add category item to ListBox
                 var listBoxItem = new ListBoxItem
@@ -514,12 +501,19 @@ namespace SimpleLLMChatGUI
         /// Scans the tools/ directory (and one level of subdirectories) for *.json manifests
         /// and returns a sorted list of all discovered tool names.
         /// </summary>
+        private IOrderedEnumerable<IGrouping<string, ToolOptionDefinition>> GetToolOptionGroups()
+        {
+            return _toolOptions
+                .GroupBy(opt => string.IsNullOrWhiteSpace(opt.Source) ? "Tools" : opt.Source, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+        }
+
         private List<string> LoadAvailableToolsFromManifests()
         {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var toolNames = new List<string>();
-            string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
 
-            foreach (string jsonFile in ManifestScanner.GetManifestFiles(toolsDir))
+            foreach (string jsonFile in ManifestScanner.GetManifestFiles(_toolsDir))
             {
                 try
                 {
@@ -531,7 +525,7 @@ namespace SimpleLLMChatGUI
                     foreach (JObject tool in tools)
                     {
                         string name = (string)tool["name"];
-                        if (!string.IsNullOrEmpty(name) && !toolNames.Contains(name))
+                        if (!string.IsNullOrEmpty(name) && seen.Add(name))
                             toolNames.Add(name);
                     }
                 }
@@ -545,24 +539,18 @@ namespace SimpleLLMChatGUI
             return toolNames;
         }
 
-        private void ApplyToolSelectionToListBox(System.Windows.Controls.ListBox listBox, string toolsValue)
+        private void ApplyToolSelectionToListBox(System.Windows.Controls.ListBox listBox, List<string> tools)
         {
-            if (listBox == null || string.IsNullOrWhiteSpace(toolsValue))
+            if (listBox == null || tools == null)
                 return;
 
-            var requestedTools = toolsValue.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var requestedTool in requestedTools)
+            foreach (var tool in tools)
             {
-                var trimmed = requestedTool.Trim();
-                if (trimmed.Length == 0)
-                    continue;
-
                 foreach (var item in listBox.Items)
                 {
                     var toolName = item as string;
                     if (toolName != null &&
-                        string.Equals(toolName, trimmed, StringComparison.OrdinalIgnoreCase))
+                        string.Equals(toolName, tool, StringComparison.OrdinalIgnoreCase))
                     {
                         listBox.SelectedItems.Add(item);
                         break;
