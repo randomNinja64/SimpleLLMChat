@@ -20,6 +20,7 @@ namespace SimpleLLMChatGUI
         private bool _showToolOutput;
         private bool _showReasoningOutput;
         private bool _markdownParsing;
+        private string _codeFontFamily;
         private string _customFontFamily;
         private int _chatFontSize;
         private ProcessHandler _processHandler;
@@ -91,6 +92,12 @@ namespace SimpleLLMChatGUI
             set { _markdownParsing = value; OnPropertyChanged(nameof(MarkdownParsing)); }
         }
 
+        public string CodeFontFamily
+        {
+            get { return _codeFontFamily; }
+            set { _codeFontFamily = value; OnPropertyChanged(nameof(CodeFontFamily)); }
+        }
+
         public string CustomFontFamily
         {
             get { return _customFontFamily; }
@@ -133,6 +140,7 @@ namespace SimpleLLMChatGUI
             ShowToolOutput = true;
             ShowReasoningOutput = true;
             MarkdownParsing = true;
+            CodeFontFamily = "";
             CustomFontFamily = "";
             ChatFontSize = AppConstants.DefaultChatFontSize;
         }
@@ -193,6 +201,7 @@ namespace SimpleLLMChatGUI
             ShowToolOutput = config.GetConfigBool("showtooloutput");
             ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
             MarkdownParsing = config.GetConfigBool("markdownparsing", true);
+            CodeFontFamily = config.GetConfigValue("codeblockfontfamily");
             CustomFontFamily = config.GetConfigValue("customfontfamily");
             ChatFontSize = config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
 
@@ -241,6 +250,7 @@ namespace SimpleLLMChatGUI
             {
                 "apikey=" + ApiKey,
                 "assistantname=" + AssistantName,
+                "codeblockfontfamily=" + CodeFontFamily,
                 "customfontfamily=" + CustomFontFamily,
                 "fontsize=" + ChatFontSize,
                 "llmserver=" + ServerURL,

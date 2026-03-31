@@ -27,13 +27,14 @@ namespace SimpleLLMChatGUI
         private static readonly Regex LinkPattern = new Regex(@"\[([^\[\]]+)\]\(([^()]+)\)", RegexOptions.Compiled);
         private static readonly Regex BareUrlPattern = new Regex(@"https?://[^\s<>""'()\[\]{}]+(?<![.,;:!?])", RegexOptions.Compiled);
         private static readonly Regex HorizontalRulePattern = new Regex(@"^(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$", RegexOptions.Compiled);
-        private static readonly Regex BacktickFencePattern = new Regex(@"^(`{3,})([^`]*)$", RegexOptions.Compiled);
+        private static readonly Regex BacktickFencePattern = new Regex(@"^([^`]*:\s*)?(`{3,})([^`]*)$", RegexOptions.Compiled);
 
         public static void processMarkdown(RichTextBox chatOutput)
         {
             int activeBacktickFenceLength = 0;
             bool insideThinkTag = false;
             Brush codeBlockBrush = GetCodeBlockBrush();
+            FontFamily codeBlockFontFamily = FontHandler.TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"));
 
             // Process each paragraph in order
             foreach (var paragraph in chatOutput.Document.Blocks.OfType<Paragraph>().ToList())
@@ -47,7 +48,11 @@ namespace SimpleLLMChatGUI
                     {
                         // Opening fence can include an optional language/info string.
                         activeBacktickFenceLength = fenceLength;
+                        int backtickIdx = paragraphText.IndexOf('`');
+                        string prefix = backtickIdx > 0 ? paragraphText.Substring(0, backtickIdx).TrimEnd() : null;
                         paragraph.Inlines.Clear();
+                        if (!string.IsNullOrEmpty(prefix))
+                            paragraph.Inlines.Add(new Run(prefix));
                         continue;
                     }
 
@@ -75,8 +80,11 @@ namespace SimpleLLMChatGUI
                 // Skip processing if we're inside an excluded region
                 if (activeBacktickFenceLength > 0 || insideThinkTag)
                 {
-                    if (activeBacktickFenceLength > 0){
+                    if (activeBacktickFenceLength > 0)
+                    {
                         paragraph.Background = codeBlockBrush;
+                        if (codeBlockFontFamily != null)
+                            paragraph.FontFamily = codeBlockFontFamily;
                     }
                     continue;
                 }
@@ -93,6 +101,8 @@ namespace SimpleLLMChatGUI
                 {
                     var codeSpan = new Span(new Run(match.Groups[1].Value));
                     codeSpan.Background = codeBlockBrush;
+                    if (codeBlockFontFamily != null)
+                        codeSpan.FontFamily = codeBlockFontFamily;
                     return codeSpan;
                 });
 
@@ -211,8 +221,8 @@ namespace SimpleLLMChatGUI
             if (!match.Success)
                 return false;
 
-            fenceLength = match.Groups[1].Value.Length;
-            hasInfoString = !string.IsNullOrWhiteSpace(match.Groups[2].Value);
+            fenceLength = match.Groups[2].Value.Length;
+            hasInfoString = !string.IsNullOrWhiteSpace(match.Groups[3].Value);
             return true;
         }
 

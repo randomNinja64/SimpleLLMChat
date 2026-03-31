@@ -26,8 +26,15 @@
                         Text="{Binding AssistantName, UpdateSourceTrigger=PropertyChanged}"
                         Height="23"/>
 
-                <!-- Custom Font -->
-                <Label Content="Custom Font:"/>
+                <!-- Code Block Font -->
+                <Label Content="Code Block Font:"/>
+                <ComboBox x:Name="CustomCodeFontComboBox"
+                         ItemsSource="{Binding SystemFonts}"
+                         SelectedItem="{Binding CodeFontFamily, UpdateSourceTrigger=PropertyChanged}"
+                         Height="23"/>
+
+                <!--  Font -->
+                <Label Content="Font:"/>
                 <ComboBox x:Name="CustomFontComboBox"
                          ItemsSource="{Binding SystemFonts}"
                          SelectedItem="{Binding CustomFontFamily, UpdateSourceTrigger=PropertyChanged}"

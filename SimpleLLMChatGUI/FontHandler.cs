@@ -13,43 +13,30 @@ namespace SimpleLLMChatGUI
         public static void ApplyFontToWindow(Window window)
         {
             if (window == null) return;
-
-            var defaultFont = SystemFonts.MessageFontFamily;
-
-            // Use default font if no custom font specified
-            string fontFamilyName = App.Config.GetConfigValue("customfontfamily");
-            if (string.IsNullOrWhiteSpace(fontFamilyName) ||
-                fontFamilyName.Equals("Default", StringComparison.OrdinalIgnoreCase))
-            {
-                window.FontFamily = defaultFont;
-                return;
-            }
-
-            // Try to apply the custom font
-            try
-            {
-                var fontFamily = new FontFamily(fontFamilyName);
-                // Verify the font exists by checking if it has typefaces
-                if (fontFamily.GetTypefaces().FirstOrDefault() != null)
-                {
-                    window.FontFamily = fontFamily;
-                }
-                else
-                {
-                    // Font exists but has no typefaces, use default
-                    window.FontFamily = defaultFont;
-                }
-            }
-            catch
-            {
-                // Invalid font family name, use default
-                window.FontFamily = defaultFont;
-            }
+            window.FontFamily = TryGetFontFamily(App.Config.GetConfigValue("customfontfamily"))
+                                ?? SystemFonts.MessageFontFamily;
         }
 
         public static int GetFontSize()
         {
             return App.Config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
+        }
+
+        internal static FontFamily TryGetFontFamily(string fontFamilyName)
+        {
+            if (string.IsNullOrWhiteSpace(fontFamilyName) ||
+                fontFamilyName.Equals("Default", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            try
+            {
+                var fontFamily = new FontFamily(fontFamilyName);
+                if (fontFamily.GetTypefaces().FirstOrDefault() != null)
+                    return fontFamily;
+            }
+            catch { }
+
+            return null;
         }
 
         public static void ApplyFontSizeToControl(Control control, int fontSize)
