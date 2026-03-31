@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace SimpleLLMChatCLI
 {
@@ -267,15 +268,41 @@ namespace SimpleLLMChatCLI
                     StandardErrorEncoding = Encoding.UTF8
                 };
 
+                // Determine per-tool timeout from config (key: tooltimeout.<toolname>)
+                string timeoutVal = config.GetConfigString("tooltimeout." + toolName.ToLowerInvariant());
+                int timeoutSecs = 0;
+                int.TryParse(timeoutVal, out timeoutSecs);
+                int timeoutMs = timeoutSecs > 0 ? timeoutSecs * 1000 : 0;
+
                 using (Process process = Process.Start(psi))
                 {
                     // Write arguments via stdin
                     process.StandardInput.Write(stdinData);
                     process.StandardInput.Close();
 
-                    string stdout = process.StandardOutput.ReadToEnd();
-                    string stderr = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
+                    // Read stdout/stderr asynchronously to avoid deadlock
+                    var stdoutTask = Task.Factory.StartNew(() => process.StandardOutput.ReadToEnd());
+                    var stderrTask = Task.Factory.StartNew(() => process.StandardError.ReadToEnd());
+
+                    bool exited;
+                    if (timeoutMs > 0)
+                        exited = process.WaitForExit(timeoutMs);
+                    else
+                    {
+                        process.WaitForExit();
+                        exited = true;
+                    }
+
+                    if (!exited)
+                    {
+                        try { process.Kill(); } catch { }
+                        toolContent = FormatCommandResult(toolName, "error: tool call timed out after " + timeoutSecs + " second(s).", -1);
+                        exitCode = -1;
+                        return;
+                    }
+
+                    string stdout = stdoutTask.Result;
+                    string stderr = stderrTask.Result;
                     exitCode = process.ExitCode;
 
                     string output = stdout;

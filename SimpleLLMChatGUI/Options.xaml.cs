@@ -35,6 +35,9 @@ namespace SimpleLLMChatGUI
         private readonly Dictionary<string, FrameworkElement> _toolOptionControls = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
         private List<ScrollViewer> _toolGroupPages = new List<ScrollViewer>();
 
+        // Per-tool timeout controls (keyed by tool name)
+        private readonly Dictionary<string, TextBox> _toolTimeoutControls = new Dictionary<string, TextBox>(StringComparer.OrdinalIgnoreCase);
+
         public List<string> AvailableTools
         {
             get { return _availableTools; }
@@ -242,6 +245,9 @@ namespace SimpleLLMChatGUI
 
             // Build dynamic tool options UI and populate values
             BuildToolOptionsUI(config);
+
+            // Build per-tool timeout UI
+            BuildToolTimeoutsUI(config);
         }
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -300,6 +306,15 @@ namespace SimpleLLMChatGUI
                         value = tb.Text;
                 }
                 lines.Add(opt.Name.ToLowerInvariant() + "=" + value);
+            }
+
+            // Save per-tool timeouts
+            foreach (var kvp in _toolTimeoutControls)
+            {
+                string val = kvp.Value.Text.Trim();
+                int parsed;
+                if (!string.IsNullOrEmpty(val) && int.TryParse(val, out parsed) && parsed > 0)
+                    lines.Add("tooltimeout." + kvp.Key.ToLowerInvariant() + "=" + parsed);
             }
 
             lines.Sort(StringComparer.OrdinalIgnoreCase);
@@ -387,6 +402,66 @@ namespace SimpleLLMChatGUI
                 ContentGrid.Children.Add(scrollViewer);
                 _toolGroupPages.Add(scrollViewer);
             }
+        }
+
+        /// <summary>
+        /// Adds a per-tool timeout section to the Tools page.
+        /// Each known tool gets a label and a small TextBox for its timeout in seconds.
+        /// Values are stored in config as tooltimeout.&lt;toolname&gt;.
+        /// </summary>
+        private void BuildToolTimeoutsUI(ConfigHandler config)
+        {
+            _toolTimeoutControls.Clear();
+
+            if (_availableTools.Count == 0)
+                return;
+
+            var stack = ToolsPage.Content as StackPanel;
+            if (stack == null)
+                return;
+
+            stack.Children.Add(new Label
+            {
+                Content = "Tool Timeouts (seconds, 0 or blank = no timeout):",
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
+
+            foreach (string toolName in _availableTools)
+            {
+                int rowIdx = grid.RowDefinitions.Count;
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                var label = new TextBlock
+                {
+                    Text = toolName,
+                    Padding = new Thickness(0, 2, 4, 2),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                label.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
+                Grid.SetRow(label, rowIdx);
+                Grid.SetColumn(label, 0);
+
+                string configVal = config.GetConfigString("tooltimeout." + toolName.ToLowerInvariant()) ?? "";
+                var textBox = new TextBox
+                {
+                    Text = configVal,
+                    Height = 23,
+                    Margin = new Thickness(0, 2, 0, 2),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetRow(textBox, rowIdx);
+                Grid.SetColumn(textBox, 1);
+
+                grid.Children.Add(label);
+                grid.Children.Add(textBox);
+                _toolTimeoutControls[toolName] = textBox;
+            }
+
+            stack.Children.Add(grid);
         }
 
         /// <summary>
