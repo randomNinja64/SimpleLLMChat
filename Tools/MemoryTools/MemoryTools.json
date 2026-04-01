@@ -1,0 +1,44 @@
+{
+    "name": "Memory Tools",
+    "executable": "MemoryTools.exe",
+    "options": [
+        { "name": "maxContentLength", "label": "Max Memory Content Length (characters)", "type": "int", "default": "2000" },
+        { "name": "maxMemories", "label": "Max Number of Memories", "type": "int", "default": "50" }
+    ],
+    "tools": [
+        {
+            "name": "save_memory",
+            "description": "Save or update a named memory entry. Use this to remember facts about the user that are likely to be relevant in future sessions — such as their name, preferences, ongoing projects, or recurring topics. Do not save temporary details or things only relevant to the current conversation.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "Name for this memory entry. Used as the filename, so keep it lowercase with underscores (e.g. 'user_name', 'preferred_language', 'project_context').", "required": true },
+                { "name": "content", "type": "string", "description": "The content to remember. Can be multiple sentences. Limit to {config.maxContentLength} characters; content beyond this will be truncated.", "required": true }
+            ]
+        },
+        {
+            "name": "recall_memory",
+            "description": "Read a saved memory entry by name.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "The name of the memory entry to recall.", "required": true }
+            ]
+        },
+        {
+            "name": "delete_memory",
+            "description": "Delete a saved memory entry by name.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "The name of the memory entry to delete.", "required": true }
+            ]
+        },
+        {
+            "name": "list_memories",
+            "description": "List the names of all saved memory entries without returning their full content.",
+            "parameters": []
+        },
+        {
+            "name": "search_memories",
+            "description": "Search all memory entries for a keyword. Returns matching entry names and the lines that contain the keyword.",
+            "parameters": [
+                { "name": "keyword", "type": "string", "description": "The keyword or phrase to search for (case-insensitive).", "required": true }
+            ]
+        }
+    ]
+}

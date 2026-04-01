@@ -312,6 +312,39 @@ public class LLMClient
         return msgObj;
     }
 
+    private string BuildMemorySummary()
+    {
+        string toolDir;
+        if (registry == null || !registry.PackageDirectories.TryGetValue("Memory Tools", out toolDir))
+            return null;
+
+        string memoriesFolder = Path.Combine(toolDir, "memories");
+        if (!Directory.Exists(memoriesFolder))
+            return null;
+
+        string[] files = Directory.GetFiles(memoriesFolder, "*.md");
+        if (files.Length == 0)
+            return null;
+
+        Array.Sort(files);
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("Current Memories:");
+
+        foreach (string file in files)
+        {
+            string name = Path.GetFileNameWithoutExtension(file);
+            string content = File.ReadAllText(file, Encoding.UTF8).Trim();
+            // Collapse newlines for the preview snippet
+            string preview = content.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+            if (preview.Length > 150)
+                preview = preview.Substring(0, 150) + "...";
+            sb.AppendLine(name + ": " + preview);
+        }
+
+        return sb.ToString().Trim();
+    }
+
     LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools, Action<string> onReasoningChunk, Action<int> onReasoningSummary)
     {
         // Build payload
@@ -324,10 +357,15 @@ public class LLMClient
         JArray messages = new JArray();
 
         // System message
+        string sysprompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"));
+        string memorySummary = BuildMemorySummary();
+        if (memorySummary != null)
+            sysprompt += "\n\n" + memorySummary;
+
         JObject systemMsg = new JObject
         {
             ["role"] = "system",
-            ["content"] = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"))
+            ["content"] = sysprompt
         };
         messages.Add(systemMsg);
 

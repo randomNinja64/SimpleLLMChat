@@ -18,7 +18,7 @@ mkdir "%OUT%"
 copy /Y "%ROOT%SimpleLLMChatCLI\bin\Release\SimpleLLMChatCLI.exe" "%OUT%\" >nul
 copy /Y "%ROOT%SimpleLLMChatGUI\bin\Release\SimpleLLMChatGUI.exe" "%OUT%\" >nul
 
-for %%T in (FileTools PythonTools ShellTools WebTools) do (
+for %%T in (FileTools PythonTools ShellTools WebTools MemoryTools) do (
     mkdir "%OUT%\tools\%%T"
     copy /Y "%ROOT%Tools\%%T\bin\Release\%%T.exe"           "%OUT%\tools\%%T\" >nul
     copy /Y "%ROOT%Tools\%%T\bin\Release\%%T.json"          "%OUT%\tools\%%T\" >nul

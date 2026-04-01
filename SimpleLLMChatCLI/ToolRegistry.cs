@@ -48,7 +48,10 @@ namespace SimpleLLMChatCLI
             public string ExecutablePath;
         }
 
-        private readonly Dictionary<string, ToolDefinition> tools = new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, ToolDefinition> Tools = new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase);
+
+        // Maps package display name (manifest "name" field) to the directory containing its executable.
+        public readonly Dictionary<string, string> PackageDirectories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Default values for options declared in manifests, keyed by lowercase name
         private readonly Dictionary<string, string> optionDefaults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -112,9 +115,13 @@ namespace SimpleLLMChatCLI
             string json = File.ReadAllText(jsonFilePath, Encoding.UTF8);
             JObject manifest = JObject.Parse(json);
 
+            string packageName = (string)manifest["name"] ?? "";
             string executable = (string)manifest["executable"] ?? "";
             string manifestDir = Path.GetDirectoryName(jsonFilePath);
             string executablePath = Path.Combine(manifestDir, executable);
+
+            if (!string.IsNullOrEmpty(packageName))
+                PackageDirectories[packageName] = manifestDir;
 
             JArray toolsArray = manifest["tools"] as JArray;
             if (toolsArray == null)
@@ -162,7 +169,7 @@ namespace SimpleLLMChatCLI
                     }
                 }
 
-                tools[name] = def;
+                Tools[name] = def;
             }
         }
 
@@ -176,7 +183,7 @@ namespace SimpleLLMChatCLI
             foreach (string toolName in enabledTools)
             {
                 ToolDefinition def;
-                if (!tools.TryGetValue(toolName, out def))
+                if (!Tools.TryGetValue(toolName, out def))
                     continue;
 
                 JObject props = new JObject();
@@ -231,7 +238,7 @@ namespace SimpleLLMChatCLI
             exitCode = 0;
 
             ToolDefinition def;
-            if (!tools.TryGetValue(toolName, out def))
+            if (!Tools.TryGetValue(toolName, out def))
             {
                 toolContent = FormatCommandResult(toolName, "error: unknown tool '" + toolName + "'.", 1);
                 exitCode = 1;
