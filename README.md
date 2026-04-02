@@ -28,6 +28,12 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 
 ## Setup
 
+To use the application, download and extract the appropriate build for your system from the Releases page (builds ending in -XP are recommended for Windows XP systems).
+
+To initialize the configuration file (LLMSettings.ini), open `SimpleLLMChatGUI.exe` and select `Options`. Make sure to set LLM server settings in `System`. Then, set other options as desired.
+
+Once the options have been set, the software can be used via the `SimpleLLMChatCLI.exe` or `SimpleLLMChatGUI.exe` executables.
+
 ## Building
 
 ## Configuration
