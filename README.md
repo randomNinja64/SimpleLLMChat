@@ -100,6 +100,28 @@ CLI mode provides the following additional flags:
 
 ## Tools
 
+SimpleLLMChat includes the following 5 tool packages:
+
+- File Tools
+  - Tools
+    - `copy_file`: Copies a file from one location to another
+    - `delete_file`: Deletes a file from the file system
+    - `extract_file`: Extracts an archive to a destination directory
+    - `list_directory`: Lists all files and subdirectories in a given directory
+    - `move_file`: Moves a file from one location to another
+    - `read_file`: Reads the contents of a local file
+    - `write_file`: Writes contents to a local file
+  - Configuration Options
+    - `maxFileContentLength`: Maximum number of characters to read from a file (default: `8000`)
+  - Dependencies
+    - `7za.exe`: used to extract archives
+- Memory Tools
+- Python Tools
+- Shell Tools
+- Web Tools
+
+**Note**: Dependencies should be placed alongside tool executables. The release builds already include these dependencies.
+
 ## Troubleshooting
 
 ## Credits
