@@ -33,20 +33,6 @@ namespace SimpleLLMChatCLI
             string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
             registry.LoadToolsFromDirectory(toolsDir);
 
-            // Inject memory names into system prompt if MemoryTools memories folder exists
-            string memoriesDir = Path.Combine(toolsDir, "MemoryTools", "memories");
-            if (Directory.Exists(memoriesDir))
-            {
-                string[] memFiles = Directory.GetFiles(memoriesDir, "*.md");
-                if (memFiles.Length > 0)
-                {
-                    Array.Sort(memFiles);
-                    string names = string.Join(", ", Array.ConvertAll(memFiles,
-                        f => Path.GetFileNameWithoutExtension(f)));
-                    Config.SetConfigValue("syspromptappend", "\n\nCurrent Memories: " + names);
-                }
-            }
-
             // Initialize LLMClient
             LLMClient client = new LLMClient(Config, registry);
 

@@ -1,7 +1,4 @@
-using Newtonsoft.Json.Linq;
 using System;
-using System.IO;
-using System.Text;
 
 namespace MemoryTools
 {
@@ -9,107 +6,44 @@ namespace MemoryTools
     {
         static int Main(string[] args)
         {
-            Console.InputEncoding = Encoding.UTF8;
-            Console.OutputEncoding = Encoding.UTF8;
-            ToolHelper.LoadManifestDefaults();
-
-            if (args.Length < 1)
+            return ToolHelper.RunToolMain(args, (toolName, argumentsJson) =>
             {
-                Console.Write("Usage: MemoryTools.exe <tool_name>\nArguments JSON is read from stdin.");
-                return 1;
-            }
+                MemoryHandler handler = new MemoryHandler();
 
-            string toolName = args[0];
-
-            string stdinData = Console.In.ReadToEnd();
-            string argumentsJson = "";
-
-            if (!string.IsNullOrWhiteSpace(stdinData))
-            {
-                try
-                {
-                    JObject root = JObject.Parse(stdinData);
-
-                    JObject configObj = root["config"] as JObject;
-                    if (configObj != null)
-                    {
-                        foreach (JProperty prop in configObj.Properties())
-                            ToolHelper.Config[prop.Name] = prop.Value.ToString();
-                    }
-
-                    JToken argsToken = root["arguments"];
-                    if (argsToken != null)
-                        argumentsJson = argsToken.ToString();
-                }
-                catch
-                {
-                    argumentsJson = stdinData;
-                }
-            }
-
-            MemoryHandler handler = new MemoryHandler();
-
-            int exitCode = 0;
-            string output = "";
-
-            try
-            {
                 switch (toolName)
                 {
                     case "save_memory":
                         {
                             string name = ToolHelper.GetRequiredArg(argumentsJson, "name");
                             string content = ToolHelper.GetRequiredArg(argumentsJson, "content");
-                            output = handler.SaveMemory(name, content);
-                            break;
+                            return new ToolResult(handler.SaveMemory(name, content), 0);
                         }
 
                     case "recall_memory":
                         {
                             string name = ToolHelper.GetRequiredArg(argumentsJson, "name");
-                            output = handler.RecallMemory(name);
-                            break;
+                            return new ToolResult(handler.RecallMemory(name), 0);
                         }
 
                     case "delete_memory":
                         {
                             string name = ToolHelper.GetRequiredArg(argumentsJson, "name");
-                            output = handler.DeleteMemory(name);
-                            break;
+                            return new ToolResult(handler.DeleteMemory(name), 0);
                         }
 
                     case "list_memories":
-                        {
-                            output = handler.ListMemories();
-                            break;
-                        }
+                        return new ToolResult(handler.ListMemories(), 0);
 
                     case "search_memories":
                         {
                             string keyword = ToolHelper.GetRequiredArg(argumentsJson, "keyword");
-                            output = handler.SearchMemories(keyword);
-                            break;
+                            return new ToolResult(handler.SearchMemories(keyword), 0);
                         }
 
                     default:
-                        exitCode = 1;
-                        output = "Unknown tool: " + toolName;
-                        break;
+                        return new ToolResult("Unknown tool: " + toolName, 1);
                 }
-            }
-            catch (ArgumentException ex)
-            {
-                exitCode = 1;
-                output = "Error: " + ex.Message;
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                output = "Unexpected error: " + ex.Message;
-            }
-
-            Console.Write(output);
-            return exitCode;
+            });
         }
     }
 }

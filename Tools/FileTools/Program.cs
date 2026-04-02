@@ -1,6 +1,4 @@
-using Newtonsoft.Json.Linq;
 using System;
-using System.Text;
 
 namespace FileTools
 {
@@ -8,56 +6,7 @@ namespace FileTools
     {
         static int Main(string[] args)
         {
-            Console.InputEncoding = Encoding.UTF8;
-            Console.OutputEncoding = Encoding.UTF8;
-            ToolHelper.LoadManifestDefaults();
-
-            if (args.Length < 1)
-            {
-                Console.Write("Usage: FileTools.exe <tool_name>\nArguments JSON is read from stdin.");
-                return 1;
-            }
-
-            string toolName = args[0];
-
-            // Read arguments JSON from stdin
-            string stdinData = Console.In.ReadToEnd();
-            string argumentsJson = "";
-
-            if (!string.IsNullOrWhiteSpace(stdinData))
-            {
-                try
-                {
-                    JObject root = JObject.Parse(stdinData);
-
-                    // Extract config if present
-                    JObject configObj = root["config"] as JObject;
-                    if (configObj != null)
-                    {
-                        foreach (JProperty prop in configObj.Properties())
-                        {
-                            ToolHelper.Config[prop.Name] = prop.Value.ToString();
-                        }
-                    }
-
-                    // Extract arguments if present
-                    JToken argsToken = root["arguments"];
-                    if (argsToken != null)
-                    {
-                        argumentsJson = argsToken.ToString();
-                    }
-                }
-                catch
-                {
-                    // If parsing fails, treat whole stdin as arguments JSON
-                    argumentsJson = stdinData;
-                }
-            }
-
-            int exitCode = 0;
-            string output = "";
-
-            try
+            return ToolHelper.RunToolMain(args, (toolName, argumentsJson) =>
             {
                 switch (toolName)
                 {
@@ -66,70 +15,67 @@ namespace FileTools
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
                             int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "offset")?.Trim() ?? "", out int offset);
                             int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 8000);
-                            output = FileHandler.ReadFile(filename, maxContentLength, out exitCode, offset);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.ReadFile(filename, maxContentLength, out exitCode, offset);
+                            return new ToolResult(output, exitCode);
                         }
 
                     case "write_file":
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
                             string content = ToolHelper.JsonExtractString(argumentsJson, "content")?.Trim() ?? "";
-                            output = FileHandler.WriteFile(filename, content, out exitCode);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.WriteFile(filename, content, out exitCode);
+                            return new ToolResult(output, exitCode);
                         }
 
                     case "extract_file":
                         {
                             string archivePath = ToolHelper.GetRequiredArg(argumentsJson, "archive_path");
                             string destinationPath = ToolHelper.GetRequiredArg(argumentsJson, "destination_path");
-                            output = FileHandler.ExtractFile(archivePath, destinationPath, out exitCode);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.ExtractFile(archivePath, destinationPath, out exitCode);
+                            return new ToolResult(output, exitCode);
                         }
 
                     case "move_file":
                         {
                             string sourcePath = ToolHelper.GetRequiredArg(argumentsJson, "source_path");
                             string destinationPath = ToolHelper.GetRequiredArg(argumentsJson, "destination_path");
-                            output = FileHandler.MoveFile(sourcePath, destinationPath, out exitCode);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.MoveFile(sourcePath, destinationPath, out exitCode);
+                            return new ToolResult(output, exitCode);
                         }
 
                     case "copy_file":
                         {
                             string sourcePath = ToolHelper.GetRequiredArg(argumentsJson, "source_path");
                             string destinationPath = ToolHelper.GetRequiredArg(argumentsJson, "destination_path");
-                            output = FileHandler.CopyFile(sourcePath, destinationPath, out exitCode);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.CopyFile(sourcePath, destinationPath, out exitCode);
+                            return new ToolResult(output, exitCode);
                         }
 
                     case "delete_file":
                         {
                             string filePath = ToolHelper.GetRequiredArg(argumentsJson, "file_path");
-                            output = FileHandler.DeleteFile(filePath, out exitCode);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.DeleteFile(filePath, out exitCode);
+                            return new ToolResult(output, exitCode);
                         }
 
                     case "list_directory":
                         {
                             string directoryPath = ToolHelper.GetRequiredArg(argumentsJson, "directory_path");
-                            output = FileHandler.ListDirectory(directoryPath, out exitCode);
-                            break;
+                            int exitCode;
+                            string output = FileHandler.ListDirectory(directoryPath, out exitCode);
+                            return new ToolResult(output, exitCode);
                         }
 
                     default:
-                        output = "error: unknown tool '" + toolName + "'.";
-                        exitCode = 1;
-                        break;
+                        return new ToolResult("error: unknown tool '" + toolName + "'.", 1);
                 }
-            }
-            catch (Exception e)
-            {
-                output = "error: " + e.Message;
-                exitCode = 1;
-            }
-
-            Console.Write(output);
-            return exitCode;
+            });
         }
     }
 }
