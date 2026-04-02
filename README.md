@@ -72,8 +72,7 @@ Tool-specific configuration options for the included tools are available in the 
 
 ## Usage
 
-**GUI**
-To launch the GUI interface, open `SimpleLLMChatGUI.exe`.
+**GUI**: To launch the GUI interface, open `SimpleLLMChatGUI.exe`.
 
 - To adjust application settings, select `Options`.
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
@@ -82,13 +81,12 @@ To launch the GUI interface, open `SimpleLLMChatGUI.exe`.
   - To use desktop assistant mode, press `Ctrl+Shift+D`. This will focus the application with a screenshot of your last active window attached, allowing you to ask the LLM about it.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
 
-**CLI**
-To run the CLI in interactive/REPL mode, open `SimpleLLMChatCLI.exe` directly or from a terminal.
+**CLI**: To run the CLI in interactive/REPL mode, open `SimpleLLMChatCLI.exe` directly or from a terminal.
 
 Interactive mode provides the following commands:
 - `clear`: Clears chat context
 - `exit`: Exits the application
-- `image`: Sends an image to the model alongside the next message, used as `image <path> <prompt>`
+- `image`: Sends an image to the model alongside the next message, used as `image <path> <prompt>` 
 
 The application can also be used in a non-interactive mode.
 
