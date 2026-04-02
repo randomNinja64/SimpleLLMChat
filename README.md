@@ -120,7 +120,7 @@ SimpleLLMChat includes the following 5 tool packages:
 - Shell Tools
 - Web Tools
 
-**Note**: Dependencies should be placed alongside tool executables. The release builds already include these dependencies.
+**Note**: Dependencies should be placed alongside tool executables. The release builds already include these dependencies, with the exclusion of Python.
 
 ## Troubleshooting
 
