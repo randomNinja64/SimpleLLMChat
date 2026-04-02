@@ -42,9 +42,33 @@ Alternatively, the project can be built using the `SimpleLLMChat.sln` file direc
 
 Both methods require the .NET 4.0 Targeting Pack to be installed.
 
-**Note**: Builds generated using these methods include only the core executables. Some optional features (such as the cURL fallback or tool-specific dependencies) require additional executables that are not bundled automatically. Tool-specific dependencies are listed in the **Tools** section.
+**Note**: Builds generated using these methods include only the core executables. Some optional features (such as the cURL fallback or tool-specific dependencies) require additional executables that are not bundled automatically. Tool-specific dependencies are listed in the [Tools](#tools) section.
 
 ## Configuration
+
+SimpleLLMChat can be configured either using the GUI options pages or manually via `LLMSettings.ini`. The options available within the INI file are as follows:
+
+**Appearance**
+- `assistantname`: Display name for assistant responses
+- `codeblockfontfamily`: Font used for rendering code blocks in the GUI
+- `customfontfamily`: Font used for all non-code block text in the GUI
+- `fontsize`: Font size for chat and input text
+- `markdownparsing`: Enables/disables Markdown rendering in the GUI (`1` or `0`)
+- `showreasoningoutput`: Enables/disables reasoning output display (`1` or `0`)
+- `showtooloutput`: Enables/disables full tool execution output in chat (`1` or `0`)
+
+**System**
+- `apikey`: API key (if required by model provider)
+- `llmserver`: Base URL of the OpenAI-compatible endpoint
+- `model`: Model name to use for text generation (if supported by the endpoint)
+- `sysprompt`: System prompt for the LLM
+
+**Tools**
+- `tools`: Comma-separated list of tools the AI is allowed to use
+- `toolsrequiringapproval`: Comma-separated list of tools that require manual approval for the AI to use
+- `tooltimeout.<toolname>`: Timeout for tool-call (per-tool) in seconds
+
+Tool-specific configuration options for the included tools are available in the [Tools](#tools) section.
 
 ## Usage
 
