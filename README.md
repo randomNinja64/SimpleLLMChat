@@ -36,6 +36,14 @@ Once the options have been set, the software can be used via the `SimpleLLMChatC
 
 ## Building
 
+The project can be built via the included `build.bat` script (Visual Studio/Visual Studio Build Tools/MSBuild required).
+
+Alternatively, the project can be built using the `SimpleLLMChat.sln` file directly in Visual Studio.
+
+Both methods require the .NET 4.0 Targeting Pack to be installed.
+
+**Note**: Builds generated using these methods include only the core executables. Some optional features (such as the cURL fallback or tool-specific dependencies) require additional executables that are not bundled automatically. Tool-specific dependencies are listed in the **Tools** section.
+
 ## Configuration
 
 ## Usage
