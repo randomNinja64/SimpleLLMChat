@@ -14,12 +14,17 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 - **GUI/CLI Modes** - The software can be used either via its REPL CLI or a GUI wrapper.
 - **Image Support** - Images can be passed to supported models via both the CLI and GUI.
 - **Markdown Rendering** - The GUI can render Markdown formatting for easier reading.
-- **OpenAI-Compatible Endpoint Support** - In addition to OpenAI, any service/server offering the OpenAI v1 chat endpoint can be used, including Llama.cpp and LM Studio.
+- **OpenAI-Compatible Endpoint Support** - In addition to OpenAI, any service/server offering the OpenAI v1 chat endpoint can be used, including [llama.cpp](https://github.com/ggerganov/llama.cpp) and [LM Studio](https://lmstudio.ai/).
 - **Script-Friendly** - Output without tool calls and reasoning can be piped out of the CLI using the `-o` or `--output-only` flag.
 - **Streaming Responses** - Responses are streamed from the LLM server in real-time.
 - **Tools** - A modular, extensible tool system is available. For information about the included tools, see [Tools](#tools)
 
 ## Requirements
+
+- Access to the OpenAI API or a compatible LLM server
+  - **Note**: If your server or endpoint requires modern TLS that the OS does not support, a `curl.exe` and `ca-bundle.crt` can be placed in the same folder as the application executable as a fallback (already included in the XP release build).
+- Windows XP (SP3 recommended) or later
+
 
 ## Setup
 
