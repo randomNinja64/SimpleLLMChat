@@ -9,7 +9,7 @@
 SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs accessible on both legacy and modern Windows systems. The software is designed to work with OpenAI-compatible endpoints and can be extended via a tool system.
 
 ## Features
-- **Customizable GUI** - The GUI's colors and fonts can be customized as desired.
+- **Customizable GUI** - The GUI's colors and fonts can be customized.
 - **Desktop Assistant Mode** - When enabled, a global Ctrl+Shift+D hotkey can be used to capture a screenshot of the current active window and pass it to the LLM.
 - **GUI/CLI Modes** - The software can be used either via its REPL CLI or a GUI wrapper.
 - **Image Support** - Images can be passed to supported models via both the CLI and GUI.
@@ -150,8 +150,12 @@ SimpleLLMChat includes the following 5 tool packages:
 
 **Note**: Dependencies should be placed alongside tool executables. The release builds already include these dependencies, with the exclusion of Python.
 
-Third party tools can be installed by extracting them into the `tools` folder. For more information on developing/distributing custom tools, see https://github.com/randomNinja64/SimpleLLMChat-Tool-SDK
-
-## Troubleshooting
+Third-party tools can be installed by extracting them into the `tools` folder. For more information on developing/distributing custom tools, see [SimpleLLMChat-Tool-SDK](https://github.com/randomNinja64/SimpleLLMChat-Tool-SDK)
 
 ## Credits
+
+Thank you to the following for all of their contributions:
+
+[LoRd_MuldeR](https://github.com/lordmulder/cURL-build-win32) for the cURL builds for XP
+[myamano4](https://myamano4.carrd.co) for the icon
+[nicolaasjan](https://github.com/nicolaasjan) for the YT-DLP builds for XP
