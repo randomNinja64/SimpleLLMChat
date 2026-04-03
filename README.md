@@ -22,9 +22,8 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 ## Requirements
 
 - Access to the OpenAI API or a compatible LLM server
-  - **Note**: If your server or endpoint requires modern TLS that the OS does not support, a `curl.exe` and `ca-bundle.crt` can be placed in the same folder as the application executable as a fallback (already included in the XP release build).
+  - **Note**: If your server or endpoint requires modern TLS that the OS does not support, a `curl.exe` and `curl-ca-bundle.crt` can be placed in the same folder as the application executable as a fallback (already included in the XP release build).
 - Windows XP (SP3 recommended) or later
-
 
 ## Setup
 
@@ -66,7 +65,7 @@ SimpleLLMChat can be configured either using the GUI options pages or manually v
 **Tools**
 - `tools`: Comma-separated list of tools the AI is allowed to use
 - `toolsrequiringapproval`: Comma-separated list of tools that require manual approval for the AI to use
-- `tooltimeout.<toolname>`: Timeout for tool-call (per-tool) in seconds
+- `tooltimeout.<toolname>`: Timeout for tool-call in seconds
 
 Tool-specific configuration options for the included tools are available in the [Tools](#tools) section.
 
@@ -86,7 +85,7 @@ Tool-specific configuration options for the included tools are available in the 
 Interactive mode provides the following commands:
 - `clear`: Clears chat context
 - `exit`: Exits the application
-- `image`: Sends an image to the model alongside the next message, used as `image <path> <prompt>` 
+- `image`: Sends an image to the model alongside the next message, used as `image <path> <prompt>`
 
 The application can also be used in a non-interactive mode.
 
@@ -116,11 +115,42 @@ SimpleLLMChat includes the following 5 tool packages:
   - Dependencies
     - `7za.exe`: used to extract archives
 - Memory Tools
+  - Tools
+    - `delete_memory`: Deletes a saved memory entry
+    - `list_memories`: Lists the names of all saved memory entries
+    - `recall_memory`: Reads a saved memory entry
+    - `save_memory`: Saves or updates a memory entry
+    - `search_memories`: Searches all memory entries by keyword
+  - Configuration Options
+    - `maxContentLength`: Maximum length of a memory entry (in characters) (default: `2000`)
+    - `maxMemories`: Maximum number of memories to store (default: `50`)
 - Python Tools
+  - Tools
+    - `run_python_script`: Creates and executes a Python script
+  - Dependencies
+    - Python must be installed and available on PATH.
 - Shell Tools
+  - Tools
+    - `run_shell_command`: Executes a shell command
 - Web Tools
+  - Tools
+    - `download_file`: Downloads a file using cURL
+    - `download_video`: Downloads an online video using YT-DLP and saves it to the user's desktop
+    - `read_website`: Reads the HTML content of a web page
+    - `run_web_search`: Searches the web using SearXNG, with DDG and Wiby as fallbacks
+  - Configuration Options
+    - `maxSearchResults`: Maximum number of search results to retrieve (default: `20`)
+    - `maxWebContentLength`: Maximum number of characters to return when reading a webpage (default: `8000`)
+    - `SearXNGInstance`: SearXNG instance to use for running web searches (must support JSON API) (default: none)
+    - `userAgent`: User agent to use when making web requests (default: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36`)
+  - Dependencies
+    - `curl-ca-bundle.crt`: used for cURL
+    - `curl.exe`:  used to download web content
+    - `yt-dlp.exe`: used to download online videos
 
 **Note**: Dependencies should be placed alongside tool executables. The release builds already include these dependencies, with the exclusion of Python.
+
+Third party tools can be installed by extracting them into the `tools` folder. For more information on developing/distributing custom tools, see https://github.com/randomNinja64/SimpleLLMChat-Tool-SDK
 
 ## Troubleshooting
 
