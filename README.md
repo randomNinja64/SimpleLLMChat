@@ -157,5 +157,5 @@ Third-party tools can be installed by extracting them into the `tools` folder. F
 Thank you to the following for all of their contributions:
 
 - [LoRd_MuldeR](https://github.com/lordmulder/cURL-build-win32) for the cURL builds for XP
-- [myamano4](https://myamano4.carrd.co) for the icon
+- [myamano4](https://mininet.neocities.org) for the icon
 - [nicolaasjan](https://github.com/nicolaasjan) for the YT-DLP builds for XP
