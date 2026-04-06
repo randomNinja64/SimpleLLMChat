@@ -115,11 +115,18 @@ namespace SimpleLLMChatCLI
                 if (firstContent)
                 {
                     content = content.TrimStart('\n');
-                    if (content.Length == 0) return;
-                    firstContent = false;
+                    if (content.Length > 0)
+                    {
+                        firstContent = false;
+                        Console.Write(content);
+                        output.Append(content);
+                    }
                 }
-                Console.Write(content);
-                output.Append(content);
+                else
+                {
+                    Console.Write(content);
+                    output.Append(content);
+                }
             }
 
             string finishReason = (string)choice["finish_reason"];
