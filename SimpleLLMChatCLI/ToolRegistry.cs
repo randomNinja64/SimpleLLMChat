@@ -53,6 +53,9 @@ namespace SimpleLLMChatCLI
         // Maps package display name (manifest "name" field) to the directory containing its executable.
         public readonly Dictionary<string, string> PackageDirectories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        // Context injectors declared by manifests via the "context_injector" field (executablePath -> commandName).
+        private readonly Dictionary<string, string> contextInjectorsByExecutable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // Default values for options declared in manifests, keyed by lowercase name
         private readonly Dictionary<string, string> optionDefaults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -122,6 +125,10 @@ namespace SimpleLLMChatCLI
 
             if (!string.IsNullOrEmpty(packageName))
                 PackageDirectories[packageName] = manifestDir;
+
+            string contextInjectorCommand = (string)manifest["context_injector"];
+            if (!string.IsNullOrEmpty(contextInjectorCommand))
+                contextInjectorsByExecutable[executablePath] = contextInjectorCommand;
 
             JArray toolsArray = manifest["tools"] as JArray;
             if (toolsArray == null)
@@ -226,6 +233,85 @@ namespace SimpleLLMChatCLI
             }
 
             return toolsArray;
+        }
+
+        /// <summary>
+        /// Calls each package's context injector for packages that have at least
+        /// one enabled tool, and returns all non-empty results for injection into the system prompt.
+        /// </summary>
+        public List<string> GetContextInjections(List<string> enabledTools)
+        {
+            var results = new List<string>();
+
+            if (enabledTools == null || enabledTools.Count == 0 || contextInjectorsByExecutable.Count == 0)
+                return results;
+
+            // Determine which executables are active (have at least one enabled tool).
+            var activeExecutables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string toolName in enabledTools)
+            {
+                ToolDefinition def;
+                if (Tools.TryGetValue(toolName, out def) && !string.IsNullOrEmpty(def.ExecutablePath))
+                    activeExecutables.Add(def.ExecutablePath);
+            }
+
+            foreach (var kvp in contextInjectorsByExecutable)
+            {
+                if (!activeExecutables.Contains(kvp.Key))
+                    continue;
+
+                string output = InvokeContextProvider(kvp.Key, kvp.Value);
+                if (!string.IsNullOrWhiteSpace(output))
+                    results.Add(output.Trim());
+            }
+
+            return results;
+        }
+
+        private string InvokeContextProvider(string executablePath, string commandName)
+        {
+            try
+            {
+                JObject stdinPayload = new JObject();
+                stdinPayload["arguments"] = new JObject();
+
+                JObject configObj = new JObject();
+                foreach (var kvp in optionDefaults)
+                    configObj[kvp.Key] = kvp.Value;
+                foreach (var kvp in config.GetAllValues())
+                    configObj[kvp.Key] = kvp.Value;
+                stdinPayload["config"] = configObj;
+
+                string stdinData = stdinPayload.ToString(Newtonsoft.Json.Formatting.None);
+
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    Arguments = commandName,
+                    WorkingDirectory = Path.GetDirectoryName(executablePath),
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                using (Process process = Process.Start(psi))
+                {
+                    process.StandardInput.Write(stdinData);
+                    process.StandardInput.Close();
+
+                    var stdoutTask = Task.Factory.StartNew(() => process.StandardOutput.ReadToEnd());
+                    process.WaitForExit();
+                    return stdoutTask.Result;
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>

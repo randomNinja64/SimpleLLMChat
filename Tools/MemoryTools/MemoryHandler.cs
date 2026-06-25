@@ -5,12 +5,10 @@ using System.Text.RegularExpressions;
 
 namespace MemoryTools
 {
-    internal class MemoryHandler
+    internal static class MemoryHandler
     {
         private static readonly string memoryFolder = Path.Combine(
             Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? typeof(MemoryHandler).Assembly.Location), "memories");
-
-        public MemoryHandler() { }
 
         private const int MaxNameLength = 100;
 
@@ -27,7 +25,7 @@ namespace MemoryTools
             return safe + ".md";
         }
 
-        public string SaveMemory(string name, string content)
+        public static string SaveMemory(string name, string content)
         {
             int maxContentLength = ToolHelper.GetConfigInt("maxContentLength", 2000);
             bool truncated = content.Length > maxContentLength;
@@ -67,7 +65,7 @@ namespace MemoryTools
             return sb.ToString();
         }
 
-        public string RecallMemory(string name)
+        public static string RecallMemory(string name)
         {
             string path = Path.Combine(memoryFolder, NameToFileName(name));
             if (!File.Exists(path))
@@ -76,7 +74,7 @@ namespace MemoryTools
             return File.ReadAllText(path, Encoding.UTF8).Trim();
         }
 
-        public string DeleteMemory(string name)
+        public static string DeleteMemory(string name)
         {
             string path = Path.Combine(memoryFolder, NameToFileName(name));
             if (!File.Exists(path))
@@ -86,7 +84,7 @@ namespace MemoryTools
             return "Memory deleted: " + name;
         }
 
-        public string ListMemories()
+        public static string ListMemories()
         {
             if (!Directory.Exists(memoryFolder))
                 return "(no memories saved)";
@@ -104,7 +102,34 @@ namespace MemoryTools
             return sb.ToString().Trim();
         }
 
-        public string SearchMemories(string keyword)
+        public static string GetContext()
+        {
+            if (!Directory.Exists(memoryFolder))
+                return null;
+
+            string[] files = Directory.GetFiles(memoryFolder, "*.md");
+            if (files.Length == 0)
+                return null;
+
+            Array.Sort(files);
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Current Memories:");
+
+            foreach (string file in files)
+            {
+                string name = Path.GetFileNameWithoutExtension(file);
+                string content = File.ReadAllText(file, Encoding.UTF8).Trim();
+                string preview = content.Replace("\r\n", " ").Replace("\n", " ").Replace("\r", " ");
+                if (preview.Length > 150)
+                    preview = preview.Substring(0, 150) + "...";
+                sb.AppendLine(name + ": " + preview);
+            }
+
+            return sb.ToString().Trim();
+        }
+
+        public static string SearchMemories(string keyword)
         {
             if (!Directory.Exists(memoryFolder))
                 return "(no memories saved)";
