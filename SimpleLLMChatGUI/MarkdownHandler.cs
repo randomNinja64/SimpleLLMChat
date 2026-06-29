@@ -29,7 +29,7 @@ namespace SimpleLLMChatGUI
         private static readonly Regex HorizontalRulePattern = new Regex(@"^(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$", RegexOptions.Compiled);
         private static readonly Regex BacktickFencePattern = new Regex(@"^([^`]*:\s*)?(`{3,})([^`]*)$", RegexOptions.Compiled);
 
-        public static void processMarkdown(RichTextBox chatOutput)
+        public static void ProcessMarkdown(RichTextBox chatOutput)
         {
             int activeBacktickFenceLength = 0;
             bool insideThinkTag = false;

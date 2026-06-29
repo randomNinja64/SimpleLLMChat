@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.Win32;
-using System.Windows.Controls.Primitives;
 using System.IO;
 
 namespace SimpleLLMChatGUI

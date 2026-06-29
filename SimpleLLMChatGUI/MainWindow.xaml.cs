@@ -93,7 +93,7 @@ namespace SimpleLLMChatGUI
             {
                 if (IsMarkdownParsingEnabled())
                 {
-                    MarkdownHandler.processMarkdown(chatOutput);
+                    MarkdownHandler.ProcessMarkdown(chatOutput);
                 }
                 SetInputControlsEnabled(true);
                 chatInput.Focus();

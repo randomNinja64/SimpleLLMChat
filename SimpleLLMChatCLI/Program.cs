@@ -11,7 +11,7 @@ namespace SimpleLLMChatCLI
         public static ConfigHandler Config;
 
         // Print interactive CLI instructions
-        static void printCliInstructions()
+        static void PrintCliInstructions()
         {
             Console.WriteLine("=== SimpleLLMChat CLI ===");
             Console.WriteLine("Type 'exit' to quit.");
@@ -93,7 +93,7 @@ namespace SimpleLLMChatCLI
                         try
                         {
                             // Convert image file to base64 and add to list
-                            base64Image = ImageHandler.ImageFileToBase64(imagePath);
+                            base64Image = ImageEncoder.ImageFileToBase64(imagePath);
                         }
                         catch (Exception e)
                         {
@@ -129,7 +129,7 @@ namespace SimpleLLMChatCLI
 
             if (showBanners)
             {
-                printCliInstructions();
+                PrintCliInstructions();
             }
 
             // Main program loop
@@ -154,7 +154,7 @@ namespace SimpleLLMChatCLI
                     if (showBanners)
                     {
                         Console.WriteLine("Context cleared.\n");
-                        printCliInstructions();
+                        PrintCliInstructions();
                     }
                     continue;
                 }
@@ -184,8 +184,7 @@ namespace SimpleLLMChatCLI
 
                     try
                     {
-                        imageBase64 = ImageHandler.ImageFileToBase64(imagePath);
-                        // Console.WriteLine("Image converted to base64 successfully.");
+                        imageBase64 = ImageEncoder.ImageFileToBase64(imagePath);
                     }
                     catch (Exception e)
                     {
