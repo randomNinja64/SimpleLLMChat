@@ -19,7 +19,7 @@ public struct ToolResult
 }
 
 /// <summary>
-/// Shared helper utilities for tool executable projects (BuiltInTools, FileTools, etc.).
+/// Shared helper utilities for tool executable projects (FileTools, WebTools, etc.).
 /// </summary>
 public static class ToolHelper
 {

@@ -17,6 +17,19 @@ namespace SimpleLLMChatGUI
         private HotkeyHandler hotkeyHandler;
         private HwndSource source;
         private bool suppressAttachDialog;
+        private bool suppressReasoningEffortChange;
+        private string _reasoningEffort = "";
+
+        private static readonly KeyValuePair<string, string>[] ReasoningEffortOptions =
+        {
+            new KeyValuePair<string, string>("Default", ""),
+            new KeyValuePair<string, string>("None", "none"),
+            new KeyValuePair<string, string>("Minimal", "minimal"),
+            new KeyValuePair<string, string>("Low", "low"),
+            new KeyValuePair<string, string>("Medium", "medium"),
+            new KeyValuePair<string, string>("High", "high"),
+            new KeyValuePair<string, string>("Extra High", "xhigh"),
+        };
 
         public MainWindow()
         {
@@ -45,14 +58,57 @@ namespace SimpleLLMChatGUI
             FontHandler.ApplyFontToWindow(this);
             LoadAndApplyFontSize();
             LoadAndApplyColors();
+            LoadReasoningEffortSelection();
             StartLLMProcess();
+        }
+
+        private void LoadReasoningEffortSelection()
+        {
+            suppressReasoningEffortChange = true;
+            try
+            {
+                reasoningEffortComboBox.Items.Clear();
+                foreach (KeyValuePair<string, string> option in ReasoningEffortOptions)
+                    reasoningEffortComboBox.Items.Add(option.Key);
+
+                int selectedIndex = 0;
+                for (int i = 0; i < ReasoningEffortOptions.Length; i++)
+                {
+                    if (string.Equals(ReasoningEffortOptions[i].Value, _reasoningEffort, StringComparison.OrdinalIgnoreCase))
+                    {
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+
+                reasoningEffortComboBox.SelectedIndex = selectedIndex;
+            }
+            finally
+            {
+                suppressReasoningEffortChange = false;
+            }
+        }
+
+        private void reasoningEffortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (suppressReasoningEffortChange || reasoningEffortComboBox.SelectedIndex < 0)
+                return;
+
+            _reasoningEffort = ReasoningEffortOptions[reasoningEffortComboBox.SelectedIndex].Value;
+            if (processHandler != null && processHandler.IsProcessRunning)
+                processHandler.SendReasoningEffort(_reasoningEffort);
         }
 
         private void StartLLMProcess()
         {
+            if (processHandler != null)
+            {
+                processHandler.Dispose();
+                processHandler = null;
+            }
+
             processHandler = new ProcessHandler();
 
-            // Subscribe to events
             processHandler.OutputReceived += OnOutputReceived;
             processHandler.ErrorOccurred += OnErrorOccurred;
             processHandler.GenerationComplete += OnGenerationComplete;
@@ -62,7 +118,11 @@ namespace SimpleLLMChatGUI
             if (!processHandler.StartProcess("SimpleLLMChatCLI.exe"))
             {
                 MessageBox.Show("Failed to start LLM process. Please check if SimpleLLMChatCLI.exe exists.");
+                return;
             }
+
+            if (!string.IsNullOrEmpty(_reasoningEffort))
+                processHandler.SendReasoningEffort(_reasoningEffort);
         }
 
         private void OnOutputReceived(string text)
@@ -281,7 +341,10 @@ namespace SimpleLLMChatGUI
         {
             // Kill running process first to stop any new output
             if (processHandler != null)
+            {
                 processHandler.Dispose();
+                processHandler = null;
+            }
 
             ClearChatAndRestart();
         }
@@ -297,6 +360,7 @@ namespace SimpleLLMChatGUI
                 FontHandler.ApplyFontToWindow(this);
                 LoadAndApplyFontSize();
                 LoadAndApplyColors();
+                processHandler = null; // Options disposes the process on save
                 ClearChatAndRestart();
             }
         }

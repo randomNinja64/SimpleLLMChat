@@ -14,6 +14,8 @@ public class LLMClient
     private readonly ToolRegistry registry;
     private readonly Func<string, string, bool> requestToolApproval;
 
+    public string ReasoningEffort { get; set; }
+
     public LLMClient(ConfigHandler config, ToolRegistry registry, Func<string, string, bool> requestToolApproval = null)
     {
         this.registry = registry;
@@ -340,6 +342,9 @@ public class LLMClient
         }
 
         payload["stream"] = true;
+
+        if (!string.IsNullOrEmpty(ReasoningEffort))
+            payload["reasoning_effort"] = ReasoningEffort;
 
         return SendHttpRequest(payload, onReasoningChunk, onReasoningSummary);
     }

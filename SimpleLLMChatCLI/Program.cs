@@ -11,12 +11,49 @@ namespace SimpleLLMChatCLI
         public static ConfigHandler Config;
 
         // Print interactive CLI instructions
+        private static readonly string[] ValidReasoningEfforts =
+        {
+            "none", "minimal", "low", "medium", "high", "xhigh"
+        };
+
         static void PrintCliInstructions()
         {
             Console.WriteLine("=== SimpleLLMChat CLI ===");
-            Console.WriteLine("Type 'exit' to quit.");
-            Console.WriteLine("Type 'clear' to reset the chat.");
-            Console.WriteLine("Type 'image <filepath>' to send an image.");
+            Console.WriteLine("Type '/exit' to quit.");
+            Console.WriteLine("Type '/clear' to reset the chat.");
+            Console.WriteLine("Type '/image \"path\" prompt' to send an image.");
+            Console.WriteLine("Type '/reasoning <effort>' to set reasoning effort; '/reasoning' alone uses the API default.");
+        }
+
+        static bool TryParseImageCommand(string input, out string imagePath, out string textPrompt)
+        {
+            imagePath = null;
+            textPrompt = null;
+
+            if (input.Length < 8 || !input.StartsWith("/image "))
+                return false;
+
+            int quoteStart = input.IndexOf('"', 7);
+            int quoteEnd = input.IndexOf('"', quoteStart + 1);
+
+            if (quoteStart == -1 || quoteEnd == -1)
+                return false;
+
+            imagePath = input.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+            textPrompt = (quoteEnd + 1 < input.Length)
+                ? input.Substring(quoteEnd + 1).TrimStart(' ', '\t')
+                : string.Empty;
+            return true;
+        }
+
+        static bool IsValidReasoningEffort(string effort)
+        {
+            foreach (string valid in ValidReasoningEfforts)
+            {
+                if (string.Equals(valid, effort, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
 
         static void Main(string[] args)
@@ -75,7 +112,26 @@ namespace SimpleLLMChatCLI
                     if (arg == "-o" || arg == "--output-only")
                     {
                         outputOnly = true;
-                        continue; // Skip to next argument
+                        continue;
+                    }
+
+                    if (arg == "--reasoning-effort")
+                    {
+                        if (i + 1 >= args.Length)
+                        {
+                            Console.Error.WriteLine("Error: --reasoning-effort flag requires a value.");
+                            return;
+                        }
+
+                        string effort = args[++i];
+                        if (!IsValidReasoningEffort(effort))
+                        {
+                            Console.Error.WriteLine("Error: Invalid reasoning effort. Valid values: none, minimal, low, medium, high, xhigh.");
+                            return;
+                        }
+
+                        client.ReasoningEffort = effort;
+                        continue;
                     }
 
                     // Check for image flag
@@ -88,20 +144,18 @@ namespace SimpleLLMChatCLI
                             return;
                         }
 
-                        string imagePath = args[++i]; // Get the next argument as image path
+                        string imagePath = args[++i];
 
                         try
                         {
-                            // Convert image file to base64 and add to list
                             base64Image = ImageEncoder.ImageFileToBase64(imagePath);
                         }
                         catch (Exception e)
                         {
-                            // Handle errors reading/converting the image
                             Console.Error.WriteLine("Error processing image: " + e.Message);
                             return;
                         }
-                        continue; // Skip to next argument
+                        continue;
                     }
 
                     // If not a flag, treat argument as part of the text prompt
@@ -132,7 +186,6 @@ namespace SimpleLLMChatCLI
                 PrintCliInstructions();
             }
 
-            // Main program loop
             while (true)
             {
                 Console.Write("You: ");
@@ -141,13 +194,12 @@ namespace SimpleLLMChatCLI
                 if (userInput == null)
                     continue;
 
-                // Decode multi-line text: replace <<NEWLINE>> marker back to newlines
                 userInput = userInput.Replace("<<NEWLINE>>", "\n");
 
-                if (userInput == "exit")
+                if (userInput == "/exit")
                     break;
 
-                if (userInput == "clear")
+                if (userInput == "/clear")
                 {
                     conversation.Clear();
 
@@ -159,29 +211,25 @@ namespace SimpleLLMChatCLI
                     continue;
                 }
 
-                // String for image and prompt
-                string textPrompt = null;
-                string imageBase64 = null;
-
-                // Check for "image " command
-                if (userInput.Length > 6 && userInput.StartsWith("image "))
+                if (userInput == "/reasoning" || userInput.StartsWith("/reasoning "))
                 {
-                    int quoteStart = userInput.IndexOf('"', 6);
-                    int quoteEnd = userInput.IndexOf('"', quoteStart + 1);
-
-                    if (quoteStart == -1 || quoteEnd == -1)
+                    string effort = userInput.Length > 11 ? userInput.Substring(11).Trim() : string.Empty;
+                    if (!string.IsNullOrEmpty(effort) && !IsValidReasoningEffort(effort))
                     {
-                        Console.Error.WriteLine("Error: Please enclose the image path in quotes.");
+                        Console.Error.WriteLine("Error: Invalid reasoning effort. Valid values: none, minimal, low, medium, high, xhigh.");
                         continue;
                     }
 
-                    string imagePath = userInput.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+                    client.ReasoningEffort = string.IsNullOrEmpty(effort) ? null : effort;
+                    continue;
+                }
 
-                    // Remaining text after the closing quote
-                    textPrompt = (quoteEnd + 1 < userInput.Length)
-                        ? userInput.Substring(quoteEnd + 1).TrimStart(' ', '\t')
-                        : string.Empty;
+                string textPrompt = null;
+                string imageBase64 = null;
 
+                string imagePath;
+                if (TryParseImageCommand(userInput, out imagePath, out textPrompt))
+                {
                     try
                     {
                         imageBase64 = ImageEncoder.ImageFileToBase64(imagePath);

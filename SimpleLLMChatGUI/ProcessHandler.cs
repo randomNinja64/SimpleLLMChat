@@ -10,6 +10,7 @@ namespace SimpleLLMChatGUI
     public class ProcessHandler : IDisposable
     {
         private Process llmProcess;
+        private bool disposed;
         private StringBuilder textBuffer = new StringBuilder(); // Buffer for incomplete text
 
         public event Action<string> OutputReceived;
@@ -90,8 +91,14 @@ namespace SimpleLLMChatGUI
             string quotedPath = "\"" + imagePath + "\"";
 
             // Build the final command
-            string command = "image " + quotedPath + " " + prompt;
+            string command = "/image " + quotedPath + " " + prompt;
 
+            return SendInput(command);
+        }
+
+        public bool SendReasoningEffort(string effort)
+        {
+            string command = string.IsNullOrEmpty(effort) ? "/reasoning" : "/reasoning " + effort;
             return SendInput(command);
         }
 
@@ -358,6 +365,10 @@ namespace SimpleLLMChatGUI
 
         public void Dispose()
         {
+            if (disposed)
+                return;
+
+            disposed = true;
             OutputReceived = null;
             ErrorOccurred = null;
             GenerationComplete = null;
@@ -366,7 +377,11 @@ namespace SimpleLLMChatGUI
             {
                 try { llmProcess.Kill(); }
                 catch { }
+            }
+            if (llmProcess != null)
+            {
                 llmProcess.Dispose();
+                llmProcess = null;
             }
         }
     }

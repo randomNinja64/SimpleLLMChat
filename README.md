@@ -83,9 +83,10 @@ Tool-specific configuration options for the included tools are available in the 
 **CLI**: To run the CLI in interactive/REPL mode, open `SimpleLLMChatCLI.exe` directly or from a terminal.
 
 Interactive mode provides the following commands:
-- `clear`: Clears chat context
-- `exit`: Exits the application
-- `image`: Sends an image to the model alongside the next message, used as `image <path> <prompt>`
+- `/clear`: Clears chat context
+- `/exit`: Exits the application
+- `/image`: Sends an image to the model alongside the next message, used as `/image "path" prompt`
+- `/reasoning`: Sets reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); `/reasoning` alone uses the API default
 
 The application can also be used in a non-interactive mode.
 
@@ -96,6 +97,7 @@ To pass in an image alongside a prompt, use `SimpleLLMChatCLI.exe --image <path>
 CLI mode provides the following additional flags:
 - `--no-banners`: Suppresses instructional prompts
 - `-o`, `--output-only`: Outputs only the model's response (useful for scripting)
+- `--reasoning-effort`: Sets initial reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`)
 
 ## Tools
 

@@ -16,7 +16,7 @@ namespace SimpleLLMChatGUI
         public string Label;        // Display label for the UI
         public string Type;         // "string", "int", or "bool"
         public string Default;      // Default value as a string
-        public string Source;       // Manifest/category name (e.g., "BuiltInTools")
+        public string Source;       // Manifest package name (e.g., "FileTools")
     }
 
     public static class ToolOptionsRegistry

@@ -50,9 +50,6 @@ namespace SimpleLLMChatCLI
 
         public readonly Dictionary<string, ToolDefinition> Tools = new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase);
 
-        // Maps package display name (manifest "name" field) to the directory containing its executable.
-        public readonly Dictionary<string, string> PackageDirectories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
         // Context injectors declared by manifests via the "context_injector" field (executablePath -> commandName).
         private readonly Dictionary<string, string> contextInjectorsByExecutable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -118,13 +115,9 @@ namespace SimpleLLMChatCLI
             string json = File.ReadAllText(jsonFilePath, Encoding.UTF8);
             JObject manifest = JObject.Parse(json);
 
-            string packageName = (string)manifest["name"] ?? "";
             string executable = (string)manifest["executable"] ?? "";
             string manifestDir = Path.GetDirectoryName(jsonFilePath);
             string executablePath = Path.Combine(manifestDir, executable);
-
-            if (!string.IsNullOrEmpty(packageName))
-                PackageDirectories[packageName] = manifestDir;
 
             string contextInjectorCommand = (string)manifest["context_injector"];
             if (!string.IsNullOrEmpty(contextInjectorCommand))
