@@ -56,6 +56,7 @@ namespace SimpleLLMChatGUI
             processHandler.OutputReceived += OnOutputReceived;
             processHandler.ErrorOccurred += OnErrorOccurred;
             processHandler.GenerationComplete += OnGenerationComplete;
+            processHandler.ApprovalRequested += OnApprovalRequested;
 
             // Start the process
             if (!processHandler.StartProcess("SimpleLLMChatCLI.exe"))
@@ -85,6 +86,23 @@ namespace SimpleLLMChatGUI
             {
                 MessageBox.Show(errorMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }));
+        }
+
+        private bool OnApprovalRequested(string toolName, string arguments)
+        {
+            bool approved = false;
+            Dispatcher.Invoke((Action)(() =>
+            {
+                string message = ToolApproval.FormatApprovalMessage(toolName, arguments);
+                MessageBoxResult result = MessageBox.Show(
+                    message,
+                    "Tool Call",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question,
+                    MessageBoxResult.No);
+                approved = result == MessageBoxResult.Yes;
+            }));
+            return approved;
         }
 
         private void OnGenerationComplete()

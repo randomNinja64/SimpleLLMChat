@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
-using System.Windows.Forms;
 
 namespace SimpleLLMChatCLI
 {
@@ -13,11 +12,13 @@ public class LLMClient
 {
     private readonly ConfigHandler config;
     private readonly ToolRegistry registry;
+    private readonly Func<string, string, bool> requestToolApproval;
 
-    public LLMClient(ConfigHandler config, ToolRegistry registry)
+    public LLMClient(ConfigHandler config, ToolRegistry registry, Func<string, string, bool> requestToolApproval = null)
     {
         this.registry = registry;
         this.config = config;
+        this.requestToolApproval = requestToolApproval ?? ToolApproval.RequestApproval;
         // Enable modern TLS protocols for HTTPS support
         // .NET 4.0 only has named constant for Tls (1.0)
         // Tls11 = 768, Tls12 = 3072, Tls13 = 12288 (numeric values used until .NET 4.5+)
@@ -141,33 +142,12 @@ public class LLMClient
                     }
                     else if (toolsRequiringApproval != null && toolsRequiringApproval.Contains(call.Name))
                     {
-                        // Tool requires approval - prompt user
-                        string formattedArguments = call.Arguments
-                            .Replace("\\n", "\n")
-                            .Replace("\\r", "\r")
-                            .Replace("\\t", "\t")
-                            .Replace("\\\"", "\"")
-                            .Replace("\\'", "'")
-                            .Replace("\\\\", "\\");
-                        
-                        string approvalMessage = "Run tool: " + call.Name + "\n\n" +
-                                                "With arguments:\n" + formattedArguments + "?";
-                        
-                        DialogResult result = MessageBox.Show(
-                            approvalMessage,
-                            "Tool Call",
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Question,
-                            MessageBoxDefaultButton.Button2
-                        );
-
-                        if (result == DialogResult.Yes)
+                        if (requestToolApproval(call.Name, call.Arguments))
                         {
                             registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode);
                         }
                         else
                         {
-                            // User declined - return cancellation message
                             exitCode = -1;
                             toolContent = ToolRegistry.FormatCommandResult(
                                 call.Name,

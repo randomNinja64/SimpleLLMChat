@@ -15,6 +15,9 @@ namespace SimpleLLMChatGUI
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
         public event Action GenerationComplete;
+        public event Func<string, string, bool> ApprovalRequested;
+
+        private readonly StringBuilder streamBuffer = new StringBuilder();
 
         public bool IsProcessRunning
         {
@@ -37,6 +40,7 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.CreateNoWindow = true;
                 llmProcess.StartInfo.Arguments = "--no-banners";
                 textBuffer.Clear();
+                streamBuffer.Clear();
                 llmProcess.Start();
 
                 // 256 byte async buffer
@@ -141,23 +145,120 @@ namespace SimpleLLMChatGUI
             }
         }
 
+        public bool SendApprovalResponse(bool approved)
+        {
+            if (llmProcess != null && !llmProcess.HasExited)
+            {
+                try
+                {
+                    llmProcess.StandardInput.WriteLine(approved ? "Y" : "N");
+                    llmProcess.StandardInput.Flush();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    ErrorOccurred?.Invoke("Error sending approval response: " + ex.Message);
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
         private void ProcessStreamingText(string newText)
         {
-            if (!string.IsNullOrEmpty(newText))
+            if (string.IsNullOrEmpty(newText))
+                return;
+
+            streamBuffer.Append(newText);
+
+            while (true)
             {
-                if (textBuffer.Length > 0)
+                string buffered = streamBuffer.ToString();
+                int promptIndex = buffered.IndexOf(ToolApproval.ApprovalPrompt, StringComparison.Ordinal);
+                if (promptIndex < 0)
                 {
-                    textBuffer.Append(newText);
-                    newText = textBuffer.ToString();
-                    textBuffer.Clear();
+                    int holdBack = GetPartialSuffixLength(buffered, ToolApproval.ApprovalPrompt);
+                    if (holdBack > 0)
+                    {
+                        ProcessTextChunk(buffered.Substring(0, buffered.Length - holdBack));
+                        streamBuffer.Clear();
+                        streamBuffer.Append(buffered.Substring(buffered.Length - holdBack));
+                    }
+                    else
+                    {
+                        ProcessTextChunk(buffered);
+                        streamBuffer.Clear();
+                    }
+                    return;
                 }
 
-                ProcessTextChunk(newText);
+                int blockStart = buffered.LastIndexOf(ToolApproval.RunToolPrefix, promptIndex, StringComparison.Ordinal);
+                if (blockStart < 0)
+                {
+                    ProcessTextChunk(buffered.Substring(0, promptIndex + ToolApproval.ApprovalPrompt.Length));
+                    streamBuffer.Clear();
+                    streamBuffer.Append(buffered.Substring(promptIndex + ToolApproval.ApprovalPrompt.Length));
+                    continue;
+                }
+
+                if (blockStart > 0)
+                    ProcessTextChunk(buffered.Substring(0, blockStart));
+
+                string approvalBlock = buffered.Substring(blockStart, promptIndex + ToolApproval.ApprovalPrompt.Length - blockStart);
+                HandleApprovalBlock(approvalBlock);
+
+                string remaining = buffered.Substring(promptIndex + ToolApproval.ApprovalPrompt.Length);
+                streamBuffer.Clear();
+                if (string.IsNullOrEmpty(remaining))
+                    return;
+
+                streamBuffer.Append(remaining);
             }
+        }
+
+        private static int GetPartialSuffixLength(string text, string marker)
+        {
+            int maxLength = Math.Min(marker.Length - 1, text.Length);
+            for (int length = maxLength; length > 0; length--)
+            {
+                if (text.EndsWith(marker.Substring(0, length), StringComparison.Ordinal))
+                    return length;
+            }
+
+            return 0;
+        }
+
+        private void HandleApprovalBlock(string approvalBlock)
+        {
+            string toolName;
+            string arguments;
+            if (!ToolApproval.TryParseApprovalPrompt(approvalBlock, out toolName, out arguments))
+            {
+                ErrorOccurred?.Invoke("Failed to parse tool approval prompt.");
+                SendApprovalResponse(false);
+                return;
+            }
+
+            bool approved = false;
+            if (ApprovalRequested != null)
+                approved = ApprovalRequested(toolName, arguments);
+
+            SendApprovalResponse(approved);
         }
 
         private void ProcessTextChunk(string textChunk)
         {
+            if (string.IsNullOrEmpty(textChunk))
+                return;
+
+            if (textBuffer.Length > 0)
+            {
+                textBuffer.Append(textChunk);
+                textChunk = textBuffer.ToString();
+                textBuffer.Clear();
+            }
+
             // For streaming, we want to output text immediately
             // But we need to be careful about "You:" patterns
 
@@ -260,6 +361,7 @@ namespace SimpleLLMChatGUI
             OutputReceived = null;
             ErrorOccurred = null;
             GenerationComplete = null;
+            ApprovalRequested = null;
             if (llmProcess != null && !llmProcess.HasExited)
             {
                 try { llmProcess.Kill(); }
