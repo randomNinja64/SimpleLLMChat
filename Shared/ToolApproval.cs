@@ -27,7 +27,7 @@ public static class ToolApproval
     public static string FormatApprovalMessage(string toolName, string arguments)
     {
         string formattedArguments = UnescapeArguments(arguments);
-        return RunToolPrefix + toolName + "\n\n" + ArgumentsPrefix + "\n" + formattedArguments + "?";
+        return RunToolPrefix + toolName + "\n\n" + ArgumentsPrefix + "\n" + formattedArguments;
     }
 
     public static bool RequestApproval(string toolName, string arguments)
@@ -98,11 +98,7 @@ public static class ToolApproval
             return false;
         argsStart++;
 
-        string argsPart = block.Substring(argsStart).TrimEnd('\r', '\n', ' ');
-        if (!argsPart.EndsWith("?", StringComparison.Ordinal))
-            return false;
-
-        arguments = argsPart.Substring(0, argsPart.Length - 1);
+        arguments = block.Substring(argsStart).TrimEnd('\r', '\n', ' ');
         return true;
     }
 }

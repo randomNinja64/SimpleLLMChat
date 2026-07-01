@@ -185,18 +185,7 @@ namespace SimpleLLMChatGUI
                 int promptIndex = buffered.IndexOf(ToolApproval.ApprovalPrompt, StringComparison.Ordinal);
                 if (promptIndex < 0)
                 {
-                    int holdBack = GetPartialSuffixLength(buffered, ToolApproval.ApprovalPrompt);
-                    if (holdBack > 0)
-                    {
-                        ProcessTextChunk(buffered.Substring(0, buffered.Length - holdBack));
-                        streamBuffer.Clear();
-                        streamBuffer.Append(buffered.Substring(buffered.Length - holdBack));
-                    }
-                    else
-                    {
-                        ProcessTextChunk(buffered);
-                        streamBuffer.Clear();
-                    }
+                    FlushBufferedTextWithoutApprovalPrompt(buffered);
                     return;
                 }
 
@@ -221,6 +210,36 @@ namespace SimpleLLMChatGUI
                     return;
 
                 streamBuffer.Append(remaining);
+            }
+        }
+
+        private void FlushBufferedTextWithoutApprovalPrompt(string buffered)
+        {
+            int runIndex = buffered.LastIndexOf(ToolApproval.RunToolPrefix, StringComparison.Ordinal);
+            if (runIndex >= 0)
+            {
+                if (runIndex > 0)
+                    ProcessTextChunk(buffered.Substring(0, runIndex));
+
+                streamBuffer.Clear();
+                streamBuffer.Append(buffered.Substring(runIndex));
+                return;
+            }
+
+            int holdBack = Math.Max(
+                GetPartialSuffixLength(buffered, ToolApproval.ApprovalPrompt),
+                GetPartialSuffixLength(buffered, ToolApproval.RunToolPrefix));
+
+            if (holdBack > 0)
+            {
+                ProcessTextChunk(buffered.Substring(0, buffered.Length - holdBack));
+                streamBuffer.Clear();
+                streamBuffer.Append(buffered.Substring(buffered.Length - holdBack));
+            }
+            else
+            {
+                ProcessTextChunk(buffered);
+                streamBuffer.Clear();
             }
         }
 
