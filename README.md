@@ -126,6 +126,8 @@ SimpleLLMChat includes the following 5 tool packages:
   - Configuration Options
     - `maxContentLength`: Maximum length of a memory entry (in characters) (default: `2000`)
     - `maxMemories`: Maximum number of memories to store (default: `50`)
+  - Context Injector
+    - `get_memory_context`: Creates a summary of saved memories to be injected into the system prompt
 - Python Tools
   - Tools
     - `run_python_script`: Creates and executes a Python script
