@@ -1,0 +1,52 @@
+{
+    "name": "Skill Tools",
+    "executable": "SkillTools.exe",
+    "context_injector": "get_skills_context",
+    "options": [
+        { "name": "skillsDirectory", "label": "Skills Directory", "type": "string", "default": "" }
+    ],
+    "tools": [
+        {
+            "name": "view_skill",
+            "description": "Load a skill's SKILL.md, absolute skill root, and relative linked-file listing. With relative_path, reads that file (Skill root / File headers; no listing).",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "The skill name.", "required": true },
+                { "name": "relative_path", "type": "string", "description": "Optional relative path within the skill to read (e.g. 'references/api.md'). Omit to get SKILL.md plus the linked-files listing.", "required": false }
+            ]
+        },
+        {
+            "name": "create_skill",
+            "description": "Create a new skill directory with SKILL.md only (YAML frontmatter + markdown instructions). Errors if the skill already exists.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "Skill name: lowercase letters, numbers, and hyphens only (e.g. 'code-review'). Becomes the folder name.", "required": true },
+                { "name": "description", "type": "string", "description": "What the skill does and when to use it (third person). Truncated to 1024 characters.", "required": true },
+                { "name": "instructions", "type": "string", "description": "Markdown body of SKILL.md (procedure, when to load supporting files, examples).", "required": true }
+            ]
+        },
+        {
+            "name": "edit_skill",
+            "description": "Update an existing skill's SKILL.md (description and/or instructions; omitted fields unchanged). Errors if the skill does not exist.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "The existing skill name.", "required": true },
+                { "name": "description", "type": "string", "description": "Optional. New description (third person). Truncated to 1024 characters. Omit to leave the current description unchanged.", "required": false },
+                { "name": "instructions", "type": "string", "description": "Optional. New markdown body for SKILL.md. Omit to leave current instructions unchanged.", "required": false }
+            ]
+        },
+        {
+            "name": "edit_skill_file",
+            "description": "Create or overwrite a supporting file under an existing skill. Errors if the skill does not exist. Creates parent directories as needed.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "The existing skill name.", "required": true },
+                { "name": "relative_path", "type": "string", "description": "Relative path within the skill (e.g. 'scripts/helper.py' or 'references/api.md').", "required": true },
+                { "name": "content", "type": "string", "description": "Full file contents to write.", "required": true }
+            ]
+        },
+        {
+            "name": "remove_skill",
+            "description": "Delete an agent skill directory (SKILL.md and all supporting files) by skill name.",
+            "parameters": [
+                { "name": "name", "type": "string", "description": "The skill name to remove.", "required": true }
+            ]
+        }
+    ]
+}

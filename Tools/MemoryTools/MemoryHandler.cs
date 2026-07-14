@@ -7,10 +7,19 @@ namespace MemoryTools
 {
     internal static class MemoryHandler
     {
-        private static readonly string memoryFolder = Path.Combine(
-            Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? typeof(MemoryHandler).Assembly.Location), "memories");
-
         private const int MaxNameLength = 100;
+
+        public static string GetMemoriesDirectory()
+        {
+            string configured = ToolHelper.GetConfigString("memoriesDirectory").Trim();
+            if (!string.IsNullOrEmpty(configured))
+                return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
+
+            string baseDir = Path.GetDirectoryName(
+                System.Reflection.Assembly.GetEntryAssembly()?.Location
+                ?? typeof(MemoryHandler).Assembly.Location);
+            return Path.GetFullPath(Path.Combine(baseDir, "memories"));
+        }
 
         // Converts a name to a safe filename by replacing any character that
         // isn't alphanumeric, underscore, or hyphen with an underscore.
@@ -32,6 +41,7 @@ namespace MemoryTools
             if (truncated)
                 content = content.Substring(0, maxContentLength);
 
+            string memoryFolder = GetMemoriesDirectory();
             if (!Directory.Exists(memoryFolder))
                 Directory.CreateDirectory(memoryFolder);
 
@@ -67,7 +77,7 @@ namespace MemoryTools
 
         public static string RecallMemory(string name)
         {
-            string path = Path.Combine(memoryFolder, NameToFileName(name));
+            string path = Path.Combine(GetMemoriesDirectory(), NameToFileName(name));
             if (!File.Exists(path))
                 return "No memory entry found with name: " + name;
 
@@ -76,7 +86,7 @@ namespace MemoryTools
 
         public static string DeleteMemory(string name)
         {
-            string path = Path.Combine(memoryFolder, NameToFileName(name));
+            string path = Path.Combine(GetMemoriesDirectory(), NameToFileName(name));
             if (!File.Exists(path))
                 return "No memory entry found with name: " + name;
 
@@ -86,6 +96,7 @@ namespace MemoryTools
 
         public static string ListMemories()
         {
+            string memoryFolder = GetMemoriesDirectory();
             if (!Directory.Exists(memoryFolder))
                 return "(no memories saved)";
 
@@ -104,6 +115,7 @@ namespace MemoryTools
 
         public static string GetContext()
         {
+            string memoryFolder = GetMemoriesDirectory();
             if (!Directory.Exists(memoryFolder))
                 return null;
 
@@ -131,6 +143,7 @@ namespace MemoryTools
 
         public static string SearchMemories(string keyword)
         {
+            string memoryFolder = GetMemoriesDirectory();
             if (!Directory.Exists(memoryFolder))
                 return "(no memories saved)";
 

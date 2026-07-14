@@ -4,10 +4,10 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{B2E63688-4968-40D0-8AC0-C54AA92A643E}</ProjectGuid>
+    <ProjectGuid>{06A0D752-9263-4680-84D0-3B95978B43B4}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>PythonTools</RootNamespace>
-    <AssemblyName>PythonTools</AssemblyName>
+    <RootNamespace>SkillTools</RootNamespace>
+    <AssemblyName>SkillTools</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -42,12 +42,12 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="..\ToolHelper.cs" />
-    <Compile Include="PythonRunner.cs" />
+    <Compile Include="SkillHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="PythonTools.json">
+    <None Include="SkillTools.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

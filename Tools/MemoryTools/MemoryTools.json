@@ -3,6 +3,7 @@
     "executable": "MemoryTools.exe",
     "context_injector": "get_memory_context",
     "options": [
+        { "name": "memoriesDirectory", "label": "Memories Directory", "type": "string", "default": "" },
         { "name": "maxContentLength", "label": "Max Memory Content Length (characters)", "type": "int", "default": "2000" },
         { "name": "maxMemories", "label": "Max Number of Memories", "type": "int", "default": "50" }
     ],

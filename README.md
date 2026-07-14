@@ -101,7 +101,7 @@ CLI mode provides the following additional flags:
 
 ## Tools
 
-SimpleLLMChat includes the following 5 tool packages:
+SimpleLLMChat includes the following 6 tool packages:
 
 - File Tools
   - Tools
@@ -124,6 +124,7 @@ SimpleLLMChat includes the following 5 tool packages:
     - `save_memory`: Saves or updates a memory entry
     - `search_memories`: Searches all memory entries by keyword
   - Configuration Options
+    - `memoriesDirectory`: Directory for memory `.md` files (default: `memories` folder next to `MemoryTools.exe`)
     - `maxContentLength`: Maximum length of a memory entry (in characters) (default: `2000`)
     - `maxMemories`: Maximum number of memories to store (default: `50`)
   - Context Injector
@@ -136,6 +137,17 @@ SimpleLLMChat includes the following 5 tool packages:
 - Shell Tools
   - Tools
     - `run_shell_command`: Executes a shell command
+- Skill Tools
+  - Tools
+    - `create_skill`: Creates a new agent skill
+    - `edit_skill`: Updates an existing agent skill (description and/or instructions; omitted fields unchanged)
+    - `edit_skill_file`: Creates or overwrites a supporting file under an existing skill (e.g. scripts, references)
+    - `remove_skill`: Deletes an agent skill
+    - `view_skill`: Loads a skill's full `SKILL.md`, absolute path to the skill folder, and relative paths for linked files (optional `relative_path` loads one relative file)
+  - Configuration Options
+    - `skillsDirectory`: Directory to scan recursively for skill folders (folders containing 'SKILL.md') (default: `skills` folder next to `SkillTools.exe`)
+  - Context Injector
+    - `get_skills_context`: Injects skill names and descriptions into the system prompt, with instructions to load matching skills via `view_skill`, to run skill scripts as shell commands under the skill root directory, and to author skills with `create_skill` / `edit_skill` / `edit_skill_file` / `remove_skill`.
 - Web Tools
   - Tools
     - `download_file`: Downloads a file using cURL

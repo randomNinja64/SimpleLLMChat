@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{F6A7B8C9-D0E1-2345-F012-567890123456}</ProjectGuid>
+    <ProjectGuid>{7B9924DB-B9DD-4C9E-BDA7-A81DF5F35E90}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>MemoryTools</RootNamespace>
     <AssemblyName>MemoryTools</AssemblyName>
