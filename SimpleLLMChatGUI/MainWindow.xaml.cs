@@ -17,9 +17,9 @@ namespace SimpleLLMChatGUI
         private HotkeyHandler hotkeyHandler;
         private HwndSource source;
         private bool suppressAttachDialog;
-        private bool suppressReasoningEffortChange;
         private string _reasoningEffort = "";
         private TokenTracker tokenTracker;
+        private ContextMenu reasoningEffortMenu;
 
         private static readonly KeyValuePair<string, string>[] ReasoningEffortOptions =
         {
@@ -59,44 +59,64 @@ namespace SimpleLLMChatGUI
             FontHandler.ApplyFontToWindow(this);
             LoadAndApplyFontSize();
             LoadAndApplyColors();
-            LoadReasoningEffortSelection();
+            UpdateReasoningEffortLabel();
+            BuildReasoningEffortMenu();
             tokenTracker = new TokenTracker(tokenStatusText);
             StartLLMProcess();
         }
 
-        private void LoadReasoningEffortSelection()
+        private void UpdateReasoningEffortLabel()
         {
-            suppressReasoningEffortChange = true;
-            try
+            string label = ReasoningEffortOptions[0].Key;
+            for (int i = 0; i < ReasoningEffortOptions.Length; i++)
             {
-                reasoningEffortComboBox.Items.Clear();
-                foreach (KeyValuePair<string, string> option in ReasoningEffortOptions)
-                    reasoningEffortComboBox.Items.Add(option.Key);
-
-                int selectedIndex = 0;
-                for (int i = 0; i < ReasoningEffortOptions.Length; i++)
+                if (string.Equals(ReasoningEffortOptions[i].Value, _reasoningEffort, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(ReasoningEffortOptions[i].Value, _reasoningEffort, StringComparison.OrdinalIgnoreCase))
-                    {
-                        selectedIndex = i;
-                        break;
-                    }
+                    label = ReasoningEffortOptions[i].Key;
+                    break;
                 }
-
-                reasoningEffortComboBox.SelectedIndex = selectedIndex;
             }
-            finally
+            reasoningEffortLabel.Text = label;
+        }
+
+        private void BuildReasoningEffortMenu()
+        {
+            reasoningEffortMenu = new ContextMenu();
+            foreach (KeyValuePair<string, string> option in ReasoningEffortOptions)
             {
-                suppressReasoningEffortChange = false;
+                MenuItem item = new MenuItem();
+                item.Header = option.Key;
+                item.Tag = option.Value;
+                item.IsCheckable = true;
+                item.Click += reasoningEffortMenuItem_Click;
+                reasoningEffortMenu.Items.Add(item);
             }
         }
 
-        private void reasoningEffortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void reasoningEffortLabel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (suppressReasoningEffortChange || reasoningEffortComboBox.SelectedIndex < 0)
+            if (reasoningEffortMenu == null)
                 return;
 
-            _reasoningEffort = ReasoningEffortOptions[reasoningEffortComboBox.SelectedIndex].Value;
+            foreach (MenuItem item in reasoningEffortMenu.Items)
+            {
+                string value = item.Tag as string ?? "";
+                item.IsChecked = string.Equals(value, _reasoningEffort, StringComparison.OrdinalIgnoreCase);
+            }
+
+            reasoningEffortMenu.PlacementTarget = (UIElement)sender;
+            reasoningEffortMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            reasoningEffortMenu.IsOpen = true;
+        }
+
+        private void reasoningEffortMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            MenuItem item = sender as MenuItem;
+            if (item == null)
+                return;
+
+            _reasoningEffort = item.Tag as string ?? "";
+            UpdateReasoningEffortLabel();
             if (processHandler != null && processHandler.IsProcessRunning)
                 processHandler.SendReasoningEffort(_reasoningEffort);
         }
@@ -133,7 +153,6 @@ namespace SimpleLLMChatGUI
 
         private void OnStatusReceived(int tokens)
         {
-            // Fire-and-forget: never block the pipe reader on the UI thread.
             Dispatcher.BeginInvoke((Action)(() =>
             {
                 if (tokenTracker != null)

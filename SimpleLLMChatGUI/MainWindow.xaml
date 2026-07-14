@@ -24,31 +24,26 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Desktop Assistant -->
+            <!-- Left: Clear Chat -->
+            <Button Name="clearButton"
+                    Content="Clear Chat"
+                    Width="80"
+                    Height="25"
+                    Margin="0,0,5,0"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left"
+                    Grid.Column="0"
+                    Click="clearButton_Click" />
+
+            <!-- Center: Desktop Assistant -->
             <ToggleButton Name="desktopAssistantToggle"
                           Content="Desktop Assistant"
                           ToolTip="Ctrl+Shift+D — capture a screenshot and ask about it. Requires a vision-capable model."
                           Padding="8,0"
                           Height="25"
                           VerticalAlignment="Center"
-                          HorizontalAlignment="Left"
-                          Grid.Column="0" />
-
-            <!-- Center: Reasoning Effort -->
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                <TextBlock Text="Reasoning:"
-                           Foreground="{DynamicResource LabelTextColorBrush}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,6,0" />
-                <ComboBox Name="reasoningEffortComboBox"
-                          Height="25"
-                          MinWidth="110"
-                          VerticalAlignment="Center"
-                          SelectionChanged="reasoningEffortComboBox_SelectionChanged" />
-            </StackPanel>
+                          HorizontalAlignment="Center"
+                          Grid.Column="1" />
 
             <!-- Right: Options -->
             <Button Name="optionsButton"
@@ -77,48 +72,25 @@
             </RichTextBox.Resources>
         </RichTextBox>
 
-        <!-- Bottom bar: two 25px button rows with padding -->
+        <!-- Bottom bar: attach + input + send -->
         <Grid Grid.Row="2" Margin="0,0,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <!-- New Chat + attach -->
                 <ColumnDefinition Width="*" />
-                <!-- Input expands -->
                 <ColumnDefinition Width="Auto" />
-                <!-- Send button -->
             </Grid.ColumnDefinitions>
 
-            <!-- Bottom left: Clear Chat aligned to input top, image button to input bottom -->
-            <Grid Grid.Column="0"
-                  Width="80"
-                  Margin="0,0,5,0"
-                  VerticalAlignment="Stretch">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <Button Name="clearButton"
-                        Grid.Row="0"
-                        Content="Clear Chat"
-                        Height="25"
-                        VerticalAlignment="Top"
-                        HorizontalAlignment="Stretch"
-                        Click="clearButton_Click" />
-
-                <ToggleButton Name="attachButton"
-                              Grid.Row="2"
-                              Height="25"
-                              VerticalAlignment="Bottom"
-                              HorizontalAlignment="Stretch"
-                              ToolTip="Attach Image (if supported by model)"
-                              Checked="attachButton_Checked"
-                              Unchecked="attachButton_Unchecked">
-                    <Image Source="pack://application:,,,/Resources/photoframe.png"
-                           Width="20" Height="20" Stretch="Uniform"/>
-                </ToggleButton>
-            </Grid>
+            <ToggleButton Name="attachButton"
+                          Grid.Column="0"
+                          Width="45"
+                          Margin="0,0,5,0"
+                          VerticalAlignment="Stretch"
+                          ToolTip="Attach Image (if supported by model)"
+                          Checked="attachButton_Checked"
+                          Unchecked="attachButton_Unchecked">
+                <Image Source="pack://application:,,,/Resources/photoframe.png"
+                       Width="20" Height="20" Stretch="Uniform"/>
+            </ToggleButton>
 
             <TextBox Name="chatInput"
                      Grid.Column="1"
@@ -152,7 +124,16 @@
                     </Grid>
                 </ItemsPanelTemplate>
             </StatusBar.ItemsPanel>
-            <!-- Left items go in column 0 -->
+            <StatusBarItem Grid.Column="0" Padding="0" Margin="0" HorizontalAlignment="Left">
+                <TextBlock FontSize="11"
+                           Cursor="Hand"
+                           MouseLeftButtonUp="reasoningEffortLabel_MouseLeftButtonUp">
+                    <Run Text="Reasoning: "/>
+                    <Run x:Name="reasoningEffortLabel"
+                         Text="Default"
+                         TextDecorations="Underline"/>
+                </TextBlock>
+            </StatusBarItem>
             <StatusBarItem Grid.Column="1" Padding="0" Margin="0" HorizontalAlignment="Right">
                 <TextBlock Name="tokenStatusText"
                            Text="Tokens: ~0"
