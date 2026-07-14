@@ -39,6 +39,7 @@ namespace SkillTools
             List<SkillInfo> skills = DiscoverSkills();
             var sb = new StringBuilder();
             sb.AppendLine("Skills:");
+            sb.AppendLine("Skills are located in " + GetSkillsDirectory() + ".");
             sb.AppendLine("Before replying, scan the skills below. If one clearly matches your task, load it with view_skill and follow its instructions.");
             sb.AppendLine("To run a skill's scripts, run them as shell commands under the skill root returned by view_skill.");
             sb.AppendLine("To author or change skills, use create_skill, edit_skill, edit_skill_file, or remove_skill if available.");

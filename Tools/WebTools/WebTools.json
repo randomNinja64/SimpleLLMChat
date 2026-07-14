@@ -2,7 +2,8 @@
     "name": "Web Tools",
     "executable": "WebTools.exe",
     "options": [
-        { "name": "maxWebContentLength", "label": "Maximum Processing Length for Web Content", "type": "int", "default": "8000" },
+        { "name": "maxWebContentLength", "label": "Maximum Processing Length for Web Content (0 = no limit)", "type": "int", "default": "10000" },
+        { "name": "maxLinks", "label": "Maximum Links from Webpage", "type": "int", "default": "40" },
         { "name": "maxSearchResults", "label": "Maximum Search Results", "type": "int", "default": "20" },
         { "name": "SearXNGInstance", "label": "SearXNG Instance (optional, must support JSON API)", "type": "string", "default": "" },
         { "name": "userAgent", "label": "User Agent", "type": "string", "default": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36" }
@@ -10,7 +11,7 @@
     "tools": [
         {
             "name": "read_website",
-            "description": "Browse to a specific URL/web page and return its HTML content. Always reads up to {config.maxWebContentLength} characters.",
+            "description": "Browse to a URL and return Title/Desc, page text and images (alts+srcs), and a Links section. Output is capped at {config.maxWebContentLength} characters; truncating body as needed.",
             "parameters": [
                 { "name": "URL", "type": "string", "description": "The URL of the web page to get the content of.", "required": true }
             ]
