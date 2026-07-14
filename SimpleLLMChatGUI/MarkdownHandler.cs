@@ -29,19 +29,35 @@ namespace SimpleLLMChatGUI
         private static readonly Regex HorizontalRulePattern = new Regex(@"^(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$", RegexOptions.Compiled);
         private static readonly Regex BacktickFencePattern = new Regex(@"^([^`]*:\s*)?(`{3,})([^`]*)$", RegexOptions.Compiled);
 
-        public static void ProcessMarkdown(RichTextBox chatOutput)
+        /// <summary>
+        /// Renders markdown in blocks at or after <paramref name="startBlockIndex"/>, then
+        /// advances that index to the document's block count so later passes skip already-handled content.
+        /// </summary>
+        public static void ProcessMarkdown(RichTextBox chatOutput, ref int startBlockIndex)
         {
+            if (chatOutput == null)
+                return;
+
+            List<Block> blocks = chatOutput.Document.Blocks.ToList();
+            if (startBlockIndex < 0)
+                startBlockIndex = 0;
+            if (startBlockIndex > blocks.Count)
+                startBlockIndex = blocks.Count;
+
             int activeBacktickFenceLength = 0;
             bool insideThinkTag = false;
             Brush codeBlockBrush = GetCodeBlockBrush();
             FontFamily codeBlockFontFamily = FontHandler.TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"));
 
-            // Process each paragraph in order
-            foreach (var paragraph in chatOutput.Document.Blocks.OfType<Paragraph>().ToList())
+            for (int i = startBlockIndex; i < blocks.Count; i++)
             {
-                string paragraphText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text;
+                Paragraph paragraph = blocks[i] as Paragraph;
+                if (paragraph == null)
+                    continue;
 
+                string paragraphText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text;
                 string trimmedText = paragraphText.Trim();
+
                 if (TryParseBacktickFence(trimmedText, out int fenceLength, out bool hasInfoString))
                 {
                     if (activeBacktickFenceLength == 0)
@@ -93,6 +109,10 @@ namespace SimpleLLMChatGUI
                 if (ProcessHorizontalRule(paragraph, trimmedText))
                     continue;
 
+                // Streaming AppendText leaves many Runs per line; merge before regex matching.
+                ConsolidateRuns(paragraph);
+                trimmedText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text.Trim();
+
                 // Process headers first (paragraph-level formatting)
                 ProcessHeaders(paragraph, trimmedText);
 
@@ -118,6 +138,22 @@ namespace SimpleLLMChatGUI
                 ReplaceInRuns(paragraph, ItalicPattern, match => new Run(FirstCapturedGroup(match)) { FontStyle = FontStyles.Italic });
                 ReplaceInRuns(paragraph, StrikethroughPattern, match => new Run(match.Groups[1].Value) { TextDecorations = TextDecorations.Strikethrough });
             }
+
+            startBlockIndex = blocks.Count;
+        }
+
+        private static void ConsolidateRuns(Paragraph paragraph)
+        {
+            List<Run> runs = paragraph.Inlines.OfType<Run>().ToList();
+            if (runs.Count <= 1 || runs.Count != paragraph.Inlines.Count)
+                return;
+
+            var sb = new System.Text.StringBuilder();
+            foreach (Run run in runs)
+                sb.Append(run.Text);
+
+            paragraph.Inlines.Clear();
+            paragraph.Inlines.Add(new Run(sb.ToString()));
         }
 
         private static void ProcessHeaders(Paragraph paragraph, string trimmedText)

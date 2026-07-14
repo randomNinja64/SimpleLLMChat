@@ -20,6 +20,8 @@ namespace SimpleLLMChatGUI
         private string _reasoningEffort = "";
         private TokenTracker tokenTracker;
         private ContextMenu reasoningEffortMenu;
+        // Block index in the output document already processed by MarkdownHandler
+        private int _markdownProcessedBlockCount;
 
         private static readonly KeyValuePair<string, string>[] ReasoningEffortOptions =
         {
@@ -206,7 +208,7 @@ namespace SimpleLLMChatGUI
             {
                 if (IsMarkdownParsingEnabled())
                 {
-                    MarkdownHandler.ProcessMarkdown(chatOutput);
+                    MarkdownHandler.ProcessMarkdown(chatOutput, ref _markdownProcessedBlockCount);
                 }
                 SetInputControlsEnabled(true);
                 chatInput.Focus();
@@ -367,6 +369,7 @@ namespace SimpleLLMChatGUI
             Dispatcher.BeginInvoke((Action)(() =>
             {
                 chatOutput.Document.Blocks.Clear();
+                _markdownProcessedBlockCount = 0;
                 StartLLMProcess();
                 SetInputControlsEnabled(true);
             }), System.Windows.Threading.DispatcherPriority.Background);
