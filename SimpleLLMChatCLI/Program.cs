@@ -9,6 +9,7 @@ namespace SimpleLLMChatCLI
     internal class Program
     {
         public static ConfigHandler Config;
+        public static StatusPipeServer StatusPipe;
 
         // Print interactive CLI instructions
         private static readonly string[] ValidReasoningEfforts =
@@ -65,6 +66,26 @@ namespace SimpleLLMChatCLI
             Config = new ConfigHandler(System.IO.Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
 
+            // Always-on status pipe for GUI (and optional external monitors)
+            StatusPipe = new StatusPipeServer();
+            StatusPipe.Start();
+
+            try
+            {
+                Run(args);
+            }
+            finally
+            {
+                if (StatusPipe != null)
+                {
+                    StatusPipe.Dispose();
+                    StatusPipe = null;
+                }
+            }
+        }
+
+        static void Run(string[] args)
+        {
             // Initialize tool registry and load tools from tools/ directory
             ToolRegistry registry = new ToolRegistry(Config);
             string toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
@@ -84,6 +105,9 @@ namespace SimpleLLMChatCLI
 
             // Conversation storage
             List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
+
+            // Token status starts at 0; base overhead is measured on the first real request.
+            client.PublishStatusTokens(0);
 
             bool showBanners = true;
 
@@ -202,7 +226,7 @@ namespace SimpleLLMChatCLI
                 if (userInput == "/clear")
                 {
                     conversation.Clear();
-
+                    client.PublishStatusTokens(client.GetBaseCharacterOverhead());
                     if (showBanners)
                     {
                         Console.WriteLine("Context cleared.\n");

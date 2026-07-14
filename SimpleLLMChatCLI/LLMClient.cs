@@ -14,6 +14,9 @@ public class LLMClient
     private readonly ToolRegistry registry;
     private readonly Func<string, string, bool> requestToolApproval;
 
+    // Cached sysprompt + tools schema length (NyoCoder-style base overhead).
+    private int? _baseOverheadChars;
+
     public string ReasoningEffort { get; set; }
 
     public LLMClient(ConfigHandler config, ToolRegistry registry, Func<string, string, bool> requestToolApproval = null)
@@ -82,27 +85,30 @@ public class LLMClient
         bool outputOnly,
         bool showToolOutput)
     {
-        // Add user message
-        ChatMessage userMsg = new ChatMessage
+        // If prior context is already high, summarize it silently first, then run the user prompt.
+        MaybeSummarizeInBackground(
+            conversation,
+            outputOnly,
+            "\n\n[Continue from this context. The user's next message follows.]");
+
+        conversation.Add(new ChatMessage
         {
             Role = "user",
             Content = userMessage,
             Image = image
-        };
-        conversation.Add(userMsg);
+        });
 
         while (true)
         {
+            PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+
             if (!outputOnly)
             {
                 Console.WriteLine();
                 Console.Write(assistantName + ": ");
             }
 
-            Action<string> onReasoningChunk = (!outputOnly && config.GetConfigBool("showreasoningoutput")) ? (Action<string>)Console.Write : null;
-            Action<int> onReasoningSummary = (!outputOnly && !config.GetConfigBool("showreasoningoutput")) ?
-                (Action<int>)(s => Console.WriteLine("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]")) : null;
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools, onReasoningChunk, onReasoningSummary);
+            LLMCompletionResponse response = sendMessages(conversation, enabledTools, Console.Write);
 
             if (response.FinishReason == "request_failed")
             {
@@ -190,7 +196,11 @@ public class LLMClient
                     }
                 }
 
-                // Run loop again so assistant can ingest tool output
+                // Mid-turn (after tools): compact context silently, then continue the user request.
+                MaybeSummarizeInBackground(
+                    conversation,
+                    outputOnly,
+                    "\n\n[Continue from this context. The user's original request is being processed.]");
                 continue;
             }
 
@@ -201,6 +211,7 @@ public class LLMClient
                 Content = response.Content
             };
             conversation.Add(assistantMsg);
+            PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
             
             if (!outputOnly)
             {
@@ -208,6 +219,174 @@ public class LLMClient
             }
             break;
         }
+    }
+
+    /// <summary>
+    /// If context usage is high, summarize silently (summary text is not shown) and replace
+    /// the conversation with a compact summary message.
+    /// </summary>
+    private void MaybeSummarizeInBackground(List<ChatMessage> conversation, bool outputOnly, string continueHint)
+    {
+        int statusChars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
+        PublishStatusTokens(statusChars);
+
+        if (!TokenEstimator.ShouldSummarize(statusChars, config.GetConfigInt("contextWindowSize", 0)))
+            return;
+
+        if (!outputOnly)
+        {
+            Console.WriteLine();
+            Console.WriteLine("[Context usage high - summarizing conversation...]");
+        }
+
+        string summary = SummarizeConversation(conversation);
+        if (string.IsNullOrEmpty(summary))
+            return;
+
+        conversation.Clear();
+        conversation.Add(new ChatMessage(
+            "user",
+            "[Previous conversation summary]\n" + summary + continueHint));
+
+        if (!outputOnly)
+            Console.WriteLine("[Conversation summarized - continuing...]");
+
+        PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+    }
+
+    public void PublishStatusTokens(int characterCount)
+    {
+        if (Program.StatusPipe == null)
+            return;
+
+        Program.StatusPipe.PublishStatus(TokenEstimator.ApproximateTokens(characterCount));
+    }
+
+    /// <summary>
+    /// Sum of message content and tool-call name/arguments (excludes base overhead).
+    /// </summary>
+    public static int GetConversationCharacterCount(List<ChatMessage> conversation)
+    {
+        int count = 0;
+        if (conversation == null)
+            return count;
+
+        foreach (var msg in conversation)
+        {
+            if (!string.IsNullOrEmpty(msg.Content))
+                count += msg.Content.Length;
+
+            if (msg.ToolCalls != null)
+            {
+                foreach (var toolCall in msg.ToolCalls)
+                {
+                    if (!string.IsNullOrEmpty(toolCall.Name))
+                        count += toolCall.Name.Length;
+                    if (!string.IsNullOrEmpty(toolCall.Arguments))
+                        count += toolCall.Arguments.Length;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Cached system prompt + tool schema length. 0 until the first request is built.
+    /// </summary>
+    public int GetBaseCharacterOverhead()
+    {
+        return _baseOverheadChars.HasValue ? _baseOverheadChars.Value : 0;
+    }
+
+    private string BuildSystemPrompt(List<string> enabledTools)
+    {
+        string sysprompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt")) ?? "";
+
+        if (registry != null)
+        {
+            foreach (string injection in registry.GetContextInjections(enabledTools))
+                sysprompt += "\n\n" + injection;
+        }
+
+        return sysprompt;
+    }
+
+    private JObject BuildRequestPayload(List<ChatMessage> conversation, List<string> enabledTools)
+    {
+        JObject payload = new JObject
+        {
+            ["model"] = config.GetConfigValue("model")
+        };
+
+        string systemPrompt = BuildSystemPrompt(enabledTools);
+
+        JArray messages = new JArray();
+        messages.Add(new JObject
+        {
+            ["role"] = "system",
+            ["content"] = systemPrompt
+        });
+
+        if (conversation != null)
+        {
+            foreach (var msg in conversation)
+                messages.Add(BuildMessageObject(msg));
+        }
+
+        payload["messages"] = messages;
+
+        int toolsChars = 0;
+        if (enabledTools != null && enabledTools.Count > 0 && registry != null)
+        {
+            JArray toolsArray = registry.BuildToolsArray(enabledTools);
+            if (toolsArray.Count > 0)
+            {
+                payload["tools"] = toolsArray;
+                toolsChars = toolsArray.ToString(Formatting.None).Length;
+            }
+        }
+
+        // Capture overhead from a normal request only (not summarization with tools disabled).
+        if (!_baseOverheadChars.HasValue)
+        {
+            List<string> configuredTools = config.GetConfigList("tools");
+            bool summarizationPass = (enabledTools == null || enabledTools.Count == 0)
+                && configuredTools != null && configuredTools.Count > 0;
+            if (!summarizationPass)
+                _baseOverheadChars = systemPrompt.Length + toolsChars;
+        }
+
+        payload["stream"] = true;
+
+        if (!string.IsNullOrEmpty(ReasoningEffort))
+            payload["reasoning_effort"] = ReasoningEffort;
+
+        return payload;
+    }
+
+    /// <summary>
+    /// Asks the model for a concise summary of the conversation (tools disabled).
+    /// Runs silently — summary text is not streamed to the user.
+    /// </summary>
+    public string SummarizeConversation(List<ChatMessage> conversation)
+    {
+        if (conversation == null || conversation.Count == 0)
+            return string.Empty;
+
+        List<ChatMessage> summaryConversation = new List<ChatMessage>(conversation);
+        summaryConversation.Add(new ChatMessage(
+            "user",
+            "Please provide a concise summary of our conversation so far. " +
+            "Focus on: the main topics discussed, important details or decisions, " +
+            "and anything that still needs follow-up."));
+
+        // No tools, null output — silent background pass.
+        LLMCompletionResponse response = sendMessages(summaryConversation, new List<string>(), null);
+        if (response.FinishReason == "request_failed")
+            return string.Empty;
+
+        return response.Content ?? string.Empty;
     }
 
 
@@ -294,62 +473,15 @@ public class LLMClient
         return msgObj;
     }
 
-    LLMCompletionResponse sendMessages(List<ChatMessage> conversation, List<string> enabledTools, Action<string> onReasoningChunk, Action<int> onReasoningSummary)
+    LLMCompletionResponse sendMessages(
+        List<ChatMessage> conversation,
+        List<string> enabledTools,
+        Action<string> outputCallback = null)
     {
-        // Build payload
-        JObject payload = new JObject
-        {
-            ["model"] = config.GetConfigValue("model")
-        };
-
-        // Messages
-        JArray messages = new JArray();
-
-        // System message
-        string sysprompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"));
-
-        // Context from tools
-        if (registry != null)
-        {
-            foreach (string injection in registry.GetContextInjections(enabledTools))
-                sysprompt += "\n\n" + injection;
-        }
-
-        JObject systemMsg = new JObject
-        {
-            ["role"] = "system",
-            ["content"] = sysprompt
-        };
-        messages.Add(systemMsg);
-
-        // Process all user messages in the conversation list
-        if (conversation != null)
-        {
-            foreach (var msg in conversation)
-            {
-                messages.Add(BuildMessageObject(msg));
-            }
-        }
-
-        payload["messages"] = messages;
-
-        // Add tools if any are enabled
-        if (enabledTools != null && enabledTools.Count > 0 && registry != null)
-        {
-            JArray toolsArray = registry.BuildToolsArray(enabledTools);
-            if (toolsArray.Count > 0)
-                payload["tools"] = toolsArray;
-        }
-
-        payload["stream"] = true;
-
-        if (!string.IsNullOrEmpty(ReasoningEffort))
-            payload["reasoning_effort"] = ReasoningEffort;
-
-        return SendHttpRequest(payload, onReasoningChunk, onReasoningSummary);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback);
     }
 
-    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> onReasoningChunk, Action<int> onReasoningSummary)
+    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null)
     {
         LLMCompletionResponse completionResponse = new LLMCompletionResponse
         {
@@ -357,6 +489,16 @@ public class LLMClient
             ToolCalls = new List<ToolRegistry.ToolCall>(),
             FinishReason = string.Empty
         };
+
+        // NyoCoder-style: wire reasoning from config when streaming output is enabled.
+        bool showReasoning = outputCallback != null && config.GetConfigBool("showreasoningoutput");
+        Action<string> onReasoningChunk = showReasoning ? outputCallback : null;
+        Action<int> onReasoningSummary = null;
+        if (outputCallback != null && !showReasoning)
+        {
+            onReasoningSummary = s => Console.WriteLine(
+                "[thought for " + s + " second" + (s == 1 ? "" : "s") + "]");
+        }
 
         try
         {
@@ -377,7 +519,7 @@ public class LLMClient
             using (var responseStream = httpResponse.GetResponseStream())
             using (var reader = new StreamReader(responseStream, Encoding.UTF8))
             {
-                completionResponse = SseStreamParser.Parse(reader, onReasoningChunk, onReasoningSummary);
+                completionResponse = SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary);
             }
         }
         catch (Exception ex)
@@ -402,7 +544,7 @@ public class LLMClient
             string serverUrl = config.GetConfigValue("llmserver") ?? "";
             string curlPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "curl.exe");
             if (serverUrl.StartsWith("https:", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(curlPath) && ShouldFallbackToCurl(ex))
-                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, onReasoningChunk, onReasoningSummary);
+                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }

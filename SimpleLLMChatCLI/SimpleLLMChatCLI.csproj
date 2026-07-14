@@ -65,6 +65,12 @@
     <Compile Include="..\Shared\ManifestScanner.cs">
       <Link>Shared\ManifestScanner.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\TokenEstimator.cs">
+      <Link>Shared\TokenEstimator.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe.cs">
+      <Link>Shared\StatusPipe.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

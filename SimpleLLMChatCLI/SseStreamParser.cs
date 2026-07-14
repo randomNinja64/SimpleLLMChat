@@ -10,6 +10,7 @@ namespace SimpleLLMChatCLI
     {
         public static LLMClient.LLMCompletionResponse Parse(
             TextReader reader,
+            Action<string> onContentChunk,
             Action<string> onReasoningChunk,
             Action<int> onReasoningSummary)
         {
@@ -36,7 +37,8 @@ namespace SimpleLLMChatCLI
 
                 if (jsonPart.Contains("\"error\""))
                 {
-                    Console.Write("[API Error] " + jsonPart.Trim() + "\n");
+                    if (onContentChunk != null)
+                        onContentChunk("[API Error] " + jsonPart.Trim() + "\n");
                     continue;
                 }
 
@@ -49,7 +51,7 @@ namespace SimpleLLMChatCLI
                     foreach (JObject choice in choices)
                     {
                         ProcessChoice(choice, ref response, output, ref inReasoning, ref firstContent,
-                            ref reasoningStart, partialToolCalls, onReasoningChunk, onReasoningSummary);
+                            ref reasoningStart, partialToolCalls, onContentChunk, onReasoningChunk, onReasoningSummary);
                     }
                 }
                 catch
@@ -73,6 +75,7 @@ namespace SimpleLLMChatCLI
             ref bool firstContent,
             ref DateTime reasoningStart,
             Dictionary<int, ToolRegistry.ToolCall> partialToolCalls,
+            Action<string> onContentChunk,
             Action<string> onReasoningChunk,
             Action<int> onReasoningSummary)
         {
@@ -118,13 +121,13 @@ namespace SimpleLLMChatCLI
                     if (content.Length > 0)
                     {
                         firstContent = false;
-                        Console.Write(content);
+                        onContentChunk?.Invoke(content);
                         output.Append(content);
                     }
                 }
                 else
                 {
-                    Console.Write(content);
+                    onContentChunk?.Invoke(content);
                     output.Append(content);
                 }
             }

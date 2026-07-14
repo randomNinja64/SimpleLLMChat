@@ -86,7 +86,14 @@
     <Compile Include="..\Shared\ManifestScanner.cs">
       <Link>Shared\ManifestScanner.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\TokenEstimator.cs">
+      <Link>Shared\TokenEstimator.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe.cs">
+      <Link>Shared\StatusPipe.cs</Link>
+    </Compile>
     <Compile Include="ToolOptionsRegistry.cs" />
+    <Compile Include="TokenTracker.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

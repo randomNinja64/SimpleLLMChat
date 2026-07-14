@@ -19,6 +19,7 @@ namespace SimpleLLMChatGUI
         private bool suppressAttachDialog;
         private bool suppressReasoningEffortChange;
         private string _reasoningEffort = "";
+        private TokenTracker tokenTracker;
 
         private static readonly KeyValuePair<string, string>[] ReasoningEffortOptions =
         {
@@ -59,6 +60,7 @@ namespace SimpleLLMChatGUI
             LoadAndApplyFontSize();
             LoadAndApplyColors();
             LoadReasoningEffortSelection();
+            tokenTracker = new TokenTracker(tokenStatusText);
             StartLLMProcess();
         }
 
@@ -113,6 +115,10 @@ namespace SimpleLLMChatGUI
             processHandler.ErrorOccurred += OnErrorOccurred;
             processHandler.GenerationComplete += OnGenerationComplete;
             processHandler.ApprovalRequested += OnApprovalRequested;
+            processHandler.StatusReceived += OnStatusReceived;
+
+            if (tokenTracker != null)
+                tokenTracker.Reset();
 
             // Start the process
             if (!processHandler.StartProcess("SimpleLLMChatCLI.exe"))
@@ -125,10 +131,20 @@ namespace SimpleLLMChatGUI
                 processHandler.SendReasoningEffort(_reasoningEffort);
         }
 
+        private void OnStatusReceived(int tokens)
+        {
+            // Fire-and-forget: never block the pipe reader on the UI thread.
+            Dispatcher.BeginInvoke((Action)(() =>
+            {
+                if (tokenTracker != null)
+                    tokenTracker.SetTokens(tokens);
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         private void OnOutputReceived(string text)
         {
-            // Display the text immediately on the UI thread
-            Dispatcher.Invoke((Action)(() =>
+            // BeginInvoke so stdout reading is not gated behind UI paint/scroll work.
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 // Add a blank line before the first bot response after clearing
                 if (chatOutput.Document.Blocks.Count == 1)
@@ -142,7 +158,7 @@ namespace SimpleLLMChatGUI
         }
         private void OnErrorOccurred(string errorMessage)
         {
-            Dispatcher.Invoke((Action)(() =>
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 MessageBox.Show(errorMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }));
@@ -167,7 +183,7 @@ namespace SimpleLLMChatGUI
 
         private void OnGenerationComplete()
         {
-            Dispatcher.Invoke((Action)(() =>
+            Dispatcher.BeginInvoke((Action)(() =>
             {
                 if (IsMarkdownParsingEnabled())
                 {
@@ -360,6 +376,8 @@ namespace SimpleLLMChatGUI
                 FontHandler.ApplyFontToWindow(this);
                 LoadAndApplyFontSize();
                 LoadAndApplyColors();
+                if (tokenTracker != null)
+                    tokenTracker.Refresh();
                 processHandler = null; // Options disposes the process on save
                 ClearChatAndRestart();
             }

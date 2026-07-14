@@ -61,6 +61,7 @@ SimpleLLMChat can be configured either using the GUI options pages or manually v
 - `llmserver`: Base URL of the OpenAI-compatible endpoint
 - `model`: Model name to use for text generation (if supported by the endpoint)
 - `sysprompt`: System prompt for the LLM
+- `contextWindowSize`: If known, can be set here to enable automatic context summarization when context fills
 
 **Tools**
 - `tools`: Comma-separated list of tools the AI is allowed to use

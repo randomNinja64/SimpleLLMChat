@@ -126,6 +126,12 @@
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"/>
 
+                    <!-- Context Window Size -->
+                    <Label Content="Context Window Size (tokens):"/>
+                    <TextBox x:Name="ContextWindowSizeTextBox"
+                             Text="{Binding ContextWindowSize, UpdateSourceTrigger=PropertyChanged}"
+                             Height="23"/>
+
                 </StackPanel>
             </ScrollViewer>
 

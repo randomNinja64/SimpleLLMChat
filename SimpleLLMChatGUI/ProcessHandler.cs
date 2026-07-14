@@ -17,8 +17,10 @@ namespace SimpleLLMChatGUI
         public event Action<string> ErrorOccurred;
         public event Action GenerationComplete;
         public event Func<string, string, bool> ApprovalRequested;
+        public event Action<int> StatusReceived;
 
         private readonly StringBuilder streamBuffer = new StringBuilder();
+        private StatusPipeClient statusPipeClient;
 
         public bool IsProcessRunning
         {
@@ -33,6 +35,8 @@ namespace SimpleLLMChatGUI
         {
             try
             {
+                DisposeStatusPipeClient();
+
                 llmProcess = new Process();
                 llmProcess.StartInfo.FileName = executablePath;
                 llmProcess.StartInfo.UseShellExecute = false;
@@ -43,6 +47,10 @@ namespace SimpleLLMChatGUI
                 textBuffer.Clear();
                 streamBuffer.Clear();
                 llmProcess.Start();
+
+                statusPipeClient = new StatusPipeClient(llmProcess.Id);
+                statusPipeClient.StatusReceived += OnStatusPipeReceived;
+                statusPipeClient.Start();
 
                 // 256 byte async buffer
                 var buffer = new byte[256];
@@ -55,6 +63,23 @@ namespace SimpleLLMChatGUI
             {
                 ErrorOccurred?.Invoke("Failed to start process: " + ex.Message);
                 return false;
+            }
+        }
+
+        private void OnStatusPipeReceived(int tokens)
+        {
+            Action<int> handler = StatusReceived;
+            if (handler != null)
+                handler(tokens);
+        }
+
+        private void DisposeStatusPipeClient()
+        {
+            if (statusPipeClient != null)
+            {
+                statusPipeClient.StatusReceived -= OnStatusPipeReceived;
+                statusPipeClient.Dispose();
+                statusPipeClient = null;
             }
         }
 
@@ -388,10 +413,12 @@ namespace SimpleLLMChatGUI
                 return;
 
             disposed = true;
+            DisposeStatusPipeClient();
             OutputReceived = null;
             ErrorOccurred = null;
             GenerationComplete = null;
             ApprovalRequested = null;
+            StatusReceived = null;
             if (llmProcess != null && !llmProcess.HasExited)
             {
                 try { llmProcess.Kill(); }

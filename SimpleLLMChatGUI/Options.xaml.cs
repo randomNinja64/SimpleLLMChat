@@ -16,6 +16,7 @@ namespace SimpleLLMChatGUI
         private string _apiKey;
         private string _model;
         private string _sysPrompt;
+        private int _contextWindowSize;
         private string _assistantName;
         private bool _showToolOutput;
         private bool _showReasoningOutput;
@@ -72,6 +73,12 @@ namespace SimpleLLMChatGUI
         {
             get { return _sysPrompt; }
             set { _sysPrompt = value; OnPropertyChanged(nameof(SysPrompt)); }
+        }
+
+        public int ContextWindowSize
+        {
+            get { return _contextWindowSize; }
+            set { _contextWindowSize = value; OnPropertyChanged(nameof(ContextWindowSize)); }
         }
 
         public string AssistantName
@@ -143,6 +150,7 @@ namespace SimpleLLMChatGUI
             ApiKey = "";
             Model = "";
             SysPrompt = "";
+            ContextWindowSize = 0;
             AssistantName = "";
             ShowToolOutput = true;
             ShowReasoningOutput = true;
@@ -227,6 +235,7 @@ namespace SimpleLLMChatGUI
             ApiKey = config.GetConfigValue("apikey");
             Model = config.GetConfigValue("model");
             SysPrompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"));
+            ContextWindowSize = config.GetConfigInt("contextWindowSize", 0);
             AssistantName = config.GetConfigValue("assistantname");
             ShowToolOutput = config.GetConfigBool("showtooloutput");
             ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
@@ -292,6 +301,7 @@ namespace SimpleLLMChatGUI
             var systemLines = new List<string>
             {
                 "apikey=" + ApiKey,
+                "contextWindowSize=" + ContextWindowSize,
                 "llmserver=" + ServerURL,
                 "model=" + Model,
                 "sysprompt=\"" + EscapePromptForStorage(SysPrompt) + "\"", // keep quotes around prompt; escape sequences encoded

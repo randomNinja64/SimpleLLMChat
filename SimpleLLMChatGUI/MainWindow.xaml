@@ -12,6 +12,8 @@
             <!-- Chat output -->
             <RowDefinition Height="58" />
             <!-- Chat input + button (2 button rows + padding) -->
+            <RowDefinition Height="Auto" />
+            <!-- Token status bar -->
         </Grid.RowDefinitions>
 
         <!-- Top bar -->
@@ -135,5 +137,27 @@
                     VerticalAlignment="Stretch"
                     Click="sendButton_Click" />
         </Grid>
+
+        <!-- Status bar -->
+        <StatusBar Grid.Row="3" Margin="0" Padding="0"
+                   Background="Transparent"
+                   Foreground="{DynamicResource LabelTextColorBrush}">
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <!-- Left items go in column 0 -->
+            <StatusBarItem Grid.Column="1" Padding="0" Margin="0" HorizontalAlignment="Right">
+                <TextBlock Name="tokenStatusText"
+                           Text="Tokens: ~0"
+                           FontSize="11" />
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
