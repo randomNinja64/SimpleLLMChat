@@ -14,7 +14,9 @@ namespace SimpleLLMChatCLI
             string serverUrl, string apiKey, JObject payload,
             Action<string> outputCallback,
             Action<string> onReasoningChunk,
-            Action<int> onReasoningSummary)
+            Action<int> onReasoningSummary,
+            Action onContentStart = null,
+            Action startBlock = null)
         {
             // Use a Windows named pipe so curl can read the JSON body as a file
             // from memory without touching disk, avoiding stdin pipe deadlock issues.
@@ -60,7 +62,7 @@ namespace SimpleLLMChatCLI
                         pipeThread.Start();
 
                         LLMClient.LLMCompletionResponse result = SseStreamParser.Parse(
-                            process.StandardOutput, outputCallback, onReasoningChunk, onReasoningSummary);
+                            process.StandardOutput, outputCallback, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
 
                         pipeThread.Join(5000);
                         process.WaitForExit();

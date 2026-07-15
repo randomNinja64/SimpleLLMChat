@@ -81,15 +81,18 @@ namespace SimpleLLMChatGUI
                     }
                 }
 
-                // Check for think tag markers (case-insensitive)
-                if (paragraphText.IndexOf("<think>", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    insideThinkTag = true;
-                    continue;
-                }
-                if (paragraphText.IndexOf("</think>", StringComparison.OrdinalIgnoreCase) >= 0)
+                // Check for think tag markers (case-insensitive).
+                // Closing tags first: "[/thinking]" also contains "[thinking]".
+                if (paragraphText.IndexOf("</think>", StringComparison.OrdinalIgnoreCase) >= 0
+                    || paragraphText.IndexOf("[/thinking]", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     insideThinkTag = false;
+                    continue;
+                }
+                if (paragraphText.IndexOf("<think>", StringComparison.OrdinalIgnoreCase) >= 0
+                    || paragraphText.IndexOf("[thinking]", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    insideThinkTag = true;
                     continue;
                 }
 

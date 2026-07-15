@@ -23,7 +23,7 @@ public class LLMClient
     {
         this.registry = registry;
         this.config = config;
-        this.requestToolApproval = requestToolApproval ?? ToolApproval.RequestApproval;
+        this.requestToolApproval = requestToolApproval ?? CliRequestApproval;
         // Enable modern TLS protocols for HTTPS support
         // .NET 4.0 only has named constant for Tls (1.0)
         // Tls11 = 768, Tls12 = 3072, Tls13 = 12288 (numeric values used until .NET 4.5+)
@@ -98,21 +98,48 @@ public class LLMClient
             Image = image
         });
 
+        // The assistant name is printed once per turn:
+        //   "LLM: output"  when the response starts with plain output, or
+        //   "LLM:" on its own block when a [thinking]/[tool ...] block comes first.
+        bool assistantHeaderPrinted = false;
+        Action startBlock = null;
+        Action onContentStart = null;
+        if (!outputOnly)
+        {
+            // Runs before tagged blocks ([thinking], [thought for ...], [tool ...], errors).
+            startBlock = () =>
+            {
+                ChatOutput.StartBlock();
+                if (!assistantHeaderPrinted)
+                {
+                    assistantHeaderPrinted = true;
+                    ChatOutput.WriteLine(assistantName + ":");
+                    ChatOutput.StartBlock();
+                }
+            };
+            // Runs before the first content chunk of each response.
+            onContentStart = () =>
+            {
+                ChatOutput.StartBlock();
+                if (!assistantHeaderPrinted)
+                {
+                    assistantHeaderPrinted = true;
+                    ChatOutput.Write(assistantName + ": ");
+                }
+            };
+        }
+
         while (true)
         {
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
-            if (!outputOnly)
-            {
-                Console.WriteLine();
-                Console.Write(assistantName + ": ");
-            }
-
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools, Console.Write);
+            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, onContentStart, startBlock);
 
             if (response.FinishReason == "request_failed")
             {
-                Console.WriteLine("Request to LLM Failed (" + response.Content + ")");
+                if (!outputOnly)
+                    ChatOutput.StartBlock();
+                ChatOutput.WriteLine("Request to LLM Failed (" + response.Content + ")");
                 break;
             }
 
@@ -133,7 +160,8 @@ public class LLMClient
 
                     if (!outputOnly)
                     {
-                        Console.WriteLine("\n[tool request] " + call.Name + " with arguments: " + call.Arguments);
+                        startBlock();
+                        ChatOutput.WriteLine("[tool request] " + call.Name + " with arguments: " + call.Arguments);
                     }
 
                     int exitCode = 0;
@@ -179,19 +207,20 @@ public class LLMClient
 
                     if (!outputOnly)
                     {
-                        Console.WriteLine("[tool output]");
+                        startBlock();
+                        ChatOutput.WriteLine("[tool output]");
                         if (showToolOutput)
                         {
-                            Console.Write(toolContent);
+                            ChatOutput.Write(toolContent);
                             if (!toolContent.EndsWith("\n"))
                             {
-                                Console.WriteLine(); // Add newline if not present
+                                ChatOutput.WriteLine(); // Add newline if not present
                             }
                         }
                         else
                         {
                             // Show only the exit code
-                            Console.WriteLine("Exit Code: " + exitCode);
+                            ChatOutput.WriteLine("Exit Code: " + exitCode);
                         }
                     }
                 }
@@ -212,10 +241,10 @@ public class LLMClient
             };
             conversation.Add(assistantMsg);
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
-            
+
             if (!outputOnly)
             {
-                Console.WriteLine(); // Add newline after assistant response
+                ChatOutput.EndLine(); // Terminate the response line if the model didn't
             }
             break;
         }
@@ -235,8 +264,8 @@ public class LLMClient
 
         if (!outputOnly)
         {
-            Console.WriteLine();
-            Console.WriteLine("[Context usage high - summarizing conversation...]");
+            ChatOutput.StartBlock();
+            ChatOutput.WriteLine("[Context usage high - summarizing conversation...]");
         }
 
         string summary = SummarizeConversation(conversation);
@@ -249,7 +278,7 @@ public class LLMClient
             "[Previous conversation summary]\n" + summary + continueHint));
 
         if (!outputOnly)
-            Console.WriteLine("[Conversation summarized - continuing...]");
+            ChatOutput.WriteLine("[Conversation summarized - continuing...]");
 
         PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
     }
@@ -476,12 +505,15 @@ public class LLMClient
     LLMCompletionResponse sendMessages(
         List<ChatMessage> conversation,
         List<string> enabledTools,
-        Action<string> outputCallback = null)
+        Action<string> outputCallback = null,
+        Action onContentStart = null,
+        Action startBlock = null)
     {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback, onContentStart, startBlock);
     }
 
-    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null)
+    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null,
+        Action onContentStart = null, Action startBlock = null)
     {
         LLMCompletionResponse completionResponse = new LLMCompletionResponse
         {
@@ -496,8 +528,11 @@ public class LLMClient
         Action<int> onReasoningSummary = null;
         if (outputCallback != null && !showReasoning)
         {
-            onReasoningSummary = s => Console.WriteLine(
-                "[thought for " + s + " second" + (s == 1 ? "" : "s") + "]");
+            onReasoningSummary = s =>
+            {
+                startBlock?.Invoke();
+                outputCallback("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]\n");
+            };
         }
 
         try
@@ -519,7 +554,7 @@ public class LLMClient
             using (var responseStream = httpResponse.GetResponseStream())
             using (var reader = new StreamReader(responseStream, Encoding.UTF8))
             {
-                completionResponse = SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary);
+                completionResponse = SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
             }
         }
         catch (Exception ex)
@@ -544,12 +579,52 @@ public class LLMClient
             string serverUrl = config.GetConfigValue("llmserver") ?? "";
             string curlPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "curl.exe");
             if (serverUrl.StartsWith("https:", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(curlPath) && ShouldFallbackToCurl(ex))
-                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary);
+                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }
 
         return completionResponse;
+    }
+
+    /// <summary>
+    /// Console approval prompt routed through ChatOutput so block spacing stays
+    /// accurate. Same wire format as ToolApproval.RequestApproval (the GUI
+    /// parses the "Run tool:" ... "Approve? (Y/N): " block from stdout).
+    /// </summary>
+    private static bool CliRequestApproval(string toolName, string arguments)
+    {
+        ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments));
+        Console.Out.Flush();
+
+        while (true)
+        {
+            ChatOutput.Write(ToolApproval.ApprovalPrompt);
+            Console.Out.Flush();
+
+            string input = Console.ReadLine();
+            ChatOutput.EndInputLine();
+            if (input == null)
+                continue;
+
+            input = input.Trim();
+            if (input.Length == 0)
+                continue;
+
+            if (string.Equals(input, "Y", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(input, "yes", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(input, "N", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(input, "no", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            ChatOutput.WriteLine("Please enter Y or N.");
+        }
     }
 
     private static bool ShouldFallbackToCurl(Exception ex)

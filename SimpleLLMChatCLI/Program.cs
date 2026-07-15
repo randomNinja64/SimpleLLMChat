@@ -19,11 +19,11 @@ namespace SimpleLLMChatCLI
 
         static void PrintCliInstructions()
         {
-            Console.WriteLine("=== SimpleLLMChat CLI ===");
-            Console.WriteLine("Type '/exit' to quit.");
-            Console.WriteLine("Type '/clear' to reset the chat.");
-            Console.WriteLine("Type '/image \"path\" prompt' to send an image.");
-            Console.WriteLine("Type '/reasoning <effort>' to set reasoning effort; '/reasoning' alone uses the API default.");
+            ChatOutput.WriteLine("=== SimpleLLMChat CLI ===");
+            ChatOutput.WriteLine("Type '/exit' to quit.");
+            ChatOutput.WriteLine("Type '/clear' to reset the chat.");
+            ChatOutput.WriteLine("Type '/image \"path\" prompt' to send an image.");
+            ChatOutput.WriteLine("Type '/reasoning <effort>' to set reasoning effort; '/reasoning' alone uses the API default.");
         }
 
         static bool TryParseImageCommand(string input, out string imagePath, out string textPrompt)
@@ -212,11 +212,19 @@ namespace SimpleLLMChatCLI
 
             while (true)
             {
-                Console.Write("You: ");
+                // Pad to exactly one blank line before the prompt, regardless of
+                // how the previous turn's output ended.
+                ChatOutput.StartBlock();
+                ChatOutput.Write("You: ");
                 string userInput = Console.ReadLine();
+                ChatOutput.EndInputLine();
 
                 if (userInput == null)
+                {
+                    // No Enter was echoed; don't pad the re-prompt.
+                    ChatOutput.MarkSeparated();
                     continue;
+                }
 
                 userInput = userInput.Replace("<<NEWLINE>>", "\n");
 
@@ -229,7 +237,7 @@ namespace SimpleLLMChatCLI
                     client.PublishStatusTokens(client.GetBaseCharacterOverhead());
                     if (showBanners)
                     {
-                        Console.WriteLine("Context cleared.\n");
+                        ChatOutput.WriteLine("Context cleared.\n");
                         PrintCliInstructions();
                     }
                     continue;
@@ -238,13 +246,14 @@ namespace SimpleLLMChatCLI
                 if (userInput == "/reasoning" || userInput.StartsWith("/reasoning "))
                 {
                     string effort = userInput.Length > 11 ? userInput.Substring(11).Trim() : string.Empty;
-                    if (!string.IsNullOrEmpty(effort) && !IsValidReasoningEffort(effort))
-                    {
+                    if (string.IsNullOrEmpty(effort) || IsValidReasoningEffort(effort))
+                        client.ReasoningEffort = string.IsNullOrEmpty(effort) ? null : effort;
+                    else
                         Console.Error.WriteLine("Error: Invalid reasoning effort. Valid values: none, minimal, low, medium, high, xhigh.");
-                        continue;
-                    }
 
-                    client.ReasoningEffort = string.IsNullOrEmpty(effort) ? null : effort;
+                    // Silent command (the GUI sends this programmatically): produce no
+                    // stdout, and don't pad the re-prompt with a separator newline.
+                    ChatOutput.MarkSeparated();
                     continue;
                 }
 
@@ -278,8 +287,6 @@ namespace SimpleLLMChatCLI
                                 toolsRequiringApproval,
                                 false,
                                 showToolOutput);
-
-                Console.WriteLine();
             }
         }
     }

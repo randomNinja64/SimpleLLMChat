@@ -12,7 +12,9 @@ namespace SimpleLLMChatCLI
             TextReader reader,
             Action<string> onContentChunk,
             Action<string> onReasoningChunk,
-            Action<int> onReasoningSummary)
+            Action<int> onReasoningSummary,
+            Action onContentStart = null,
+            Action startBlock = null)
         {
             LLMClient.LLMCompletionResponse response = new LLMClient.LLMCompletionResponse
             {
@@ -25,6 +27,7 @@ namespace SimpleLLMChatCLI
             Dictionary<int, ToolRegistry.ToolCall> partialToolCalls = new Dictionary<int, ToolRegistry.ToolCall>();
             bool inReasoning = false;
             bool firstContent = true;
+            bool reasoningEndedWithNewline = false;
             DateTime reasoningStart = DateTime.MinValue;
 
             string line;
@@ -38,7 +41,10 @@ namespace SimpleLLMChatCLI
                 if (jsonPart.Contains("\"error\""))
                 {
                     if (onContentChunk != null)
+                    {
+                        startBlock?.Invoke();
                         onContentChunk("[API Error] " + jsonPart.Trim() + "\n");
+                    }
                     continue;
                 }
 
@@ -51,7 +57,8 @@ namespace SimpleLLMChatCLI
                     foreach (JObject choice in choices)
                     {
                         ProcessChoice(choice, ref response, output, ref inReasoning, ref firstContent,
-                            ref reasoningStart, partialToolCalls, onContentChunk, onReasoningChunk, onReasoningSummary);
+                            ref reasoningEndedWithNewline, ref reasoningStart, partialToolCalls,
+                            onContentChunk, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
                     }
                 }
                 catch
@@ -60,7 +67,8 @@ namespace SimpleLLMChatCLI
                 }
             }
 
-            CloseReasoningBlock(ref response, inReasoning, reasoningStart, onReasoningChunk, onReasoningSummary);
+            CloseReasoningBlock(ref response, inReasoning, reasoningEndedWithNewline, reasoningStart,
+                onReasoningChunk, onReasoningSummary);
 
             response.ToolCalls.AddRange(partialToolCalls.Values);
             response.Content = output.ToString();
@@ -73,11 +81,14 @@ namespace SimpleLLMChatCLI
             StringBuilder output,
             ref bool inReasoning,
             ref bool firstContent,
+            ref bool reasoningEndedWithNewline,
             ref DateTime reasoningStart,
             Dictionary<int, ToolRegistry.ToolCall> partialToolCalls,
             Action<string> onContentChunk,
             Action<string> onReasoningChunk,
-            Action<int> onReasoningSummary)
+            Action<int> onReasoningSummary,
+            Action onContentStart,
+            Action startBlock)
         {
             string reasoningChunk = (string)choice["delta"]?["reasoning_content"]
                 ?? (string)choice["delta"]?["reasoning"];
@@ -85,8 +96,14 @@ namespace SimpleLLMChatCLI
             {
                 if (onReasoningChunk != null)
                 {
-                    if (!inReasoning) { Console.Write("[thinking]\n"); inReasoning = true; }
+                    if (!inReasoning)
+                    {
+                        startBlock?.Invoke();
+                        onReasoningChunk("[thinking]\n");
+                        inReasoning = true;
+                    }
                     onReasoningChunk(reasoningChunk);
+                    reasoningEndedWithNewline = reasoningChunk.EndsWith("\n");
                 }
                 else if (!inReasoning)
                 {
@@ -102,9 +119,7 @@ namespace SimpleLLMChatCLI
                 {
                     if (onReasoningChunk != null)
                     {
-                        Console.Write("\n[/thinking]");
-                        Console.WriteLine();
-                        Console.WriteLine();
+                        EmitReasoningClose(onReasoningChunk, reasoningEndedWithNewline);
                         firstContent = true;
                     }
                     else
@@ -121,6 +136,9 @@ namespace SimpleLLMChatCLI
                     if (content.Length > 0)
                     {
                         firstContent = false;
+                        // Lets the caller pad the block and decide whether to
+                        // print the assistant name prefix before the first chunk.
+                        onContentStart?.Invoke();
                         onContentChunk?.Invoke(content);
                         output.Append(content);
                     }
@@ -166,16 +184,14 @@ namespace SimpleLLMChatCLI
 
         private static void CloseReasoningBlock(
             ref LLMClient.LLMCompletionResponse response,
-            bool inReasoning, DateTime reasoningStart,
+            bool inReasoning, bool reasoningEndedWithNewline, DateTime reasoningStart,
             Action<string> onReasoningChunk, Action<int> onReasoningSummary)
         {
             if (!inReasoning) return;
 
             if (onReasoningChunk != null)
             {
-                Console.Write("\n[/thinking]");
-                Console.WriteLine();
-                Console.WriteLine();
+                EmitReasoningClose(onReasoningChunk, reasoningEndedWithNewline);
             }
             else
             {
@@ -183,6 +199,15 @@ namespace SimpleLLMChatCLI
                 response.ReasoningSeconds = secs;
                 onReasoningSummary?.Invoke(secs);
             }
+        }
+
+        /// <summary>
+        /// Closes an open [thinking] block on its own line. The blank line that
+        /// separates it from the next block is added by the caller's StartBlock.
+        /// </summary>
+        private static void EmitReasoningClose(Action<string> onReasoningChunk, bool reasoningEndedWithNewline)
+        {
+            onReasoningChunk(reasoningEndedWithNewline ? "[/thinking]\n" : "\n[/thinking]\n");
         }
     }
 }
