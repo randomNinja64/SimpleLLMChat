@@ -157,11 +157,15 @@ public class LLMClient
                 for (int i = 0; i < response.ToolCalls.Count; i++)
                 {
                     ToolRegistry.ToolCall call = response.ToolCalls[i];
+                    bool needsApproval = toolsRequiringApproval != null
+                        && toolsRequiringApproval.Contains(call.Name);
 
                     if (!outputOnly)
                     {
                         startBlock();
-                        ChatOutput.WriteLine("[tool request] " + call.Name + " with arguments: " + call.Arguments);
+                        // Approval prompt already shows name + args; avoid duplicating them.
+                        if (!needsApproval)
+                            ChatOutput.WriteLine("[tool request] " + call.Name + " with arguments: " + call.Arguments);
                     }
 
                     int exitCode = 0;
@@ -176,7 +180,7 @@ public class LLMClient
                             exitCode
                         );
                     }
-                    else if (toolsRequiringApproval != null && toolsRequiringApproval.Contains(call.Name))
+                    else if (needsApproval)
                     {
                         if (requestToolApproval(call.Name, call.Arguments))
                         {

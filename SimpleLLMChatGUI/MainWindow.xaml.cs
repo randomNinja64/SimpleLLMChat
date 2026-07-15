@@ -64,7 +64,18 @@ namespace SimpleLLMChatGUI
             UpdateReasoningEffortLabel();
             BuildReasoningEffortMenu();
             tokenTracker = new TokenTracker(tokenStatusText);
-            StartLLMProcess();
+
+            // Gate send until the CLI is up; leave input/attach usable meanwhile.
+            sendButton.IsEnabled = false;
+
+            // After first paint: Process.Start can take 100–1000ms and would white-out Loaded.
+            EventHandler onRendered = null;
+            onRendered = (s, args) =>
+            {
+                ContentRendered -= onRendered;
+                StartLLMProcess();
+            };
+            ContentRendered += onRendered;
         }
 
         private void UpdateReasoningEffortLabel()
@@ -151,6 +162,9 @@ namespace SimpleLLMChatGUI
 
             if (!string.IsNullOrEmpty(_reasoningEffort))
                 processHandler.SendReasoningEffort(_reasoningEffort);
+
+            SetInputControlsEnabled(true);
+            chatInput.Focus();
         }
 
         private void OnStatusReceived(int tokens)
@@ -261,7 +275,7 @@ namespace SimpleLLMChatGUI
             // Disable input controls while LLM is generating
             SetInputControlsEnabled(false);
 
-            if (processHandler.IsProcessRunning)
+            if (processHandler != null && processHandler.IsProcessRunning)
             {
                 if (imageHandler?.IsImageAttached == true && !string.IsNullOrEmpty(imageHandler.AttachedImagePath))
                 {
@@ -293,7 +307,7 @@ namespace SimpleLLMChatGUI
             else
             {
                 MessageBox.Show("Error: CLI is not running!");
-                SetInputControlsEnabled(true);
+                SetInputControlsEnabled(false);
                 chatInput.Clear();
             }
         }
@@ -370,8 +384,8 @@ namespace SimpleLLMChatGUI
             {
                 chatOutput.Document.Blocks.Clear();
                 _markdownProcessedBlockCount = 0;
+                SetInputControlsEnabled(false);
                 StartLLMProcess();
-                SetInputControlsEnabled(true);
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 

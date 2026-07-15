@@ -15,19 +15,22 @@ public static class ToolApproval
         if (string.IsNullOrEmpty(arguments))
             return string.Empty;
 
+        // Collapse literal backslashes first so path fragments like \test
+        // are not mistaken for \t / \n / \r escapes.
         return arguments
+            .Replace("\\\\", "\u0000")
             .Replace("\\n", "\n")
             .Replace("\\r", "\r")
             .Replace("\\t", "\t")
             .Replace("\\\"", "\"")
             .Replace("\\'", "'")
-            .Replace("\\\\", "\\");
+            .Replace("\u0000", "\\");
     }
 
     public static string FormatApprovalMessage(string toolName, string arguments)
     {
         string formattedArguments = UnescapeArguments(arguments);
-        return RunToolPrefix + toolName + "\n\n" + ArgumentsPrefix + "\n" + formattedArguments;
+        return RunToolPrefix + toolName + "\n" + formattedArguments;
     }
 
     public static bool RequestApproval(string toolName, string arguments)
@@ -89,16 +92,18 @@ public static class ToolApproval
 
         toolName = block.Substring(nameStart, nameEnd - nameStart).Trim();
 
-        int argsLabel = block.IndexOf(ArgumentsPrefix, nameEnd, StringComparison.Ordinal);
-        if (argsLabel < 0)
-            return false;
+        string rest = block.Substring(nameEnd + 1);
 
-        int argsStart = block.IndexOf('\n', argsLabel);
-        if (argsStart < 0)
-            return false;
-        argsStart++;
+        // Older format inserted a "With arguments:" label before the payload.
+        if (rest.StartsWith(ArgumentsPrefix, StringComparison.Ordinal))
+        {
+            int argsLineEnd = rest.IndexOf('\n');
+            if (argsLineEnd < 0)
+                return false;
+            rest = rest.Substring(argsLineEnd + 1);
+        }
 
-        arguments = block.Substring(argsStart).TrimEnd('\r', '\n', ' ');
+        arguments = rest.TrimEnd('\r', '\n', ' ');
         return true;
     }
 }
