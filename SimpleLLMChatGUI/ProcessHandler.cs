@@ -127,6 +127,11 @@ namespace SimpleLLMChatGUI
             return SendInput(command);
         }
 
+        public bool SendReload()
+        {
+            return SendInput("/reload");
+        }
+
         private void BeginReadOutput(Stream stream, byte[] buffer)
         {
             try

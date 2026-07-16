@@ -403,7 +403,7 @@ namespace SimpleLLMChatGUI
 
         private void optionsButton_Click(object sender, RoutedEventArgs e)
         {
-            var optionsDialog = new Options(processHandler);
+            var optionsDialog = new Options();
             optionsDialog.Owner = this;
 
             if (optionsDialog.ShowDialog() == true)
@@ -414,8 +414,11 @@ namespace SimpleLLMChatGUI
                 LoadAndApplyColors();
                 if (tokenTracker != null)
                     tokenTracker.Refresh();
-                processHandler = null; // Options disposes the process on save
-                ClearChatAndRestart();
+
+                if (processHandler != null && processHandler.IsProcessRunning)
+                    processHandler.SendReload();
+                else
+                    ClearChatAndRestart();
             }
         }
 

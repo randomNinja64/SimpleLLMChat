@@ -15,7 +15,7 @@ public class ConfigHandler
         LoadConfig(filename);
     }
 
-    private void LoadConfig(string filename)
+    public void LoadConfig(string filename)
     {
         configMap = IniFileHandler.LoadIni(filename);
     }

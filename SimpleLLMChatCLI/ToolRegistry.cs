@@ -65,6 +65,16 @@ namespace SimpleLLMChatCLI
         }
 
         /// <summary>
+        /// Clears loaded tools, context injectors, and option defaults so they can be reloaded.
+        /// </summary>
+        public void Clear()
+        {
+            Tools.Clear();
+            contextInjectorsByExecutable.Clear();
+            optionDefaults.Clear();
+        }
+
+        /// <summary>
         /// Scans a directory for *.json tool manifests and loads all tool definitions.
         /// </summary>
         public void LoadToolsFromDirectory(string toolsDir)

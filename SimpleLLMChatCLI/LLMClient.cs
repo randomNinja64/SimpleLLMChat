@@ -15,7 +15,8 @@ public class LLMClient
     private readonly Func<string, string, bool> requestToolApproval;
 
     // Cached sysprompt + tools schema length (NyoCoder-style base overhead).
-    private int? _baseOverheadChars;
+    // Cleared (set null) on /reload so the next request recomputes it.
+    public int? BaseOverheadChars;
 
     public string ReasoningEffort { get; set; }
 
@@ -329,7 +330,7 @@ public class LLMClient
     /// </summary>
     public int GetBaseCharacterOverhead()
     {
-        return _baseOverheadChars.HasValue ? _baseOverheadChars.Value : 0;
+        return BaseOverheadChars.HasValue ? BaseOverheadChars.Value : 0;
     }
 
     private string BuildSystemPrompt(List<string> enabledTools)
@@ -381,13 +382,13 @@ public class LLMClient
         }
 
         // Capture overhead from a normal request only (not summarization with tools disabled).
-        if (!_baseOverheadChars.HasValue)
+        if (!BaseOverheadChars.HasValue)
         {
             List<string> configuredTools = config.GetConfigList("tools");
             bool summarizationPass = (enabledTools == null || enabledTools.Count == 0)
                 && configuredTools != null && configuredTools.Count > 0;
             if (!summarizationPass)
-                _baseOverheadChars = systemPrompt.Length + toolsChars;
+                BaseOverheadChars = systemPrompt.Length + toolsChars;
         }
 
         payload["stream"] = true;

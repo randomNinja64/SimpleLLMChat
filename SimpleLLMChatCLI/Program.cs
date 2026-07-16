@@ -19,11 +19,14 @@ namespace SimpleLLMChatCLI
 
         static void PrintCliInstructions()
         {
-            ChatOutput.WriteLine("=== SimpleLLMChat CLI ===");
-            ChatOutput.WriteLine("Type '/exit' to quit.");
-            ChatOutput.WriteLine("Type '/clear' to reset the chat.");
-            ChatOutput.WriteLine("Type '/image \"path\" prompt' to send an image.");
-            ChatOutput.WriteLine("Type '/reasoning <effort>' to set reasoning effort; '/reasoning' alone uses the API default.");
+            ChatOutput.WriteLine("================== SimpleLLMChat ==================");
+            ChatOutput.WriteLine("| Commands:                                       |");
+            ChatOutput.WriteLine("| /clear: Clear chat context                      |");
+            ChatOutput.WriteLine("| /exit: Exit the application                     |");
+            ChatOutput.WriteLine("| /reload: Reload configuration                   |");
+            ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
+            ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
+            ChatOutput.WriteLine("===================================================");
         }
 
         static bool TryParseImageCommand(string input, out string imagePath, out string textPrompt)
@@ -63,7 +66,7 @@ namespace SimpleLLMChatCLI
             Console.OutputEncoding = Encoding.UTF8;
 
             // Load configuration
-            Config = new ConfigHandler(System.IO.Path.Combine(
+            Config = new ConfigHandler(Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
 
             // Always-on status pipe for GUI (and optional external monitors)
@@ -240,6 +243,26 @@ namespace SimpleLLMChatCLI
                         ChatOutput.WriteLine("Context cleared.\n");
                         PrintCliInstructions();
                     }
+                    continue;
+                }
+
+                if (userInput == "/reload")
+                {
+                    Config.LoadConfig(Path.Combine(
+                        AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
+                    registry.Clear();
+                    registry.LoadToolsFromDirectory(toolsDir);
+                    client.BaseOverheadChars = null;
+                    enabledTools = Config.GetConfigList("tools");
+                    toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
+                    showToolOutput = Config.GetConfigBool("showtooloutput");
+                    client.PublishStatusTokens(
+                        LLMClient.GetConversationCharacterCount(conversation) + client.GetBaseCharacterOverhead());
+
+                    if (showBanners)
+                        ChatOutput.WriteLine("Config reloaded.\n");
+                    else
+                        ChatOutput.MarkSeparated();
                     continue;
                 }
 

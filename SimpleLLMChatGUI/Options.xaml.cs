@@ -24,7 +24,6 @@ namespace SimpleLLMChatGUI
         private string _codeFontFamily;
         private string _customFontFamily;
         private int _chatFontSize;
-        private ProcessHandler _processHandler;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -123,12 +122,10 @@ namespace SimpleLLMChatGUI
             set { _chatFontSize = value; OnPropertyChanged(nameof(ChatFontSize)); }
         }
 
-        public Options(ProcessHandler processHandler)
+        public Options()
         {
             InitializeComponent();
             DataContext = this;
-
-            _processHandler = processHandler;
 
             _toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
 
@@ -165,10 +162,6 @@ namespace SimpleLLMChatGUI
             ApiKey = ApiKeyPasswordBox.Password;
 
             SaveIni(App.ConfigFileName);
-
-            // Kill running process
-            if (_processHandler != null)
-                _processHandler.Dispose();
 
             DialogResult = true;
             Close();
