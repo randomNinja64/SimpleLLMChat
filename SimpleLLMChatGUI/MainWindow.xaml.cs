@@ -202,8 +202,18 @@ namespace SimpleLLMChatGUI
         private bool OnApprovalRequested(string toolName, string arguments)
         {
             bool approved = false;
-            Dispatcher.Invoke((Action)(() =>
+            // Run after queued stdout updates so the approval block's leading
+            // separator can be removed before the (hidden) GUI prompt is shown.
+            Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
             {
+                if (_streamingTurn != null)
+                {
+                    _streamingTurn.TrimTrailingBlankParagraphs();
+                    // Keep half of the block separator; the CLI emits the
+                    // second newline after receiving the approval response.
+                    _streamingTurn.AppendText("\r\n");
+                }
+
                 string message = ToolApproval.FormatApprovalMessage(toolName, arguments);
                 MessageBoxResult result = MessageBox.Show(
                     message,
