@@ -220,11 +220,15 @@ namespace SimpleLLMChatGUI
         {
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                if (_streamingTurn != null && IsMarkdownParsingEnabled())
+                if (_streamingTurn != null)
                 {
-                    MarkdownHandler.ProcessMarkdown(
-                        _streamingTurn.Document,
-                        ref _streamingTurn.MarkdownProcessedBlockCount);
+                    _streamingTurn.TrimTrailingBlankParagraphs();
+                    if (IsMarkdownParsingEnabled())
+                    {
+                        MarkdownHandler.ProcessMarkdown(
+                            _streamingTurn.Document,
+                            ref _streamingTurn.MarkdownProcessedBlockCount);
+                    }
                 }
                 _streamingTurn = null;
                 SetInputControlsEnabled(true);
@@ -250,6 +254,10 @@ namespace SimpleLLMChatGUI
         {
             ChatTurn turn = new ChatTurn();
             turn.Document.FontSize = FontHandler.GetFontSize();
+            // Every turn after the first gets a blank line above it, so turns
+            // are separated the same way blocks within a turn are.
+            if (_chatTurns.Count > 0)
+                turn.AddLeadingSeparator();
             ApplyDocumentPageWidth(turn);
             _chatTurns.Add(turn);
             return turn;
@@ -328,7 +336,7 @@ namespace SimpleLLMChatGUI
             string userInput = chatInput.Text;
 
             ChatTurn userTurn = AddTurn();
-            userTurn.AppendText("You: " + userInput + "\r\n");
+            userTurn.AppendText("You: " + userInput);
             if (IsMarkdownParsingEnabled())
             {
                 MarkdownHandler.ProcessMarkdown(
