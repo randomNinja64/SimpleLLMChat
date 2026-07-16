@@ -33,12 +33,12 @@ namespace SimpleLLMChatGUI
         /// Renders markdown in blocks at or after <paramref name="startBlockIndex"/>, then
         /// advances that index to the document's block count so later passes skip already-handled content.
         /// </summary>
-        public static void ProcessMarkdown(RichTextBox chatOutput, ref int startBlockIndex)
+        public static void ProcessMarkdown(FlowDocument document, ref int startBlockIndex)
         {
-            if (chatOutput == null)
+            if (document == null)
                 return;
 
-            List<Block> blocks = chatOutput.Document.Blocks.ToList();
+            List<Block> blocks = document.Blocks.ToList();
             if (startBlockIndex < 0)
                 startBlockIndex = 0;
             if (startBlockIndex > blocks.Count)

@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,8 +21,8 @@ namespace SimpleLLMChatGUI
         private string _reasoningEffort = "";
         private TokenTracker tokenTracker;
         private ContextMenu reasoningEffortMenu;
-        // Block index in the output document already processed by MarkdownHandler
-        private int _markdownProcessedBlockCount;
+        private readonly ObservableCollection<ChatTurn> _chatTurns = new ObservableCollection<ChatTurn>();
+        private ChatTurn _streamingTurn;
 
         private static readonly KeyValuePair<string, string>[] ReasoningEffortOptions =
         {
@@ -58,6 +59,8 @@ namespace SimpleLLMChatGUI
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            chatList.ItemsSource = _chatTurns;
+
             FontHandler.ApplyFontToWindow(this);
             LoadAndApplyFontSize();
             LoadAndApplyColors();
@@ -181,14 +184,11 @@ namespace SimpleLLMChatGUI
             // BeginInvoke so stdout reading is not gated behind UI paint/scroll work.
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                // Add a blank line before the first bot response after clearing
-                if (chatOutput.Document.Blocks.Count == 1)
-                {
-                    chatOutput.AppendText("\r\n");
-                }
+                if (_streamingTurn == null)
+                    _streamingTurn = AddTurn();
 
-                chatOutput.AppendText(text);
-                chatOutput.ScrollToEnd();
+                _streamingTurn.AppendText(text);
+                ScrollChatToEnd();
             }));
         }
         private void OnErrorOccurred(string errorMessage)
@@ -220,10 +220,13 @@ namespace SimpleLLMChatGUI
         {
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                if (IsMarkdownParsingEnabled())
+                if (_streamingTurn != null && IsMarkdownParsingEnabled())
                 {
-                    MarkdownHandler.ProcessMarkdown(chatOutput, ref _markdownProcessedBlockCount);
+                    MarkdownHandler.ProcessMarkdown(
+                        _streamingTurn.Document,
+                        ref _streamingTurn.MarkdownProcessedBlockCount);
                 }
+                _streamingTurn = null;
                 SetInputControlsEnabled(true);
                 chatInput.Focus();
             }));
@@ -237,8 +240,63 @@ namespace SimpleLLMChatGUI
         private void LoadAndApplyFontSize()
         {
             int fontSize = FontHandler.GetFontSize();
-            FontHandler.ApplyFontSizeToControl(chatOutput, fontSize);
+            FontHandler.ApplyFontSizeToControl(chatList, fontSize);
             FontHandler.ApplyFontSizeToControl(chatInput, fontSize);
+            foreach (ChatTurn turn in _chatTurns)
+                turn.Document.FontSize = fontSize;
+        }
+
+        private ChatTurn AddTurn()
+        {
+            ChatTurn turn = new ChatTurn();
+            turn.Document.FontSize = FontHandler.GetFontSize();
+            ApplyDocumentPageWidth(turn);
+            _chatTurns.Add(turn);
+            return turn;
+        }
+
+        private void chatList_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            foreach (ChatTurn turn in _chatTurns)
+                ApplyDocumentPageWidth(turn);
+        }
+
+        private void ApplyDocumentPageWidth(ChatTurn turn)
+        {
+            if (turn == null || chatList == null)
+                return;
+
+            double width = chatList.ActualWidth
+                - SystemParameters.VerticalScrollBarWidth
+                - 16;
+            if (width > 50)
+                turn.Document.PageWidth = width;
+        }
+
+        private void ScrollChatToEnd()
+        {
+            if (_chatTurns.Count == 0)
+                return;
+
+            chatList.ScrollIntoView(_chatTurns[_chatTurns.Count - 1]);
+
+            ScrollViewer scrollViewer = FindScrollViewer(chatList);
+            if (scrollViewer != null)
+                scrollViewer.ScrollToEnd();
+        }
+
+        private static ScrollViewer FindScrollViewer(DependencyObject root)
+        {
+            if (root is ScrollViewer viewer)
+                return viewer;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                ScrollViewer child = FindScrollViewer(VisualTreeHelper.GetChild(root, i));
+                if (child != null)
+                    return child;
+            }
+            return null;
         }
 
         private void LoadAndApplyColors()
@@ -269,8 +327,16 @@ namespace SimpleLLMChatGUI
         {
             string userInput = chatInput.Text;
 
-            chatOutput.AppendText("You: " + userInput + "\r\n");
-            chatOutput.ScrollToEnd();
+            ChatTurn userTurn = AddTurn();
+            userTurn.AppendText("You: " + userInput + "\r\n");
+            if (IsMarkdownParsingEnabled())
+            {
+                MarkdownHandler.ProcessMarkdown(
+                    userTurn.Document,
+                    ref userTurn.MarkdownProcessedBlockCount);
+            }
+            _streamingTurn = AddTurn();
+            ScrollChatToEnd();
 
             // Disable input controls while LLM is generating
             SetInputControlsEnabled(false);
@@ -382,8 +448,8 @@ namespace SimpleLLMChatGUI
             // while waiting — that caused intermittent crashes when clicking Clear.
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                chatOutput.Document.Blocks.Clear();
-                _markdownProcessedBlockCount = 0;
+                _chatTurns.Clear();
+                _streamingTurn = null;
                 SetInputControlsEnabled(false);
                 StartLLMProcess();
             }), System.Windows.Threading.DispatcherPriority.Background);

@@ -108,6 +108,8 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ChatTurn.cs" />
+    <Compile Include="ChatMessageDocumentBehavior.cs" />
     <Compile Include="MarkdownHandler.cs" />
     <Compile Include="Options.xaml.cs">
       <DependentUpon>Options.xaml</DependentUpon>
