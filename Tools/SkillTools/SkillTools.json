@@ -3,7 +3,7 @@
     "executable": "SkillTools.exe",
     "context_injector": "get_skills_context",
     "options": [
-        { "name": "skillsDirectory", "label": "Skills Directory", "type": "string", "default": "" }
+        { "name": "skillsDirectory", "label": "Skills Directory (in tool folder if unspecified)", "type": "string", "default": "" }
     ],
     "tools": [
         {
