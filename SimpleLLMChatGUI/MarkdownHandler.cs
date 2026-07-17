@@ -46,7 +46,6 @@ namespace SimpleLLMChatGUI
 
             int activeBacktickFenceLength = 0;
             bool insideThinkTag = false;
-            Brush codeBlockBrush = GetCodeBlockBrush();
             FontFamily codeBlockFontFamily = FontHandler.TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"));
 
             for (int i = startBlockIndex; i < blocks.Count; i++)
@@ -101,7 +100,7 @@ namespace SimpleLLMChatGUI
                 {
                     if (activeBacktickFenceLength > 0)
                     {
-                        paragraph.Background = codeBlockBrush;
+                        paragraph.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
                         if (codeBlockFontFamily != null)
                             paragraph.FontFamily = codeBlockFontFamily;
                     }
@@ -123,7 +122,7 @@ namespace SimpleLLMChatGUI
                 ReplaceInRuns(paragraph, InlineCodePattern, match =>
                 {
                     var codeSpan = new Span(new Run(match.Groups[1].Value));
-                    codeSpan.Background = codeBlockBrush;
+                    codeSpan.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
                     if (codeBlockFontFamily != null)
                         codeSpan.FontFamily = codeBlockFontFamily;
                     return codeSpan;
@@ -204,9 +203,9 @@ namespace SimpleLLMChatGUI
             var hyperlink = new Hyperlink(new Run(displayText))
             {
                 NavigateUri = uri,
-                Foreground = Application.Current.Resources["ChatTextColorBrush"] as Brush ?? SystemColors.ControlTextBrush,
                 Cursor = Cursors.Hand
             };
+            hyperlink.SetResourceReference(TextElement.ForegroundProperty, "ChatTextColorBrush");
             AttachTooltip(hyperlink, uri.AbsoluteUri);
             hyperlink.PreviewMouseLeftButtonDown += OnHyperlinkClick;
             return hyperlink;
@@ -263,11 +262,6 @@ namespace SimpleLLMChatGUI
             fenceLength = match.Groups[2].Value.Length;
             hasInfoString = !string.IsNullOrWhiteSpace(match.Groups[3].Value);
             return true;
-        }
-
-        private static Brush GetCodeBlockBrush()
-        {
-            return Application.Current.Resources["CodeBlockBackgroundColorBrush"] as Brush ?? SystemColors.ControlBrush;
         }
 
         private static string FirstCapturedGroup(Match match)

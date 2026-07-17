@@ -86,9 +86,9 @@ Tool-specific configuration options for the included tools are available in the 
 Interactive mode provides the following commands:
 - `/clear`: Clears chat context
 - `/exit`: Exits the application
-- `/reload`: Reloads configuration in place (doesn't clear chat)
 - `/image`: Sends an image to the model alongside the next message, used as `/image "path" prompt`
 - `/reasoning`: Sets reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); `/reasoning` alone uses the API default
+- `/reload`: Reloads configuration in place (doesn't clear chat)
 
 The application can also be used in a non-interactive mode.
 

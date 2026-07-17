@@ -23,9 +23,9 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| Commands:                                       |");
             ChatOutput.WriteLine("| /clear: Clear chat context                      |");
             ChatOutput.WriteLine("| /exit: Exit the application                     |");
-            ChatOutput.WriteLine("| /reload: Reload configuration                   |");
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
+            ChatOutput.WriteLine("| /reload: Reload configuration                   |");
             ChatOutput.WriteLine("===================================================");
         }
 
