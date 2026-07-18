@@ -41,6 +41,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChatOutput.cs" />
@@ -48,14 +49,26 @@
     <Compile Include="CurlClient.cs" />
     <Compile Include="LLMClient.cs" />
     <Compile Include="SseStreamParser.cs" />
+    <Compile Include="StatusPipeServer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ToolRegistry.cs" />
+    <Compile Include="RAG\AutoRagContext.cs" />
+    <Compile Include="RAG\DocumentIndex.cs" />
+    <Compile Include="RAG\DocumentIndexer.cs" />
+    <Compile Include="RAG\DocumentScanFilter.cs" />
+    <Compile Include="RAG\EmbeddingsClient.cs" />
+    <Compile Include="RAG\RagHost.cs" />
+    <Compile Include="RAG\SemanticHitFormatter.cs" />
+    <Compile Include="RAG\VectorStore.cs" />
     <Compile Include="..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>
     <Compile Include="..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\RagExtensionList.cs">
+      <Link>Shared\RagExtensionList.cs</Link>
     </Compile>
     <Compile Include="..\Shared\ToolApproval.cs">
       <Link>Shared\ToolApproval.cs</Link>
@@ -69,8 +82,17 @@
     <Compile Include="..\Shared\TokenEstimator.cs">
       <Link>Shared\TokenEstimator.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe.cs">
-      <Link>Shared\StatusPipe.cs</Link>
+    <Compile Include="..\Shared\TlsConfig.cs">
+      <Link>Shared\TlsConfig.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.cs">
+      <Link>Shared\StatusPipe\StatusPipe.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Tokens.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Tokens.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Indexing.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Indexing.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>

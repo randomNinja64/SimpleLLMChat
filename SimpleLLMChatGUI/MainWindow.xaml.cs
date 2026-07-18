@@ -487,7 +487,7 @@ namespace SimpleLLMChatGUI
 
         private void optionsButton_Click(object sender, RoutedEventArgs e)
         {
-            var optionsDialog = new Options();
+            var optionsDialog = new Options(processHandler);
             optionsDialog.Owner = this;
 
             if (optionsDialog.ShowDialog() == true)

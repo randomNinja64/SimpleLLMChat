@@ -18,6 +18,7 @@ namespace SimpleLLMChatGUI
         public event Action GenerationComplete;
         public event Func<string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
+        public event Action<IndexingStatusEvent> IndexingStatusReceived;
 
         private readonly StringBuilder streamBuffer = new StringBuilder();
         private StatusPipeClient statusPipeClient;
@@ -50,6 +51,7 @@ namespace SimpleLLMChatGUI
 
                 statusPipeClient = new StatusPipeClient(llmProcess.Id);
                 statusPipeClient.StatusReceived += OnStatusPipeReceived;
+                statusPipeClient.IndexingStatusReceived += OnIndexingStatusPipeReceived;
                 statusPipeClient.Start();
 
                 // 256 byte async buffer
@@ -73,11 +75,20 @@ namespace SimpleLLMChatGUI
                 handler(tokens);
         }
 
+        private void OnIndexingStatusPipeReceived(IndexingStatusEvent status)
+        {
+            IndexingStatusHub.Publish(status);
+            Action<IndexingStatusEvent> handler = IndexingStatusReceived;
+            if (handler != null)
+                handler(status);
+        }
+
         private void DisposeStatusPipeClient()
         {
             if (statusPipeClient != null)
             {
                 statusPipeClient.StatusReceived -= OnStatusPipeReceived;
+                statusPipeClient.IndexingStatusReceived -= OnIndexingStatusPipeReceived;
                 statusPipeClient.Dispose();
                 statusPipeClient = null;
             }

@@ -77,6 +77,9 @@
     <Compile Include="..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\RagExtensionList.cs">
+      <Link>Shared\RagExtensionList.cs</Link>
+    </Compile>
     <Compile Include="..\Shared\ToolApproval.cs">
       <Link>Shared\ToolApproval.cs</Link>
     </Compile>
@@ -89,9 +92,20 @@
     <Compile Include="..\Shared\TokenEstimator.cs">
       <Link>Shared\TokenEstimator.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe.cs">
-      <Link>Shared\StatusPipe.cs</Link>
+    <Compile Include="..\Shared\TlsConfig.cs">
+      <Link>Shared\TlsConfig.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.cs">
+      <Link>Shared\StatusPipe\StatusPipe.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Tokens.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Tokens.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Indexing.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Indexing.cs</Link>
+    </Compile>
+    <Compile Include="StatusPipeClient.cs" />
+    <Compile Include="IndexingStatusHub.cs" />
     <Compile Include="ToolOptionsRegistry.cs" />
     <Compile Include="TokenTracker.cs" />
     <Compile Include="MainWindow.xaml.cs">

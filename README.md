@@ -18,6 +18,7 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 - **Script-Friendly** - Output without tool calls and reasoning can be piped out of the CLI using the `-o` or `--output-only` flag.
 - **Streaming Responses** - Responses are streamed from the LLM server in real-time.
 - **Tools** - A modular, extensible tool system is available. For information about the included tools, see [Tools](#tools).
+- **Retrieval Augmented Generation (RAG)** - Retrieve information from documents via a local knowledge folder (see [RAG](#rag)).
 
 ## Requirements
 
@@ -56,6 +57,20 @@ SimpleLLMChat can be configured either using the GUI options pages or manually v
 - `showreasoningoutput`: Enables/disables reasoning output display (`1` or `0`)
 - `showtooloutput`: Enables/disables full tool execution output in chat (`1` or `0`)
 
+**RAG**
+- `ragenabled`: Enables RAG (`1` or `0`, default off)
+- `ragallowedextensions`: Comma-separated file extensions to index (blank = built-in defaults, provided below)
+  - Allowed formats: `.md`, `.markdown`, `.txt`, `.rst`, `.csv`, `.json`, `.xml`, `.yaml`, `.yml`, `.toml`, `.ini`, `.html`, `.htm`, `.css`, `.cs`, `.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.java`, `.go`, `.rs`, `.c`, `.h`, `.cpp`, `.hpp`, `.rb`, `.php`, `.sql`, `.sh`, `.ps1`, `.bat`
+- `indexchunkoverlap`: Chunk overlap in lines (default `10`)
+- `indexchunklines`: Chunk size in lines (default `60`)
+- `embeddingsapikey`: Embeddings API key (`apikey` if blank)
+- `embeddingsendpoint`: Embeddings API base URL (`llmserver` if blank)
+- `embeddingsmodel`: Embeddings model name (required)
+- `ragknowledgepath`: Knowledge folder path (`knowledge` folder next to EXE by default)
+- `ragmaxsnippetlength`: Max characters per chunk for embedding/injection (default `2000`)
+- `ragmaxresults`: Number of chunks to retrieve per search (default `5`)
+- `ragretrievemode`: When to retrieve information from knowledge (`everyturn` or `newchat`) (default: `newchat`)
+
 **System**
 - `apikey`: API key (if required by model provider)
 - `llmserver`: Base URL of the OpenAI-compatible endpoint
@@ -84,7 +99,9 @@ Tool-specific configuration options for the included tools are available in the 
 **CLI**: To run the CLI in interactive/REPL mode, open `SimpleLLMChatCLI.exe` directly or from a terminal.
 
 Interactive mode provides the following commands:
+- `/buildindex`: Reconciles the knowledge index (adds/updates/removes changed files)
 - `/clear`: Clears chat context
+- `/clearindex`: Clears the on-disk knowledge index
 - `/exit`: Exits the application
 - `/image`: Sends an image to the model alongside the next message, used as `/image "path" prompt`
 - `/reasoning`: Sets reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); `/reasoning` alone uses the API default

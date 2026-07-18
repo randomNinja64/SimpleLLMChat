@@ -1,5 +1,6 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SimpleLLMChatCLI.RAG;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -25,20 +26,6 @@ public class LLMClient
         this.registry = registry;
         this.config = config;
         this.requestToolApproval = requestToolApproval ?? CliRequestApproval;
-        // Enable modern TLS protocols for HTTPS support
-        // .NET 4.0 only has named constant for Tls (1.0)
-        // Tls11 = 768, Tls12 = 3072, Tls13 = 12288 (numeric values used until .NET 4.5+)
-        // We use |= to ADD to existing protocols rather than replacing them
-        // This ensures fallback to older protocols if newer ones aren't available
-        try
-        {
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls | (SecurityProtocolType)768 | (SecurityProtocolType)3072 | (SecurityProtocolType)12288;
-        }
-        catch
-        {
-            // If setting TLS protocols fails, continue with system defaults
-            // This can happen on very old systems without TLS 1.2 support
-        }
     }
 
     // Struct for chat messages
@@ -92,10 +79,32 @@ public class LLMClient
             outputOnly,
             "\n\n[Continue from this context. The user's next message follows.]");
 
+        RagHost.FlushPendingErrorOnce();
+        RagHost.WaitIfIndexing();
+
+        string contentForLlm = userMessage ?? string.Empty;
+        if (config.GetConfigBool("ragEnabled", false))
+        {
+            bool everyTurn = string.Equals(
+                config.GetConfigValue("ragRetrieveMode", "newchat"),
+                "everyturn",
+                StringComparison.OrdinalIgnoreCase);
+            bool isNewChat = conversation == null || conversation.Count == 0;
+            
+            // If RAG is enabled and the retrieve mode is set to every turn or it's a new chat, retrieve the context.
+            if (everyTurn || isNewChat)
+            {
+                AutoRagResult rag = AutoRagContext.TryRetrieve(config, userMessage, contentForLlm);
+                if (!outputOnly && !string.IsNullOrEmpty(rag.UserStatusLine))
+                    ChatOutput.WriteLine(rag.UserStatusLine);
+                contentForLlm = rag.MergedPrompt;
+            }
+        }
+
         conversation.Add(new ChatMessage
         {
             Role = "user",
-            Content = userMessage,
+            Content = contentForLlm,
             Image = image
         });
 
@@ -343,6 +352,14 @@ public class LLMClient
                 sysprompt += "\n\n" + injection;
         }
 
+        string ragHint = RagHost.GetKnowledgePathHint(config);
+        if (!string.IsNullOrEmpty(ragHint))
+        {
+            if (sysprompt.Length > 0)
+                sysprompt += "\n\n";
+            sysprompt += ragHint;
+        }
+
         return sysprompt;
     }
 
@@ -582,8 +599,7 @@ public class LLMClient
 
             // Try curl fallback for HTTPS connection errors
             string serverUrl = config.GetConfigValue("llmserver") ?? "";
-            string curlPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "curl.exe");
-            if (serverUrl.StartsWith("https:", StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(curlPath) && ShouldFallbackToCurl(ex))
+            if (CurlClient.CanFallback(serverUrl, ex))
                 return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
@@ -630,26 +646,6 @@ public class LLMClient
 
             ChatOutput.WriteLine("Please enter Y or N.");
         }
-    }
-
-    private static bool ShouldFallbackToCurl(Exception ex)
-    {
-        WebException webEx = ex as WebException;
-        if (webEx != null)
-            return webEx.Status == WebExceptionStatus.SecureChannelFailure
-                || webEx.Status == WebExceptionStatus.TrustFailure
-                || webEx.Status == WebExceptionStatus.ConnectFailure
-                || webEx.Status == WebExceptionStatus.ConnectionClosed
-                || webEx.Status == WebExceptionStatus.SendFailure
-                || webEx.Status == WebExceptionStatus.ReceiveFailure
-                || webEx.Status == WebExceptionStatus.Timeout
-                || webEx.Status == WebExceptionStatus.ServerProtocolViolation
-                || (webEx.InnerException != null && webEx.InnerException.GetType().Name.Contains("Authentication"));
-
-        return ex.GetType().Name.Contains("Authentication")
-            || ex.GetType().Name.Contains("Security")
-            || ex.GetType().Name.Contains("IOException")
-            || (ex.Message != null && ex.Message.Contains("connection"));
     }
 }
 }

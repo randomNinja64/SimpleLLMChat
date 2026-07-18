@@ -25,6 +25,20 @@ namespace SimpleLLMChatGUI
         private string _customFontFamily;
         private int _chatFontSize;
 
+        // RAG
+        private bool _ragEnabled;
+        private string _ragKnowledgePath;
+        private int _ragMaxResults;
+        private int _indexChunkLines;
+        private int _indexChunkOverlap;
+        private int _ragMaxSnippetLength;
+        private string _ragRetrieveMode;
+        private string _ragAllowedExtensions;
+        private string _embeddingsEndpoint;
+        private string _embeddingsModel;
+        private string _embeddingsApiKey;
+        private readonly ProcessHandler _processHandler;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private readonly List<string> _availableTools;
@@ -122,8 +136,80 @@ namespace SimpleLLMChatGUI
             set { _chatFontSize = value; OnPropertyChanged(nameof(ChatFontSize)); }
         }
 
-        public Options()
+        public bool RagEnabled
         {
+            get { return _ragEnabled; }
+            set { _ragEnabled = value; OnPropertyChanged(nameof(RagEnabled)); }
+        }
+
+        public string RagKnowledgePath
+        {
+            get { return _ragKnowledgePath; }
+            set { _ragKnowledgePath = value; OnPropertyChanged(nameof(RagKnowledgePath)); }
+        }
+
+        public int RagMaxResults
+        {
+            get { return _ragMaxResults; }
+            set { _ragMaxResults = value; OnPropertyChanged(nameof(RagMaxResults)); }
+        }
+
+        public int IndexChunkLines
+        {
+            get { return _indexChunkLines; }
+            set { _indexChunkLines = value; OnPropertyChanged(nameof(IndexChunkLines)); }
+        }
+
+        public int IndexChunkOverlap
+        {
+            get { return _indexChunkOverlap; }
+            set { _indexChunkOverlap = value; OnPropertyChanged(nameof(IndexChunkOverlap)); }
+        }
+
+        public int RagMaxSnippetLength
+        {
+            get { return _ragMaxSnippetLength; }
+            set { _ragMaxSnippetLength = value; OnPropertyChanged(nameof(RagMaxSnippetLength)); }
+        }
+
+        public string RagRetrieveMode
+        {
+            get { return _ragRetrieveMode; }
+            set { _ragRetrieveMode = value; OnPropertyChanged(nameof(RagRetrieveMode)); }
+        }
+
+        public string RagAllowedExtensions
+        {
+            get { return _ragAllowedExtensions; }
+            set { _ragAllowedExtensions = value; OnPropertyChanged(nameof(RagAllowedExtensions)); }
+        }
+
+        public string EmbeddingsEndpoint
+        {
+            get { return _embeddingsEndpoint; }
+            set { _embeddingsEndpoint = value; OnPropertyChanged(nameof(EmbeddingsEndpoint)); }
+        }
+
+        public string EmbeddingsModel
+        {
+            get { return _embeddingsModel; }
+            set { _embeddingsModel = value; OnPropertyChanged(nameof(EmbeddingsModel)); }
+        }
+
+        public string EmbeddingsApiKey
+        {
+            get { return _embeddingsApiKey; }
+            set { _embeddingsApiKey = value; OnPropertyChanged(nameof(EmbeddingsApiKey)); }
+        }
+
+        public Options()
+            : this(null)
+        {
+        }
+
+        public Options(ProcessHandler processHandler)
+        {
+            _processHandler = processHandler;
             InitializeComponent();
             DataContext = this;
 
@@ -142,7 +228,11 @@ namespace SimpleLLMChatGUI
                 .ToList();
             _systemFonts.Insert(0, "Default");
 
-            // Default values
+            InitializeDefaults();
+        }
+
+        private void InitializeDefaults()
+        {
             ServerURL = "";
             ApiKey = "";
             Model = "";
@@ -155,13 +245,22 @@ namespace SimpleLLMChatGUI
             CodeFontFamily = "";
             CustomFontFamily = "";
             ChatFontSize = AppConstants.DefaultChatFontSize;
+            RagEnabled = false;
+            RagKnowledgePath = "";
+            RagMaxResults = 5;
+            IndexChunkLines = 60;
+            IndexChunkOverlap = 10;
+            RagMaxSnippetLength = 2000;
+            RagRetrieveMode = "newchat";
+            RagAllowedExtensions = AppConstants.DefaultRagAllowedExtensions;
+            EmbeddingsEndpoint = "";
+            EmbeddingsModel = "";
+            EmbeddingsApiKey = "";
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            ApiKey = ApiKeyPasswordBox.Password;
-
-            SaveIni(App.ConfigFileName);
+            SaveCurrentSettings();
 
             DialogResult = true;
             Close();
@@ -202,16 +301,22 @@ namespace SimpleLLMChatGUI
             AppearancePage.Visibility = Visibility.Collapsed;
             SystemPage.Visibility = Visibility.Collapsed;
             ToolsPage.Visibility = Visibility.Collapsed;
+            if (RagPage != null)
+                RagPage.Visibility = Visibility.Collapsed;
             foreach (var page in _toolGroupPages)
                 page.Visibility = Visibility.Collapsed;
 
             switch (CategoryListBox.SelectedIndex)
             {
                 case 0: AppearancePage.Visibility = Visibility.Visible; break;
-                case 1: SystemPage.Visibility = Visibility.Visible; break;
-                case 2: ToolsPage.Visibility = Visibility.Visible; break;
+                case 1:
+                    if (RagPage != null)
+                        RagPage.Visibility = Visibility.Visible;
+                    break;
+                case 2: SystemPage.Visibility = Visibility.Visible; break;
+                case 3: ToolsPage.Visibility = Visibility.Visible; break;
                 default:
-                    int toolIdx = CategoryListBox.SelectedIndex - 3;
+                    int toolIdx = CategoryListBox.SelectedIndex - 4;
                     if (toolIdx >= 0 && toolIdx < _toolGroupPages.Count)
                         _toolGroupPages[toolIdx].Visibility = Visibility.Visible;
                     break;
@@ -220,10 +325,21 @@ namespace SimpleLLMChatGUI
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // Apply custom font to this window
             FontHandler.ApplyFontToWindow(this);
 
             var config = App.Config;
+            LoadSettings(config);
+            LoadToolSelections(config);
+            BuildToolOptionsUI(config);
+            BuildToolTimeoutsUI(config);
+
+            IndexingStatusHub.Updated += OnIndexingStatusUpdated;
+            RefreshIndexingStatusUi();
+            Closed += Options_Closed;
+        }
+
+        private void LoadSettings(ConfigHandler config)
+        {
             ServerURL = config.GetConfigValue("llmserver");
             ApiKey = config.GetConfigValue("apikey");
             Model = config.GetConfigValue("model");
@@ -237,22 +353,99 @@ namespace SimpleLLMChatGUI
             CustomFontFamily = config.GetConfigValue("customfontfamily");
             ChatFontSize = config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
 
-            var enabledTools = config.GetConfigList("tools");
-            if (enabledTools.Count > 0)
-                ApplyToolSelectionToListBox(ToolsListBox, enabledTools);
+            RagEnabled = config.GetConfigBool("ragEnabled", false);
+            RagKnowledgePath = config.GetConfigValue("ragKnowledgePath");
+            RagMaxResults = config.GetConfigInt("ragMaxResults", 5);
+            IndexChunkLines = config.GetConfigInt("indexChunkLines", 60);
+            IndexChunkOverlap = config.GetConfigInt("indexChunkOverlap", 10);
+            RagMaxSnippetLength = config.GetConfigInt("ragMaxSnippetLength", 2000);
+            RagRetrieveMode = config.GetConfigValue("ragRetrieveMode", "newchat");
+            string allowedExt = config.GetConfigValue("ragAllowedExtensions");
+            RagAllowedExtensions = string.IsNullOrEmpty(allowedExt)
+                ? AppConstants.DefaultRagAllowedExtensions
+                : allowedExt;
+            EmbeddingsEndpoint = config.GetConfigString("embeddingsEndpoint") ?? string.Empty;
+            EmbeddingsModel = config.GetConfigString("embeddingsModel") ?? string.Empty;
+            EmbeddingsApiKey = config.GetConfigString("embeddingsApiKey") ?? string.Empty;
 
-            var approvalTools = config.GetConfigList("toolsrequiringapproval");
-            if (approvalTools.Count > 0)
-                ApplyToolSelectionToListBox(ToolsRequiringApprovalListBox, approvalTools);
-
-            // Sync password box manually (not bound)
             ApiKeyPasswordBox.Password = ApiKey;
+            EmbeddingsApiKeyPasswordBox.Password = EmbeddingsApiKey;
+            ApplyRetrieveModeToCombo();
+        }
 
-            // Build dynamic tool options UI and populate values
-            BuildToolOptionsUI(config);
+        private void LoadToolSelections(ConfigHandler config)
+        {
+            ApplyToolSelectionToListBox(ToolsListBox, config.GetConfigList("tools"));
+            ApplyToolSelectionToListBox(
+                ToolsRequiringApprovalListBox,
+                config.GetConfigList("toolsrequiringapproval"));
+        }
 
-            // Build per-tool timeout UI
-            BuildToolTimeoutsUI(config);
+        private void Options_Closed(object sender, EventArgs e)
+        {
+            IndexingStatusHub.Updated -= OnIndexingStatusUpdated;
+        }
+
+        private void OnIndexingStatusUpdated()
+        {
+            RefreshIndexingStatusUi();
+        }
+
+        private void RefreshIndexingStatusUi()
+        {
+            IndexingStatusSnapshot status = IndexingStatusHub.GetSnapshot();
+            if (IndexingStatusBrief != null)
+                IndexingStatusBrief.Text = status.BriefText ?? "Index: (unknown)";
+            if (IndexingStatusDetail != null)
+                IndexingStatusDetail.Text = status.DetailText ?? string.Empty;
+            if (BuildIndexButton != null)
+                BuildIndexButton.IsEnabled = !status.IsBusy;
+            if (ClearIndexButton != null)
+                ClearIndexButton.IsEnabled = !status.IsBusy;
+        }
+
+        private void ApplyRetrieveModeToCombo()
+        {
+            if (RagRetrieveModeComboBox == null)
+                return;
+            RagRetrieveModeComboBox.SelectedIndex =
+                string.Equals(RagRetrieveMode, "everyturn", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        }
+
+        private void SyncRetrieveModeFromCombo()
+        {
+            if (RagRetrieveModeComboBox == null)
+                return;
+            RagRetrieveMode = RagRetrieveModeComboBox.SelectedIndex == 1 ? "everyturn" : "newchat";
+        }
+
+        private void BuildIndexButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Persist current Options so the CLI picks them up on /reload,
+            // which also runs the RAG index check.
+            SaveCurrentSettings();
+            App.LoadSettings();
+
+            if (_processHandler != null && _processHandler.IsProcessRunning)
+                _processHandler.SendReload();
+            else
+                MessageBox.Show(this, "Start a chat session first so the CLI can build the index.", "RAG", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void SaveCurrentSettings()
+        {
+            ApiKey = ApiKeyPasswordBox.Password;
+            EmbeddingsApiKey = EmbeddingsApiKeyPasswordBox.Password;
+            SyncRetrieveModeFromCombo();
+            SaveIni(App.ConfigFileName);
+        }
+
+        private void ClearIndexButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_processHandler != null && _processHandler.IsProcessRunning)
+                _processHandler.SendInput("/clearindex");
+            else
+                MessageBox.Show(this, "Start a chat session first so the CLI can clear the index.", "RAG", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -270,13 +463,18 @@ namespace SimpleLLMChatGUI
 
         private void SaveIni(string path)
         {
-            var selectedTools = GetSelectedToolsFromListBox(ToolsListBox);
-            var selectedToolsRequiringApproval = GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox);
-
             var allLines = new List<string>();
+            AddIniSection(allLines, "Appearance", GetAppearanceSettings());
+            AddIniSection(allLines, "RAG", GetRagSettings());
+            AddIniSection(allLines, "System", GetSystemSettings());
+            AddIniSection(allLines, "Tools", GetToolSettings());
+            AddDynamicToolSettings(allLines);
+            File.WriteAllLines(path, allLines);
+        }
 
-            // [Appearance]
-            var appearanceLines = new List<string>
+        private List<string> GetAppearanceSettings()
+        {
+            return new List<string>
             {
                 "assistantname=" + AssistantName,
                 "codeblockfontfamily=" + CodeFontFamily,
@@ -286,12 +484,11 @@ namespace SimpleLLMChatGUI
                 "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
             };
-            appearanceLines.Sort(StringComparer.OrdinalIgnoreCase);
-            allLines.Add("[Appearance]");
-            allLines.AddRange(appearanceLines);
+        }
 
-            // [System]
-            var systemLines = new List<string>
+        private List<string> GetSystemSettings()
+        {
+            return new List<string>
             {
                 "apikey=" + ApiKey,
                 "contextWindowSize=" + ContextWindowSize,
@@ -299,17 +496,16 @@ namespace SimpleLLMChatGUI
                 "model=" + Model,
                 "sysprompt=\"" + EscapePromptForStorage(SysPrompt) + "\"", // keep quotes around prompt; escape sequences encoded
             };
-            systemLines.Sort(StringComparer.OrdinalIgnoreCase);
-            allLines.Add(string.Empty);
-            allLines.Add("[System]");
-            allLines.AddRange(systemLines);
+        }
 
-            // [Tools]
+        private List<string> GetToolSettings()
+        {
             var toolLines = new List<string>
             {
-                "tools=" + string.Join(",", selectedTools),
-                "toolsrequiringapproval=" + string.Join(",", selectedToolsRequiringApproval),
+                "tools=" + string.Join(",", GetSelectedToolsFromListBox(ToolsListBox)),
+                "toolsrequiringapproval=" + string.Join(",", GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox)),
             };
+
             foreach (var kvp in _toolTimeoutControls)
             {
                 string val = kvp.Value.Text.Trim();
@@ -317,38 +513,57 @@ namespace SimpleLLMChatGUI
                 if (!string.IsNullOrEmpty(val) && int.TryParse(val, out parsed) && parsed > 0)
                     toolLines.Add("tooltimeout." + kvp.Key.ToLowerInvariant() + "=" + parsed);
             }
-            toolLines.Sort(StringComparer.OrdinalIgnoreCase);
-            allLines.Add(string.Empty);
-            allLines.Add("[Tools]");
-            allLines.AddRange(toolLines);
+            return toolLines;
+        }
 
-            // Dynamic tool option groups from manifests, one section per tool group
-            if (_toolOptions.Count > 0)
+        private List<string> GetRagSettings()
+        {
+            string allowedExt = RagExtensionList.FormatForStorage(RagAllowedExtensions);
+            return new List<string>
             {
-                foreach (var group in GetToolOptionGroups())
-                {
-                    var groupLines = new List<string>();
-                    foreach (var opt in group)
-                    {
-                        string value = opt.Default;
-                        FrameworkElement control;
-                        if (_toolOptionControls.TryGetValue(opt.Name, out control))
-                        {
-                            if (opt.Type == "bool" && control is CheckBox cb)
-                                value = cb.IsChecked == true ? "1" : "0";
-                            else if (control is TextBox tb)
-                                value = tb.Text;
-                        }
-                        groupLines.Add(opt.Name.ToLowerInvariant() + "=" + value);
-                    }
-                    groupLines.Sort(StringComparer.OrdinalIgnoreCase);
-                    allLines.Add(string.Empty);
-                    allLines.Add("[" + group.Key + "]");
-                    allLines.AddRange(groupLines);
-                }
-            }
+                "ragenabled=" + (RagEnabled ? "1" : "0"),
+                "ragallowedextensions=" + allowedExt,
+                "indexchunkoverlap=" + IndexChunkOverlap,
+                "indexchunklines=" + IndexChunkLines,
+                "embeddingsapikey=" + (EmbeddingsApiKey ?? string.Empty),
+                "embeddingsendpoint=" + (EmbeddingsEndpoint ?? string.Empty),
+                "embeddingsmodel=" + (EmbeddingsModel ?? string.Empty),
+                "ragknowledgepath=" + (RagKnowledgePath ?? string.Empty),
+                "ragmaxsnippetlength=" + RagMaxSnippetLength,
+                "ragmaxresults=" + RagMaxResults,
+                "ragretrievemode=" + (RagRetrieveMode ?? "newchat"),
+            };
+        }
 
-            File.WriteAllLines(path, allLines);
+        private void AddDynamicToolSettings(List<string> allLines)
+        {
+            foreach (var group in GetToolOptionGroups())
+            {
+                var groupLines = new List<string>();
+                foreach (var opt in group)
+                {
+                    string value = opt.Default;
+                    FrameworkElement control;
+                    if (_toolOptionControls.TryGetValue(opt.Name, out control))
+                    {
+                        if (opt.Type == "bool" && control is CheckBox cb)
+                            value = cb.IsChecked == true ? "1" : "0";
+                        else if (control is TextBox tb)
+                            value = tb.Text;
+                    }
+                    groupLines.Add(opt.Name.ToLowerInvariant() + "=" + value);
+                }
+                AddIniSection(allLines, group.Key, groupLines);
+            }
+        }
+
+        private static void AddIniSection(List<string> allLines, string name, List<string> lines)
+        {
+            lines.Sort(StringComparer.OrdinalIgnoreCase);
+            if (allLines.Count > 0)
+                allLines.Add(string.Empty);
+            allLines.Add("[" + name + "]");
+            allLines.AddRange(lines);
         }
 
         /// <summary>
@@ -547,18 +762,12 @@ namespace SimpleLLMChatGUI
             if (listBox == null || tools == null)
                 return;
 
-            foreach (var tool in tools)
+            var selectedTools = new HashSet<string>(tools, StringComparer.OrdinalIgnoreCase);
+            foreach (var item in listBox.Items)
             {
-                foreach (var item in listBox.Items)
-                {
-                    var toolName = item as string;
-                    if (toolName != null &&
-                        string.Equals(toolName, tool, StringComparison.OrdinalIgnoreCase))
-                    {
-                        listBox.SelectedItems.Add(item);
-                        break;
-                    }
-                }
+                var toolName = item as string;
+                if (toolName != null && selectedTools.Contains(toolName))
+                    listBox.SelectedItems.Add(item);
             }
         }
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using SimpleLLMChatCLI.RAG;
 
 namespace SimpleLLMChatCLI
 {
@@ -21,7 +22,9 @@ namespace SimpleLLMChatCLI
         {
             ChatOutput.WriteLine("================== SimpleLLMChat ==================");
             ChatOutput.WriteLine("| Commands:                                       |");
+            ChatOutput.WriteLine("| /buildindex: Reconcile knowledge index          |");
             ChatOutput.WriteLine("| /clear: Clear chat context                      |");
+            ChatOutput.WriteLine("| /clearindex: Clear knowledge index              |");
             ChatOutput.WriteLine("| /exit: Exit the application                     |");
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
@@ -64,6 +67,7 @@ namespace SimpleLLMChatCLI
         {
             Console.InputEncoding = Encoding.UTF8;
             Console.OutputEncoding = Encoding.UTF8;
+            TlsConfig.EnsureModernProtocols();
 
             // Load configuration
             Config = new ConfigHandler(Path.Combine(
@@ -96,6 +100,9 @@ namespace SimpleLLMChatCLI
 
             // Initialize LLMClient
             LLMClient client = new LLMClient(Config, registry);
+
+            // Auto-RAG index check on launch when enabled
+            RagHost.Initialize(Config);
 
             // Get enabled tools
             List<string> enabledTools = Config.GetConfigList("tools");
@@ -256,6 +263,7 @@ namespace SimpleLLMChatCLI
                     enabledTools = Config.GetConfigList("tools");
                     toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
                     showToolOutput = Config.GetConfigBool("showtooloutput");
+                    RagHost.OnConfigReloaded(Config);
                     client.PublishStatusTokens(
                         LLMClient.GetConversationCharacterCount(conversation) + client.GetBaseCharacterOverhead());
 
@@ -263,6 +271,20 @@ namespace SimpleLLMChatCLI
                         ChatOutput.WriteLine("Config reloaded.\n");
                     else
                         ChatOutput.MarkSeparated();
+                    continue;
+                }
+
+                if (userInput == "/buildindex")
+                {
+                    RagHost.BuildIndex();
+                    ChatOutput.MarkSeparated();
+                    continue;
+                }
+
+                if (userInput == "/clearindex")
+                {
+                    RagHost.ClearIndex();
+                    ChatOutput.MarkSeparated();
                     continue;
                 }
 
