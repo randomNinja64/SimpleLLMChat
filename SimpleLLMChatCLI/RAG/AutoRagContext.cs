@@ -3,16 +3,8 @@ using System.Collections.Generic;
 
 namespace SimpleLLMChatCLI.RAG
 {
-    public enum AutoRagResultKind
-    {
-        Skipped,
-        NoHits,
-        Success
-    }
-
     public sealed class AutoRagResult
     {
-        public AutoRagResultKind Kind;
         public string MergedPrompt;
         public string UserStatusLine;
     }
@@ -26,7 +18,6 @@ namespace SimpleLLMChatCLI.RAG
         {
             AutoRagResult result = new AutoRagResult
             {
-                Kind = AutoRagResultKind.Skipped,
                 MergedPrompt = baseUserPrompt
             };
 
@@ -37,31 +28,23 @@ namespace SimpleLLMChatCLI.RAG
 
             DocumentIndex index = DocumentIndex.GetCurrent(config);
             if (!index.HasIndex)
-            {
-                // Empty knowledge / not indexed yet — same as a search with no hits.
-                result.Kind = AutoRagResultKind.NoHits;
                 return result;
-            }
 
             IndexedHitSet hits = SemanticHitFormatter.Search(
                 index, config, query, config.GetConfigInt("ragMaxResults", 5));
             if (hits == null || string.IsNullOrWhiteSpace(hits.FormattedText))
-            {
-                result.Kind = AutoRagResultKind.NoHits;
                 return result;
-            }
 
             string block = "---Retrieved Context---\n"
                 + hits.FormattedText
                 + "\n---End Retrieved Context---";
 
-            result.Kind = AutoRagResultKind.Success;
             result.MergedPrompt = MergeIntoPrompt(baseUserPrompt, block);
             result.UserStatusLine = BuildReadingLine(hits.FilePaths);
             return result;
         }
 
-        public static string MergeIntoPrompt(string basePrompt, string retrievedBlock)
+        private static string MergeIntoPrompt(string basePrompt, string retrievedBlock)
         {
             const string separator = "\n\n---\n\n";
             string baseText = basePrompt ?? string.Empty;

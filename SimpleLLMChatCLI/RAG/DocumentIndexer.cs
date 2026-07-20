@@ -111,7 +111,6 @@ namespace SimpleLLMChatCLI.RAG
                 if (string.IsNullOrWhiteSpace(content))
                     continue;
 
-                int fileChunks = 0;
                 string relative = index.ToDisplayPath(file);
                 foreach (ChunkInfo ci in Chunk(content, chunkLines, overlap))
                 {
@@ -127,13 +126,11 @@ namespace SimpleLLMChatCLI.RAG
                     };
                     pendingChunks.Add(cv);
                     pendingTexts.Add("File: " + relative + "\n" + text);
-                    fileChunks++;
                 }
 
                 index.Manifest.Files[file] = new IndexFileEntry
                 {
-                    Hash = hash,
-                    ChunkCount = fileChunks
+                    Hash = hash
                 };
             }
 

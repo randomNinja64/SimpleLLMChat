@@ -41,7 +41,6 @@ namespace SimpleLLMChatCLI.RAG
         private int _dimension;
 
         public int Count { get { return _vectors.Count; } }
-        public int Dimension { get { return _dimension; } }
 
         public void Add(ChunkVector vector)
         {

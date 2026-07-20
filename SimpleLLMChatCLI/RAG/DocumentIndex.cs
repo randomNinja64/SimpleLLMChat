@@ -10,16 +10,12 @@ namespace SimpleLLMChatCLI.RAG
     public class IndexFileEntry
     {
         public string Hash;
-        public int ChunkCount;
     }
 
     public class IndexManifest
     {
         public string KnowledgePath;
         public string EmbeddingsModel;
-        public int Dimension;
-        public bool SemanticPresent;
-        public string LastIndexedUtc;
         public int IndexChunkLines;
         public int IndexChunkOverlap;
         public int RagMaxSnippetLength;
@@ -138,9 +134,6 @@ namespace SimpleLLMChatCLI.RAG
             if (!Directory.Exists(IndexDir))
                 Directory.CreateDirectory(IndexDir);
 
-            Manifest.Dimension = Vectors.Dimension;
-            Manifest.SemanticPresent = Vectors.Count > 0;
-            Manifest.LastIndexedUtc = DateTime.UtcNow.ToString("o");
             Manifest.KnowledgePath = KnowledgePath;
 
             string json = JsonConvert.SerializeObject(Manifest, Formatting.Indented);
@@ -152,8 +145,6 @@ namespace SimpleLLMChatCLI.RAG
         {
             Vectors.Clear();
             Manifest.Files.Clear();
-            Manifest.SemanticPresent = false;
-            Manifest.Dimension = 0;
             try
             {
                 if (File.Exists(VectorsPath))

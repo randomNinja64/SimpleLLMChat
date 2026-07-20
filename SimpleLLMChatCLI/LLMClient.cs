@@ -52,14 +52,12 @@ public class LLMClient
         public string Content;
         public List<ToolRegistry.ToolCall> ToolCalls;
         public string FinishReason;
-        public int ReasoningSeconds;
 
         public LLMCompletionResponse(string content, List<ToolRegistry.ToolCall> toolCalls, string finishReason)
         {
             Content = content;
             ToolCalls = toolCalls ?? new List<ToolRegistry.ToolCall>();
             FinishReason = finishReason;
-            ReasoningSeconds = 0;
         }
     }
 
@@ -610,7 +608,7 @@ public class LLMClient
 
     /// <summary>
     /// Console approval prompt routed through ChatOutput so block spacing stays
-    /// accurate. Same wire format as ToolApproval.RequestApproval (the GUI
+    /// accurate. Wire format is FormatApprovalMessage + ApprovalPrompt (the GUI
     /// parses the "Run tool:" ... "Approve? (Y/N): " block from stdout).
     /// </summary>
     private static bool CliRequestApproval(string toolName, string arguments)

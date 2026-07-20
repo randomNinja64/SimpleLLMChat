@@ -125,7 +125,6 @@ namespace SimpleLLMChatCLI
                     else
                     {
                         int secs = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
-                        response.ReasoningSeconds = secs;
                         onReasoningSummary?.Invoke(secs);
                     }
                     inReasoning = false;
@@ -196,7 +195,6 @@ namespace SimpleLLMChatCLI
             else
             {
                 int secs = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
-                response.ReasoningSeconds = secs;
                 onReasoningSummary?.Invoke(secs);
             }
         }

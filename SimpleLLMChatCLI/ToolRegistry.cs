@@ -17,13 +17,6 @@ namespace SimpleLLMChatCLI
             public string Name;
             public string Arguments;
 
-            public ToolCall(string name, string arguments, string id = "")
-            {
-                Id = id;
-                Name = name;
-                Arguments = arguments;
-            }
-
             public ToolCall()
             {
                 Id = "";

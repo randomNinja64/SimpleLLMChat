@@ -17,13 +17,9 @@ namespace SimpleLLMChatCLI
     /// </summary>
     internal static class CurlClient
     {
-        public static readonly string ExecutablePath =
+        private static readonly string ExecutablePath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "curl.exe");
 
-        /// <summary>
-        /// True when the URL is HTTPS, curl.exe is present, and the failure looks like a
-        /// TLS/connection issue that curl may work around on legacy .NET 4.0.
-        /// </summary>
         public static bool CanFallback(string url, Exception ex)
         {
             return !string.IsNullOrEmpty(url)

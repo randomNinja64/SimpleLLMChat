@@ -300,7 +300,7 @@ namespace FileTools
         }
 
         // Helper method to ensure a directory exists
-        public static bool EnsureDirectoryExists(string directoryPath, out int exitCode, out string errorMessage)
+        private static bool EnsureDirectoryExists(string directoryPath, out int exitCode, out string errorMessage)
         {
             exitCode = 0;
             errorMessage = null;

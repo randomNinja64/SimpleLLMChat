@@ -88,7 +88,7 @@ public static class ToolHelper
 
     // Loads option defaults from the manifest file sitting next to the executable.
     // Must be called before stdin config is parsed so that stdin values take precedence.
-    public static void LoadManifestDefaults()
+    private static void LoadManifestDefaults()
     {
         try
         {

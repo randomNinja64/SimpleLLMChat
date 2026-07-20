@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows;
 
 namespace SimpleLLMChatGUI
 {
@@ -18,7 +17,6 @@ namespace SimpleLLMChatGUI
         public event Action GenerationComplete;
         public event Func<string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
-        public event Action<IndexingStatusEvent> IndexingStatusReceived;
 
         private readonly StringBuilder streamBuffer = new StringBuilder();
         private StatusPipeClient statusPipeClient;
@@ -78,9 +76,6 @@ namespace SimpleLLMChatGUI
         private void OnIndexingStatusPipeReceived(IndexingStatusEvent status)
         {
             IndexingStatusHub.Publish(status);
-            Action<IndexingStatusEvent> handler = IndexingStatusReceived;
-            if (handler != null)
-                handler(status);
         }
 
         private void DisposeStatusPipeClient()

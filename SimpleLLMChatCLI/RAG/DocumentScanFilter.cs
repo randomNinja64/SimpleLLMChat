@@ -29,7 +29,7 @@ namespace SimpleLLMChatCLI.RAG
             return set;
         }
 
-        public static bool IsAllowedExtension(string filePath, HashSet<string> allowed)
+        private static bool IsAllowedExtension(string filePath, HashSet<string> allowed)
         {
             if (string.IsNullOrEmpty(filePath) || allowed == null || allowed.Count == 0)
                 return false;

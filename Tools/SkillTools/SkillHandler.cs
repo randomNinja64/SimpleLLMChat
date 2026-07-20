@@ -22,7 +22,7 @@ namespace SkillTools
             public string Description;
         }
 
-        public static string GetSkillsDirectory()
+        private static string GetSkillsDirectory()
         {
             string configured = ToolHelper.GetConfigString("skillsDirectory").Trim();
             if (!string.IsNullOrEmpty(configured))
@@ -233,7 +233,8 @@ namespace SkillTools
                 string description = "";
                 try
                 {
-                    ParseFrontmatter(File.ReadAllText(skillMd, Encoding.UTF8), out description);
+                    string body;
+                    ParseSkillMarkdown(File.ReadAllText(skillMd, Encoding.UTF8), out description, out body);
                 }
                 catch
                 {
@@ -388,16 +389,6 @@ namespace SkillTools
                 return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
             }
             return value;
-        }
-
-        /// <summary>
-        /// Minimal frontmatter parser: flat key: value lines between --- fences.
-        /// Skill identity is the folder name; only description is read from YAML.
-        /// </summary>
-        internal static void ParseFrontmatter(string content, out string description)
-        {
-            string body;
-            ParseSkillMarkdown(content, out description, out body);
         }
 
         /// <summary>

@@ -9,7 +9,7 @@ namespace MemoryTools
     {
         private const int MaxNameLength = 100;
 
-        public static string GetMemoriesDirectory()
+        private static string GetMemoriesDirectory()
         {
             string configured = ToolHelper.GetConfigString("memoriesDirectory").Trim();
             if (!string.IsNullOrEmpty(configured))

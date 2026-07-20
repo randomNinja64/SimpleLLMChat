@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 
 /// <summary>
 /// Shared tool-approval prompt text used by CLI output and GUI parsing.
@@ -31,41 +30,6 @@ public static class ToolApproval
     {
         string formattedArguments = UnescapeArguments(arguments);
         return RunToolPrefix + toolName + "\n" + formattedArguments;
-    }
-
-    public static bool RequestApproval(string toolName, string arguments)
-    {
-        Console.WriteLine();
-        Console.WriteLine(FormatApprovalMessage(toolName, arguments));
-        Console.Out.Flush();
-
-        while (true)
-        {
-            Console.Write(ApprovalPrompt);
-            Console.Out.Flush();
-
-            string input = Console.ReadLine();
-            if (input == null)
-                continue;
-
-            input = input.Trim();
-            if (input.Length == 0)
-                continue;
-
-            if (string.Equals(input, "Y", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(input, "yes", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (string.Equals(input, "N", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(input, "no", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            Console.WriteLine("Please enter Y or N.");
-        }
     }
 
     public static bool TryParseApprovalPrompt(string text, out string toolName, out string arguments)

@@ -25,11 +25,6 @@ public class ConfigHandler
         return configMap.ContainsKey(key) ? configMap[key] : defaultValue;
     }
 
-    public void SetConfigValue(string key, string value)
-    {
-        configMap[key] = value;
-    }
-
     public int GetConfigInt(string key, int defaultValue)
     {
         if (configMap.ContainsKey(key) && int.TryParse(configMap[key], out int result))

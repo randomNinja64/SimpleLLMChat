@@ -8,8 +8,6 @@ namespace SimpleLLMChatGUI
 {
     public static class FontHandler
     {
-        private const int DefaultFontSize = AppConstants.DefaultChatFontSize;
-
         public static void ApplyFontToWindow(Window window)
         {
             if (window == null) return;

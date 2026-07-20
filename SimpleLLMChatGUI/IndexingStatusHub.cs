@@ -24,21 +24,6 @@ namespace SimpleLLMChatGUI
 
         public static event Action Updated;
 
-        public static string BriefText
-        {
-            get { lock (Sync) return _briefText; }
-        }
-
-        public static string DetailText
-        {
-            get { lock (Sync) return _detailText; }
-        }
-
-        public static bool IsBusy
-        {
-            get { lock (Sync) return _busy; }
-        }
-
         /// <summary>Returns brief/detail/busy together so callers never see a torn read across events.</summary>
         public static IndexingStatusSnapshot GetSnapshot()
         {

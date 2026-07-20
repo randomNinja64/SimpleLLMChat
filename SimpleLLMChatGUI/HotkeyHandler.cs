@@ -15,7 +15,7 @@ namespace SimpleLLMChatGUI
         private readonly int virtualKey;
         private HwndSource hwndSource;
         private bool isRegistered;
-        public bool IsEnabled { get; private set; }
+        private bool _isEnabled;
 
         public event Action<string> ScreenshotTaken;
         public event Action<string> ErrorOccurred;
@@ -55,13 +55,13 @@ namespace SimpleLLMChatGUI
 
         public void Enable()
         {
-            IsEnabled = true;
+            _isEnabled = true;
             Register();
         }
 
         public void Disable()
         {
-            IsEnabled = false;
+            _isEnabled = false;
             Unregister();
         }
 
@@ -94,7 +94,7 @@ namespace SimpleLLMChatGUI
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             const int WM_HOTKEY = 0x0312;
-            if (msg == WM_HOTKEY && wParam.ToInt32() == hotkeyId && IsEnabled)
+            if (msg == WM_HOTKEY && wParam.ToInt32() == hotkeyId && _isEnabled)
             {
                 handled = true;
                 TryTakeScreenshot();
