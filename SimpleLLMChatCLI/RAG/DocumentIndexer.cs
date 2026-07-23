@@ -94,17 +94,33 @@ namespace SimpleLLMChatCLI.RAG
                     File = Path.GetFileName(file)
                 });
 
+                IndexFileEntry existing = null;
+                long mtime = SafeMtime(file);
+                // Skip unchanged files without reading when mtime matches.
+                if (!fullRebuild
+                    && mtime != 0
+                    && index.Manifest.Files.TryGetValue(file, out existing)
+                    && existing != null
+                    && existing.Mtime == mtime)
+                {
+                    continue;
+                }
+
                 string content;
                 string hash;
                 if (!TryReadContent(file, out content, out hash))
                     continue;
 
-                IndexFileEntry existing;
                 if (!fullRebuild
                     && index.Manifest.Files.TryGetValue(file, out existing)
                     && existing != null
                     && string.Equals(existing.Hash, hash, StringComparison.Ordinal))
+                {
+                    // Content identical; refresh stored mtime so the next reconcile can skip the read.
+                    if (existing.Mtime != mtime)
+                        existing.Mtime = mtime;
                     continue;
+                }
 
                 index.RemoveFileData(file);
 
@@ -130,7 +146,8 @@ namespace SimpleLLMChatCLI.RAG
 
                 index.Manifest.Files[file] = new IndexFileEntry
                 {
-                    Hash = hash
+                    Hash = hash,
+                    Mtime = mtime
                 };
             }
 
@@ -227,6 +244,12 @@ namespace SimpleLLMChatCLI.RAG
             if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
                 return new UTF8Encoding(false).GetString(bytes, 3, bytes.Length - 3);
             return new UTF8Encoding(false).GetString(bytes);
+        }
+
+        private static long SafeMtime(string file)
+        {
+            try { return File.GetLastWriteTimeUtc(file).Ticks; }
+            catch { return 0; }
         }
 
         private static string Truncate(string text, int maxChars)

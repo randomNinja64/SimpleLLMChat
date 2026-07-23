@@ -7,9 +7,14 @@ using System.Text;
 
 namespace SimpleLLMChatCLI.RAG
 {
+    /// <summary>
+    /// Per-file bookkeeping for incremental re-indexing.
+    /// <see cref="Mtime"/> skips disk reads on reconcile; <see cref="Hash"/> confirms content when read.
+    /// </summary>
     public class IndexFileEntry
     {
         public string Hash;
+        public long Mtime;
     }
 
     public class IndexManifest
