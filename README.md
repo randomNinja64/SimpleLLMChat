@@ -30,9 +30,9 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 
 To use the application, download and extract the appropriate build for your system from the Releases page (builds ending in -XP are recommended for Windows XP systems).
 
-To initialize the configuration file (LLMSettings.ini), open `SimpleLLMChatGUI.exe` and select `Options`. Make sure to set LLM server settings in `System`. Then, set other options as desired.
+On first launch of `SimpleLLMChatGUI.exe`, if `LLMSettings.ini` does not exist next to the executable, a setup wizard walks through System settings. Settings can also be changed later via Options.
 
-Once the options have been set, the software can be used via the `SimpleLLMChatCLI.exe` or `SimpleLLMChatGUI.exe` executables.
+Once configured, the software can be used via the `SimpleLLMChatCLI.exe` or `SimpleLLMChatGUI.exe` executables.
 
 ## Building
 
@@ -46,7 +46,7 @@ Both methods require the .NET 4.0 Targeting Pack to be installed.
 
 ## Configuration
 
-SimpleLLMChat can be configured either using the GUI options pages or manually via `LLMSettings.ini`. The options available within the INI file are as follows:
+On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates it from System settings. Appearance, RAG, Tools, and other options can be changed later via Options or by editing the INI manually. The options available within the INI file are as follows:
 
 **Appearance**
 - `assistantname`: Display name for assistant responses

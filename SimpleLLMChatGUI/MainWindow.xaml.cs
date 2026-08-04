@@ -75,6 +75,7 @@ namespace SimpleLLMChatGUI
             onRendered = (s, args) =>
             {
                 ContentRendered -= onRendered;
+                OnboardingWizardWindow.ShowIfNeeded(this);
                 StartLLMProcess();
             };
             ContentRendered += onRendered;

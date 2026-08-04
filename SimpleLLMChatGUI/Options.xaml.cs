@@ -266,18 +266,6 @@ namespace SimpleLLMChatGUI
             Close();
         }
 
-        private static string EscapePromptForStorage(string prompt)
-        {
-            if (string.IsNullOrEmpty(prompt))
-                return string.Empty;
-
-            // Escape backslashes first, then other special characters
-            return prompt.Replace("\\", "\\\\")
-                        .Replace("\r\n", "\\n")  // Windows line endings
-                        .Replace("\n", "\\n")      // Unix line endings
-                        .Replace("\r", "\\r")      // Mac line endings
-                        .Replace("\t", "\\t");      // Tabs
-        }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
@@ -437,7 +425,7 @@ namespace SimpleLLMChatGUI
             ApiKey = ApiKeyPasswordBox.Password;
             EmbeddingsApiKey = EmbeddingsApiKeyPasswordBox.Password;
             SyncRetrieveModeFromCombo();
-            SaveIni(App.ConfigFileName);
+            SaveIni(App.ConfigFilePath);
         }
 
         private void ClearIndexButton_Click(object sender, RoutedEventArgs e)
@@ -463,13 +451,15 @@ namespace SimpleLLMChatGUI
 
         private void SaveIni(string path)
         {
-            var allLines = new List<string>();
-            AddIniSection(allLines, "Appearance", GetAppearanceSettings());
-            AddIniSection(allLines, "RAG", GetRagSettings());
-            AddIniSection(allLines, "System", GetSystemSettings());
-            AddIniSection(allLines, "Tools", GetToolSettings());
-            AddDynamicToolSettings(allLines);
-            File.WriteAllLines(path, allLines);
+            var sections = new List<KeyValuePair<string, List<string>>>
+            {
+                new KeyValuePair<string, List<string>>("Appearance", GetAppearanceSettings()),
+                new KeyValuePair<string, List<string>>("RAG", GetRagSettings()),
+                new KeyValuePair<string, List<string>>("System", GetSystemSettings()),
+                new KeyValuePair<string, List<string>>("Tools", GetToolSettings()),
+            };
+            AddDynamicToolSettings(sections);
+            SettingsIniWriter.WriteSections(path, sections);
         }
 
         private List<string> GetAppearanceSettings()
@@ -488,14 +478,7 @@ namespace SimpleLLMChatGUI
 
         private List<string> GetSystemSettings()
         {
-            return new List<string>
-            {
-                "apikey=" + ApiKey,
-                "contextWindowSize=" + ContextWindowSize,
-                "llmserver=" + ServerURL,
-                "model=" + Model,
-                "sysprompt=\"" + EscapePromptForStorage(SysPrompt) + "\"", // keep quotes around prompt; escape sequences encoded
-            };
+            return SettingsIniWriter.GetSystemSettings(ApiKey, ServerURL, Model, SysPrompt, ContextWindowSize);
         }
 
         private List<string> GetToolSettings()
@@ -535,7 +518,7 @@ namespace SimpleLLMChatGUI
             };
         }
 
-        private void AddDynamicToolSettings(List<string> allLines)
+        private void AddDynamicToolSettings(List<KeyValuePair<string, List<string>>> sections)
         {
             foreach (var group in GetToolOptionGroups())
             {
@@ -553,17 +536,8 @@ namespace SimpleLLMChatGUI
                     }
                     groupLines.Add(opt.Name.ToLowerInvariant() + "=" + value);
                 }
-                AddIniSection(allLines, group.Key, groupLines);
+                sections.Add(new KeyValuePair<string, List<string>>(group.Key, groupLines));
             }
-        }
-
-        private static void AddIniSection(List<string> allLines, string name, List<string> lines)
-        {
-            lines.Sort(StringComparer.OrdinalIgnoreCase);
-            if (allLines.Count > 0)
-                allLines.Add(string.Empty);
-            allLines.Add("[" + name + "]");
-            allLines.AddRange(lines);
         }
 
         /// <summary>

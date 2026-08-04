@@ -71,6 +71,7 @@
     <Compile Include="FontHandler.cs" />
     <Compile Include="HotkeyHandler.cs" />
     <Compile Include="ImageHandler.cs" />
+    <Compile Include="SettingsIniWriter.cs" />
     <Compile Include="..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>
@@ -113,6 +114,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="OnboardingWizardWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ColorsForm.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -124,6 +129,9 @@
     <Compile Include="MarkdownHandler.cs" />
     <Compile Include="Options.xaml.cs">
       <DependentUpon>Options.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OnboardingWizardWindow.xaml.cs">
+      <DependentUpon>OnboardingWizardWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="ColorsForm.xaml.cs">
       <DependentUpon>ColorsForm.xaml</DependentUpon>
