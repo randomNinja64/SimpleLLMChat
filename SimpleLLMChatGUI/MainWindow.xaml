@@ -5,6 +5,82 @@
         Title="Simple LLM Chat" Height="350" Width="450" Loaded="Window_Loaded"
         MinWidth="415" MinHeight="200"
         Background="{DynamicResource WindowBackgroundColorBrush}">
+    <Window.Resources>
+        <!-- +/- toggle for collapsible thinking / tool-call blocks -->
+        <Style x:Key="ThinkingExpandToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border Width="9" Height="9"
+                                    BorderBrush="{TemplateBinding Foreground}"
+                                    BorderThickness="1"
+                                    Background="Transparent"
+                                    Margin="0,1,5,0"
+                                    VerticalAlignment="Center"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <Rectangle x:Name="Horizontal"
+                                               Width="5" Height="1"
+                                               Fill="{TemplateBinding Foreground}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                    <Rectangle x:Name="Vertical"
+                                               Width="1" Height="5"
+                                               Fill="{TemplateBinding Foreground}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Vertical" Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ThinkingExpanderStyle" TargetType="Expander">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <DockPanel LastChildFill="True">
+                            <ToggleButton x:Name="HeaderSite"
+                                          DockPanel.Dock="Top"
+                                          Style="{StaticResource ThinkingExpandToggleStyle}"
+                                          IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Content="{TemplateBinding Header}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalContentAlignment="Left"
+                                          Padding="0"/>
+                            <ContentPresenter x:Name="ExpandSite"
+                                              ContentSource="Content"
+                                              Visibility="Collapsed"
+                                              Margin="0"/>
+                        </DockPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid Margin="5">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -62,6 +138,7 @@
         <ListBox Name="chatList"
                  Grid.Row="1"
                  Margin="0,0,0,5"
+                 Padding="4"
                  BorderThickness="1"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -73,8 +150,8 @@
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    <Setter Property="Padding" Value="4,2"/>
-                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0,0,0,14"/>
                     <Setter Property="Focusable" Value="False"/>
                     <Setter Property="Background" Value="Transparent"/>
                     <Setter Property="Template">

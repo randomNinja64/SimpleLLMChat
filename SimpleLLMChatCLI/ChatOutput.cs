@@ -78,7 +78,13 @@ namespace SimpleLLMChatCLI
             }
 
             if (sb.Length > 0)
+            {
                 Console.Write(sb.ToString());
+                // When stdout is a pipe (GUI ProcessHandler), the default buffer can
+                // hold several KB — short tool-call markers then arrive as one clump.
+                // Flush so streaming matches NyoCoder's direct UI callback.
+                Console.Out.Flush();
+            }
         }
 
         public static void WriteLine(string text)

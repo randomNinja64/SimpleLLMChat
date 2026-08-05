@@ -49,13 +49,15 @@ Both methods require the .NET 4.0 Targeting Pack to be installed.
 On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates it from System settings. Appearance, RAG, Tools, and other options can be changed later via Options or by editing the INI manually. The options available within the INI file are as follows:
 
 **Appearance**
-- `assistantname`: Display name for assistant responses
+- `assistantname`: Display name for assistant responses (default `LLM`)
 - `codeblockfontfamily`: Font used for rendering code blocks in the GUI
 - `customfontfamily`: Font used for all non-code block text in the GUI
 - `fontsize`: Font size for chat and input text
 - `markdownparsing`: Enables/disables Markdown rendering in the GUI (`1` or `0`)
 - `showreasoningoutput`: Enables/disables reasoning output display (`1` or `0`)
+- `collapsethinking`: Collapse thinking/reasoning blocks by default in the GUI (`1` or `0`, default `1`)
 - `showtooloutput`: Enables/disables full tool execution output in chat (`1` or `0`)
+- `collapsetoolcalls`: Collapse tool-call blocks by default in the GUI (`1` or `0`, default `1`)
 
 **RAG**
 - `ragenabled`: Enables RAG (`1` or `0`, default off)

@@ -87,10 +87,22 @@
                               IsChecked="{Binding ShowReasoningOutput, UpdateSourceTrigger=PropertyChanged}"
                               Margin="0,10,0,0"/>
 
+                    <!-- Collapse Thinking -->
+                    <CheckBox x:Name="CollapseThinkingCheckBox"
+                              Content="Collapse Thinking Blocks by Default"
+                              IsChecked="{Binding CollapseThinking, UpdateSourceTrigger=PropertyChanged}"
+                              Margin="0,10,0,0"/>
+
                     <!-- Show Tool Call Outputs -->
                     <CheckBox x:Name="ShowToolOutputCheckBox"
                               Content="Show Tool Call Outputs"
                               IsChecked="{Binding ShowToolOutput, UpdateSourceTrigger=PropertyChanged}"
+                              Margin="0,10,0,0"/>
+
+                    <!-- Collapse Tool Calls -->
+                    <CheckBox x:Name="CollapseToolCallsCheckBox"
+                              Content="Collapse Tool Calls by Default"
+                              IsChecked="{Binding CollapseToolCalls, UpdateSourceTrigger=PropertyChanged}"
                               Margin="0,10,0,0"/>
 
                 </StackPanel>

@@ -45,7 +45,6 @@ namespace SimpleLLMChatGUI
                 startBlockIndex = blocks.Count;
 
             int activeBacktickFenceLength = 0;
-            bool insideThinkTag = false;
             FontFamily codeBlockFontFamily = FontHandler.TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"));
 
             for (int i = startBlockIndex; i < blocks.Count; i++)
@@ -80,30 +79,13 @@ namespace SimpleLLMChatGUI
                     }
                 }
 
-                // Check for think tag markers (case-insensitive).
-                // Closing tags first: "[/thinking]" also contains "[thinking]".
-                if (paragraphText.IndexOf("</think>", StringComparison.OrdinalIgnoreCase) >= 0
-                    || paragraphText.IndexOf("[/thinking]", StringComparison.OrdinalIgnoreCase) >= 0)
+                // Skip processing inside fenced code blocks (thinking/tool bodies are
+                // BlockUIContainer expanders, not paragraphs, so they are skipped above).
+                if (activeBacktickFenceLength > 0)
                 {
-                    insideThinkTag = false;
-                    continue;
-                }
-                if (paragraphText.IndexOf("<think>", StringComparison.OrdinalIgnoreCase) >= 0
-                    || paragraphText.IndexOf("[thinking]", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    insideThinkTag = true;
-                    continue;
-                }
-
-                // Skip processing if we're inside an excluded region
-                if (activeBacktickFenceLength > 0 || insideThinkTag)
-                {
-                    if (activeBacktickFenceLength > 0)
-                    {
-                        paragraph.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
-                        if (codeBlockFontFamily != null)
-                            paragraph.FontFamily = codeBlockFontFamily;
-                    }
+                    paragraph.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
+                    if (codeBlockFontFamily != null)
+                        paragraph.FontFamily = codeBlockFontFamily;
                     continue;
                 }
 

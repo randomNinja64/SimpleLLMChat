@@ -59,6 +59,7 @@ namespace SimpleLLMChatGUI
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             chatList.ItemsSource = _chatTurns;
+            ChatTurn.ThinkingExpanderStyle = TryFindResource("ThinkingExpanderStyle") as Style;
 
             FontHandler.ApplyFontToWindow(this);
             LoadAndApplyFontSize();
@@ -257,17 +258,13 @@ namespace SimpleLLMChatGUI
             FontHandler.ApplyFontSizeToControl(chatList, fontSize);
             FontHandler.ApplyFontSizeToControl(chatInput, fontSize);
             foreach (ChatTurn turn in _chatTurns)
-                turn.Document.FontSize = fontSize;
+                turn.ApplyFontSize(fontSize);
         }
 
         private ChatTurn AddTurn()
         {
             ChatTurn turn = new ChatTurn();
-            turn.Document.FontSize = FontHandler.GetFontSize();
-            // Every turn after the first gets a blank line above it, so turns
-            // are separated the same way blocks within a turn are.
-            if (_chatTurns.Count > 0)
-                turn.AddLeadingSeparator();
+            turn.ApplyFontSize(FontHandler.GetFontSize());
             ApplyDocumentPageWidth(turn);
             _chatTurns.Add(turn);
             return turn;

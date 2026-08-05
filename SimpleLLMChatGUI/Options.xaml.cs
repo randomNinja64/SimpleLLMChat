@@ -20,6 +20,8 @@ namespace SimpleLLMChatGUI
         private string _assistantName;
         private bool _showToolOutput;
         private bool _showReasoningOutput;
+        private bool _collapseThinking;
+        private bool _collapseToolCalls;
         private bool _markdownParsing;
         private string _codeFontFamily;
         private string _customFontFamily;
@@ -110,6 +112,18 @@ namespace SimpleLLMChatGUI
         {
             get { return _showReasoningOutput; }
             set { _showReasoningOutput = value; OnPropertyChanged(nameof(ShowReasoningOutput)); }
+        }
+
+        public bool CollapseThinking
+        {
+            get { return _collapseThinking; }
+            set { _collapseThinking = value; OnPropertyChanged(nameof(CollapseThinking)); }
+        }
+
+        public bool CollapseToolCalls
+        {
+            get { return _collapseToolCalls; }
+            set { _collapseToolCalls = value; OnPropertyChanged(nameof(CollapseToolCalls)); }
         }
 
         public bool MarkdownParsing
@@ -238,9 +252,11 @@ namespace SimpleLLMChatGUI
             Model = "";
             SysPrompt = "";
             ContextWindowSize = 0;
-            AssistantName = "";
+            AssistantName = AppConstants.DefaultAssistantName;
             ShowToolOutput = true;
             ShowReasoningOutput = true;
+            CollapseThinking = true;
+            CollapseToolCalls = true;
             MarkdownParsing = true;
             CodeFontFamily = "";
             CustomFontFamily = "";
@@ -334,8 +350,12 @@ namespace SimpleLLMChatGUI
             SysPrompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"));
             ContextWindowSize = config.GetConfigInt("contextWindowSize", 0);
             AssistantName = config.GetConfigValue("assistantname");
+            if (string.IsNullOrWhiteSpace(AssistantName))
+                AssistantName = AppConstants.DefaultAssistantName;
             ShowToolOutput = config.GetConfigBool("showtooloutput");
             ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
+            CollapseThinking = config.GetConfigBool("collapsethinking", true);
+            CollapseToolCalls = config.GetConfigBool("collapsetoolcalls", true);
             MarkdownParsing = config.GetConfigBool("markdownparsing", true);
             CodeFontFamily = config.GetConfigValue("codeblockfontfamily");
             CustomFontFamily = config.GetConfigValue("customfontfamily");
@@ -472,7 +492,9 @@ namespace SimpleLLMChatGUI
                 "fontsize=" + ChatFontSize,
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
                 "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
+                "collapsethinking=" + (CollapseThinking ? "1" : "0"),
                 "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
+                "collapsetoolcalls=" + (CollapseToolCalls ? "1" : "0"),
             };
         }
 

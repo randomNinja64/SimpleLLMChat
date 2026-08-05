@@ -37,11 +37,11 @@ public class LLMClient
         public List<ToolRegistry.ToolCall> ToolCalls;
         public string ToolCallId;
 
-        public ChatMessage(string role, string content, string toolCallId = "")
+        public ChatMessage(string role, string content)
         {
             Role = role;
             Content = content;
-            ToolCallId = toolCallId;
+            ToolCallId = "";
             Image = null;
             ToolCalls = new List<ToolRegistry.ToolCall>();
         }
@@ -141,7 +141,57 @@ public class LLMClient
         {
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, onContentStart, startBlock);
+            // Stream tool calls with explicit open/close markers as they arrive, rather than
+            // waiting for the full response before printing them. A tool that requires approval
+            // is suppressed here since the approval prompt below shows its name + args instead.
+            bool toolCallUiOpen = false;
+            bool toolCallArgsEndedWithNewline = true;
+            bool currentToolCallSuppressed = false;
+            Action<ToolRegistry.ToolCall> toolCallStreamCallback = null;
+            if (!outputOnly)
+            {
+                toolCallStreamCallback = (toolCall) =>
+                {
+                    if (!string.IsNullOrEmpty(toolCall.Name) && string.IsNullOrEmpty(toolCall.Arguments))
+                    {
+                        if (toolCallUiOpen)
+                        {
+                            if (!toolCallArgsEndedWithNewline)
+                                ChatOutput.WriteLine();
+                            ChatOutput.WriteLine("[/tool call]");
+                        }
+
+                        currentToolCallSuppressed = toolsRequiringApproval != null
+                            && toolsRequiringApproval.Contains(toolCall.Name);
+
+                        if (!currentToolCallSuppressed)
+                        {
+                            startBlock();
+                            ChatOutput.WriteLine("[tool call] " + toolCall.Name);
+                            toolCallUiOpen = true;
+                            toolCallArgsEndedWithNewline = true;
+                        }
+                        else
+                        {
+                            toolCallUiOpen = false;
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(toolCall.Arguments) && !currentToolCallSuppressed)
+                    {
+                        ChatOutput.Write(toolCall.Arguments);
+                        toolCallArgsEndedWithNewline = toolCall.Arguments.EndsWith("\n");
+                    }
+                };
+            }
+
+            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback, onContentStart, startBlock);
+
+            if (toolCallUiOpen)
+            {
+                if (!toolCallArgsEndedWithNewline)
+                    ChatOutput.WriteLine();
+                ChatOutput.WriteLine("[/tool call]");
+            }
 
             if (response.FinishReason == "request_failed")
             {
@@ -168,13 +218,10 @@ public class LLMClient
                     bool needsApproval = toolsRequiringApproval != null
                         && toolsRequiringApproval.Contains(call.Name);
 
-                    if (!outputOnly)
-                    {
+                    // The tool call block itself was already streamed above (if not suppressed
+                    // for approval); only pad a blank line before the approval prompt here.
+                    if (!outputOnly && needsApproval)
                         startBlock();
-                        // Approval prompt already shows name + args; avoid duplicating them.
-                        if (!needsApproval)
-                            ChatOutput.WriteLine("[tool request] " + call.Name + " with arguments: " + call.Arguments);
-                    }
 
                     int exitCode = 0;
                     string toolContent;
@@ -333,11 +380,29 @@ public class LLMClient
     }
 
     /// <summary>
-    /// Cached system prompt + tool schema length. 0 until the first request is built.
+    /// Cached system prompt + tool schema length. 0 until the first request is built
+    /// or <see cref="RefreshBaseCharacterOverhead"/> runs (e.g. after /reload).
     /// </summary>
     public int GetBaseCharacterOverhead()
     {
         return BaseOverheadChars.HasValue ? BaseOverheadChars.Value : 0;
+    }
+
+    /// <summary>
+    /// Recomputes system prompt + tool schema overhead from the current config/tools.
+    /// Used after /reload so status stays accurate without waiting for the next request.
+    /// </summary>
+    public void RefreshBaseCharacterOverhead(List<string> enabledTools)
+    {
+        string systemPrompt = BuildSystemPrompt(enabledTools);
+        int toolsChars = 0;
+        if (enabledTools != null && enabledTools.Count > 0 && registry != null)
+        {
+            JArray toolsArray = registry.BuildToolsArray(enabledTools);
+            if (toolsArray.Count > 0)
+                toolsChars = toolsArray.ToString(Formatting.None).Length;
+        }
+        BaseOverheadChars = systemPrompt.Length + toolsChars;
     }
 
     private string BuildSystemPrompt(List<string> enabledTools)
@@ -438,8 +503,6 @@ public class LLMClient
         return response.Content ?? string.Empty;
     }
 
-
-
     private JObject BuildMessageObject(ChatMessage msg)
     {
         JObject msgObj = new JObject
@@ -526,22 +589,17 @@ public class LLMClient
         List<ChatMessage> conversation,
         List<string> enabledTools,
         Action<string> outputCallback = null,
+        Action<ToolRegistry.ToolCall> toolCallCallback = null,
         Action onContentStart = null,
         Action startBlock = null)
     {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback, onContentStart, startBlock);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback, toolCallCallback, onContentStart, startBlock);
     }
 
     private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null,
+        Action<ToolRegistry.ToolCall> toolCallCallback = null,
         Action onContentStart = null, Action startBlock = null)
     {
-        LLMCompletionResponse completionResponse = new LLMCompletionResponse
-        {
-            Content = string.Empty,
-            ToolCalls = new List<ToolRegistry.ToolCall>(),
-            FinishReason = string.Empty
-        };
-
         // NyoCoder-style: wire reasoning from config when streaming output is enabled.
         bool showReasoning = outputCallback != null && config.GetConfigBool("showreasoningoutput");
         Action<string> onReasoningChunk = showReasoning ? outputCallback : null;
@@ -574,7 +632,7 @@ public class LLMClient
             using (var responseStream = httpResponse.GetResponseStream())
             using (var reader = new StreamReader(responseStream, Encoding.UTF8))
             {
-                completionResponse = SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
+                return SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
             }
         }
         catch (Exception ex)
@@ -598,12 +656,10 @@ public class LLMClient
             // Try curl fallback for HTTPS connection errors
             string serverUrl = config.GetConfigValue("llmserver") ?? "";
             if (CurlClient.CanFallback(serverUrl, ex))
-                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, onContentStart, startBlock);
+                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }
-
-        return completionResponse;
     }
 
     /// <summary>

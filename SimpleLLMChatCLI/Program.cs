@@ -112,6 +112,10 @@ namespace SimpleLLMChatCLI
             // Get show tool output setting
             bool showToolOutput = Config.GetConfigBool("showtooloutput");
 
+            string assistantName = Config.GetConfigValue("assistantname");
+            if (string.IsNullOrWhiteSpace(assistantName))
+                assistantName = AppConstants.DefaultAssistantName;
+
             // Conversation storage
             List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
 
@@ -205,7 +209,7 @@ namespace SimpleLLMChatCLI
                         conversation,
                         textPrompt,
                         base64Image,
-                        Config.GetConfigValue("assistantname"),
+                        assistantName,
                         enabledTools,
                         toolsRequiringApproval,
                         outputOnly,
@@ -258,11 +262,14 @@ namespace SimpleLLMChatCLI
                         AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
                     registry.Clear();
                     registry.LoadToolsFromDirectory(toolsDir);
-                    client.BaseOverheadChars = null;
                     enabledTools = Config.GetConfigList("tools");
                     toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
                     showToolOutput = Config.GetConfigBool("showtooloutput");
+                    assistantName = Config.GetConfigValue("assistantname");
+                    if (string.IsNullOrWhiteSpace(assistantName))
+                        assistantName = AppConstants.DefaultAssistantName;
                     RagHost.OnConfigReloaded(Config);
+                    client.RefreshBaseCharacterOverhead(enabledTools);
                     client.PublishStatusTokens(
                         LLMClient.GetConversationCharacterCount(conversation) + client.GetBaseCharacterOverhead());
 
@@ -326,7 +333,7 @@ namespace SimpleLLMChatCLI
                 client.ProcessConversation(conversation,
                                 textPrompt,
                                 imageBase64,
-                                Config.GetConfigValue("assistantname"),
+                                assistantName,
                                 enabledTools,
                                 toolsRequiringApproval,
                                 false,

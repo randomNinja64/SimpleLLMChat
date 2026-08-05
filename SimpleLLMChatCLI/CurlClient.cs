@@ -92,6 +92,7 @@ namespace SimpleLLMChatCLI
             Action<string> outputCallback,
             Action<string> onReasoningChunk,
             Action<int> onReasoningSummary,
+            Action<ToolRegistry.ToolCall> onToolCallChunk = null,
             Action onContentStart = null,
             Action startBlock = null)
         {
@@ -107,7 +108,7 @@ namespace SimpleLLMChatCLI
                     Thread errThread = StartStderrReader(process, text => stderr = text);
                     result = SseStreamParser.Parse(
                         process.StandardOutput, outputCallback, onReasoningChunk, onReasoningSummary,
-                        onContentStart, startBlock);
+                        onToolCallChunk, onContentStart, startBlock);
                     parsed = true;
                     errThread.Join(5000);
                 });

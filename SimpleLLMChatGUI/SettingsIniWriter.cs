@@ -88,13 +88,15 @@ namespace SimpleLLMChatGUI
         {
             return new List<string>
             {
-                "assistantname=",
+                "assistantname=" + AppConstants.DefaultAssistantName,
                 "codeblockfontfamily=",
                 "customfontfamily=",
                 "fontsize=" + AppConstants.DefaultChatFontSize,
                 "markdownparsing=1",
                 "showreasoningoutput=1",
+                "collapsethinking=1",
                 "showtooloutput=1",
+                "collapsetoolcalls=1",
             };
         }
 
