@@ -298,6 +298,41 @@ namespace SimpleLLMChatGUI
             colorsForm.ShowDialog();
         }
 
+        private void ModelListButton_Click(object sender, RoutedEventArgs e)
+        {
+            string baseUrl = ServerURL != null ? ServerURL.Trim() : string.Empty;
+            string picked = ModelChooserDialog.Pick(
+                this,
+                baseUrl,
+                ApiKeyPasswordBox.Password,
+                Model,
+                "Enter an LLM server URL before listing models.");
+            if (picked != null)
+                Model = picked;
+        }
+
+        private void EmbeddingsModelListButton_Click(object sender, RoutedEventArgs e)
+        {
+            string baseUrl = EmbeddingsEndpoint;
+            if (string.IsNullOrEmpty(baseUrl))
+                baseUrl = ServerURL;
+            if (baseUrl != null)
+                baseUrl = baseUrl.Trim();
+
+            string apiKey = EmbeddingsApiKeyPasswordBox.Password;
+            if (string.IsNullOrEmpty(apiKey))
+                apiKey = ApiKeyPasswordBox.Password;
+
+            string picked = ModelChooserDialog.Pick(
+                this,
+                baseUrl,
+                apiKey,
+                EmbeddingsModel,
+                "Enter an embeddings endpoint (or configure an LLM server) before listing models.");
+            if (picked != null)
+                EmbeddingsModel = picked;
+        }
+
         private void CategoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (AppearancePage == null) return;

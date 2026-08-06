@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -185,13 +186,43 @@ namespace SimpleLLMChatGUI
             // BeginInvoke so stdout reading is not gated behind UI paint/scroll work.
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                if (_streamingTurn == null)
-                    _streamingTurn = AddTurn();
-
-                _streamingTurn.AppendText(text);
+                AppendStreamingText(text);
                 ScrollChatToEnd();
             }));
         }
+
+        /// <summary>
+        /// Each thinking / tool-call block gets its own turn, so the chat list's
+        /// item margin separates them the way it separates user and LLM turns.
+        /// </summary>
+        private void AppendStreamingText(string text)
+        {
+            string remaining = text;
+            while (!string.IsNullOrEmpty(remaining))
+            {
+                if (_streamingTurn == null)
+                    _streamingTurn = AddTurn();
+
+                string leftover = _streamingTurn.AppendText(remaining);
+                if (leftover == null)
+                    return;
+
+                EndStreamingTurn();
+                remaining = leftover;
+            }
+        }
+
+        private void EndStreamingTurn()
+        {
+            if (_streamingTurn == null)
+                return;
+
+            _streamingTurn.TrimTrailingBlankParagraphs();
+            if (!_streamingTurn.HasRenderedContent())
+                _chatTurns.Remove(_streamingTurn);
+            _streamingTurn = null;
+        }
+
         private void OnErrorOccurred(string errorMessage)
         {
             Dispatcher.BeginInvoke((Action)(() =>
@@ -231,20 +262,26 @@ namespace SimpleLLMChatGUI
         {
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                if (_streamingTurn != null)
-                {
-                    _streamingTurn.TrimTrailingBlankParagraphs();
-                    if (IsMarkdownParsingEnabled())
-                    {
-                        MarkdownHandler.ProcessMarkdown(
-                            _streamingTurn.Document,
-                            ref _streamingTurn.MarkdownProcessedBlockCount);
-                    }
-                }
-                _streamingTurn = null;
+                EndStreamingTurn();
+                if (IsMarkdownParsingEnabled())
+                    ApplyMarkdown();
                 SetInputControlsEnabled(true);
                 chatInput.Focus();
             }));
+        }
+
+        /// <summary>
+        /// A generation now spans several turns; each tracks what it already
+        /// rendered, so processed blocks are not revisited.
+        /// </summary>
+        private void ApplyMarkdown()
+        {
+            foreach (ChatTurn turn in _chatTurns)
+            {
+                MarkdownHandler.ProcessMarkdown(
+                    turn.Document,
+                    ref turn.MarkdownProcessedBlockCount);
+            }
         }
 
         private bool IsMarkdownParsingEnabled()
@@ -293,11 +330,36 @@ namespace SimpleLLMChatGUI
             if (_chatTurns.Count == 0)
                 return;
 
+            // Clear selection before forcing scroll — scrolling while text is
+            // highlighted during streaming can freeze the UI thread.
+            ClearChatSelection(chatList);
+
             chatList.ScrollIntoView(_chatTurns[_chatTurns.Count - 1]);
 
             ScrollViewer scrollViewer = FindScrollViewer(chatList);
             if (scrollViewer != null)
                 scrollViewer.ScrollToEnd();
+        }
+
+        private static void ClearChatSelection(DependencyObject root)
+        {
+            RichTextBox richTextBox = root as RichTextBox;
+            if (richTextBox != null
+                && richTextBox.Selection != null
+                && !richTextBox.Selection.IsEmpty)
+            {
+                TextPointer end = richTextBox.Document.ContentEnd;
+                richTextBox.Selection.Select(end, end);
+            }
+            else
+            {
+                TextBox textBox = root as TextBox;
+                if (textBox != null && textBox.SelectionLength > 0)
+                    textBox.Select(0, 0);
+            }
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+                ClearChatSelection(VisualTreeHelper.GetChild(root, i));
         }
 
         private static ScrollViewer FindScrollViewer(DependencyObject root)

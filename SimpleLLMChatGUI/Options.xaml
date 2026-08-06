@@ -126,9 +126,22 @@
 
                     <!-- Model -->
                     <Label Content="Model:"/>
-                    <TextBox x:Name="ModelTextBox"
-                             Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
-                             Height="23"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="ModelTextBox"
+                                 Grid.Column="0"
+                                 Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="23"
+                                 Margin="0,0,6,0"/>
+                        <Button Grid.Column="1"
+                                Content="Model List"
+                                Width="80"
+                                Height="23"
+                                Click="ModelListButton_Click"/>
+                    </Grid>
 
                     <!-- System Prompt -->
                     <Label Content="System Prompt:"/>
@@ -213,9 +226,22 @@
                              Height="23"/>
 
                     <Label Content="Embeddings Model:"/>
-                    <TextBox x:Name="EmbeddingsModelTextBox"
-                             Text="{Binding EmbeddingsModel, UpdateSourceTrigger=PropertyChanged}"
-                             Height="23"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="EmbeddingsModelTextBox"
+                                 Grid.Column="0"
+                                 Text="{Binding EmbeddingsModel, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="23"
+                                 Margin="0,0,6,0"/>
+                        <Button Grid.Column="1"
+                                Content="Model List"
+                                Width="80"
+                                Height="23"
+                                Click="EmbeddingsModelListButton_Click"/>
+                    </Grid>
 
                     <Label Content="Knowledge Folder (Default: &quot;knowledge&quot; next to EXE):"/>
                     <TextBox x:Name="RagKnowledgePathTextBox"

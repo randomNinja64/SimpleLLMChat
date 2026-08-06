@@ -87,6 +87,9 @@
     <Compile Include="..\Shared\ConfigHandler.cs">
       <Link>Shared\ConfigHandler.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\TlsConfig.cs">
+      <Link>Shared\TlsConfig.cs</Link>
+    </Compile>
     <Compile Include="..\Shared\ManifestScanner.cs">
       <Link>Shared\ManifestScanner.cs</Link>
     </Compile>
@@ -122,11 +125,16 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="ModelChooserDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChatTurn.cs" />
     <Compile Include="ChatMessageDocumentBehavior.cs" />
     <Compile Include="MarkdownHandler.cs" />
+    <Compile Include="ModelsClient.cs" />
     <Compile Include="Options.xaml.cs">
       <DependentUpon>Options.xaml</DependentUpon>
     </Compile>
@@ -135,6 +143,9 @@
     </Compile>
     <Compile Include="ColorsForm.xaml.cs">
       <DependentUpon>ColorsForm.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ModelChooserDialog.xaml.cs">
+      <DependentUpon>ModelChooserDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="ProcessHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">

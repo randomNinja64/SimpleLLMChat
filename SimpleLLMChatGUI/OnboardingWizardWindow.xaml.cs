@@ -43,6 +43,19 @@ namespace SimpleLLMChatGUI
             }
         }
 
+        private void ModelListButton_Click(object sender, RoutedEventArgs e)
+        {
+            string baseUrl = ServerTextBox.Text != null ? ServerTextBox.Text.Trim() : string.Empty;
+            string picked = ModelChooserDialog.Pick(
+                this,
+                baseUrl,
+                ApiKeyPasswordBox.Password,
+                ModelTextBox.Text,
+                "Enter an LLM server URL before listing models.");
+            if (picked != null)
+                ModelTextBox.Text = picked;
+        }
+
         private void FinishButton_Click(object sender, RoutedEventArgs e)
         {
             string apiKey = ApiKeyPasswordBox.Password ?? string.Empty;

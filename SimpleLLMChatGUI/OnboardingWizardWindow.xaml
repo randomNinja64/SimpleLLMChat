@@ -49,7 +49,21 @@
                 <TextBox x:Name="ServerTextBox" Height="23"/>
 
                 <Label Content="Model:"/>
-                <TextBox x:Name="ModelTextBox" Height="23"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ModelTextBox"
+                             Grid.Column="0"
+                             Height="23"
+                             Margin="0,0,6,0"/>
+                    <Button Content="Model List"
+                            Grid.Column="1"
+                            Width="80"
+                            Height="23"
+                            Click="ModelListButton_Click"/>
+                </Grid>
 
                 <Label Content="Context Window Size (tokens):"/>
                 <TextBox x:Name="ContextWindowSizeTextBox" Height="23"/>

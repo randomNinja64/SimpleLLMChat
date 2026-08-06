@@ -77,10 +77,15 @@ namespace SimpleLLMChatGUI
             };
         }
 
-        public void AppendText(string text)
+        /// <summary>
+        /// Appends streamed text to this turn. Returns null when the whole
+        /// string was consumed, or the leftover text when a collapsible block
+        /// boundary was reached and the caller should continue in a new turn.
+        /// </summary>
+        public string AppendText(string text)
         {
             if (string.IsNullOrEmpty(text))
-                return;
+                return null;
 
             if (!_hasContent)
             {
@@ -89,7 +94,7 @@ namespace SimpleLLMChatGUI
                 // spacing comes from ListBoxItem Margin.
                 text = text.TrimStart('\r', '\n');
                 if (text.Length == 0)
-                    return;
+                    return null;
                 _hasContent = true;
 
                 // Always start real content in a fresh paragraph.
@@ -106,12 +111,17 @@ namespace SimpleLLMChatGUI
                     if (!TryFindTag(remaining, CollapsibleOpenTags, out openIndex, out openLength))
                     {
                         AppendPlain(remaining);
-                        break;
+                        return null;
                     }
 
                     string openTag = remaining.Substring(openIndex, openLength);
                     if (openIndex > 0)
                         AppendPlain(remaining.Substring(0, openIndex));
+
+                    // A collapsible block always opens a turn of its own, so
+                    // batched tool calls are spaced by the chat list's item margin.
+                    if (HasRenderedContent())
+                        return remaining.Substring(openIndex);
 
                     remaining = remaining.Substring(openIndex + openLength);
                     if (IsToolCallOpenTag(openTag))
@@ -133,16 +143,40 @@ namespace SimpleLLMChatGUI
                     if (!TryFindTag(remaining, CollapsibleCloseTags, out closeIndex, out closeLength))
                     {
                         _activeBlock.BodyText.Text += remaining;
-                        break;
+                        return null;
                     }
 
                     if (closeIndex > 0)
                         _activeBlock.BodyText.Text += remaining.Substring(0, closeIndex);
 
                     EndCollapsibleBlock();
-                    remaining = remaining.Substring(closeIndex + closeLength).TrimStart('\r', '\n');
+                    return remaining.Substring(closeIndex + closeLength).TrimStart('\r', '\n');
                 }
             }
+
+            return null;
+        }
+
+        /// <summary>
+        /// True once this turn holds something visible — an expander or a
+        /// paragraph with text.
+        /// </summary>
+        public bool HasRenderedContent()
+        {
+            foreach (Block block in Document.Blocks)
+            {
+                if (block is BlockUIContainer)
+                    return true;
+
+                Paragraph paragraph = block as Paragraph;
+                if (paragraph != null
+                    && new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text.Trim().Length != 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
