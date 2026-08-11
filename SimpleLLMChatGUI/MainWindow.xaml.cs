@@ -24,6 +24,25 @@ namespace SimpleLLMChatGUI
         private readonly ObservableCollection<ChatTurn> _chatTurns = new ObservableCollection<ChatTurn>();
         private ChatTurn _streamingTurn;
 
+        private const double ChatTurnGapMin = 8;
+        private const double ChatTurnGapMax = 24;
+
+        /// <summary>
+        /// Bottom gap between chat turns; scales with font size (~1em + 2), clamped.
+        /// </summary>
+        public static readonly DependencyProperty ChatTurnItemMarginProperty =
+            DependencyProperty.Register(
+                nameof(ChatTurnItemMargin),
+                typeof(Thickness),
+                typeof(MainWindow),
+                new PropertyMetadata(new Thickness(0, 0, 0, AppConstants.DefaultChatFontSize + 2)));
+
+        public Thickness ChatTurnItemMargin
+        {
+            get { return (Thickness)GetValue(ChatTurnItemMarginProperty); }
+            set { SetValue(ChatTurnItemMarginProperty, value); }
+        }
+
         private static readonly KeyValuePair<string, string>[] ReasoningEffortOptions =
         {
             new KeyValuePair<string, string>("Default", ""),
@@ -63,6 +82,7 @@ namespace SimpleLLMChatGUI
             ChatTurn.ThinkingExpanderStyle = TryFindResource("ThinkingExpanderStyle") as Style;
 
             FontHandler.ApplyFontToWindow(this);
+            FontHandler.ApplyCodeBlockFontFamily();
             LoadAndApplyFontSize();
             LoadAndApplyColors();
             UpdateReasoningEffortLabel();
@@ -292,6 +312,9 @@ namespace SimpleLLMChatGUI
         private void LoadAndApplyFontSize()
         {
             int fontSize = FontHandler.GetFontSize();
+            FontSize = fontSize;
+            ChatTurnItemMargin = new Thickness(0, 0, 0,
+                Math.Max(ChatTurnGapMin, Math.Min(ChatTurnGapMax, fontSize + 2)));
             FontHandler.ApplyFontSizeToControl(chatList, fontSize);
             FontHandler.ApplyFontSizeToControl(chatInput, fontSize);
             foreach (ChatTurn turn in _chatTurns)
@@ -553,6 +576,7 @@ namespace SimpleLLMChatGUI
             {
                 App.LoadSettings(); // Reload settings after options dialog saves
                 FontHandler.ApplyFontToWindow(this);
+                FontHandler.ApplyCodeBlockFontFamily();
                 LoadAndApplyFontSize();
                 LoadAndApplyColors();
                 if (tokenTracker != null)

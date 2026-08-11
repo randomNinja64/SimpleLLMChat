@@ -30,6 +30,11 @@ namespace SimpleLLMChatGUI
         private static readonly Regex BacktickFencePattern = new Regex(@"^([^`]*:\s*)?(`{3,})([^`]*)$", RegexOptions.Compiled);
 
         /// <summary>
+        /// H1–H6 size relative to the document base font size.
+        /// </summary>
+        private static readonly double[] HeaderMultipliers = { 2.0, 1.667, 1.5, 1.333, 1.167, 1.0 };
+
+        /// <summary>
         /// Renders markdown in blocks at or after <paramref name="startBlockIndex"/>, then
         /// advances that index to the document's block count so later passes skip already-handled content.
         /// </summary>
@@ -45,7 +50,6 @@ namespace SimpleLLMChatGUI
                 startBlockIndex = blocks.Count;
 
             int activeBacktickFenceLength = 0;
-            FontFamily codeBlockFontFamily = FontHandler.TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"));
 
             for (int i = startBlockIndex; i < blocks.Count; i++)
             {
@@ -84,8 +88,7 @@ namespace SimpleLLMChatGUI
                 if (activeBacktickFenceLength > 0)
                 {
                     paragraph.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
-                    if (codeBlockFontFamily != null)
-                        paragraph.FontFamily = codeBlockFontFamily;
+                    ApplyCodeBlockFont(paragraph);
                     continue;
                 }
 
@@ -98,15 +101,16 @@ namespace SimpleLLMChatGUI
                 trimmedText = new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text.Trim();
 
                 // Process headers first (paragraph-level formatting)
-                ProcessHeaders(paragraph, trimmedText);
+                ProcessHeaders(paragraph, trimmedText, document);
 
                 // Process inline code blocks first to split them out
                 ReplaceInRuns(paragraph, InlineCodePattern, match =>
                 {
-                    var codeSpan = new Span(new Run(match.Groups[1].Value));
+                    var codeRun = new Run(match.Groups[1].Value);
+                    var codeSpan = new Span(codeRun);
                     codeSpan.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
-                    if (codeBlockFontFamily != null)
-                        codeSpan.FontFamily = codeBlockFontFamily;
+                    codeSpan.SetResourceReference(TextElement.FontFamilyProperty, FontHandler.CodeBlockFontFamilyKey);
+                    codeRun.ClearValue(TextElement.FontFamilyProperty);
                     return codeSpan;
                 });
 
@@ -126,6 +130,21 @@ namespace SimpleLLMChatGUI
             startBlockIndex = blocks.Count;
         }
 
+        /// <summary>
+        /// Streaming <see cref="TextRange"/> insertion freezes the chat font onto
+        /// each <see cref="Run"/> as a local value; clear those so inlines inherit
+        /// the paragraph's <see cref="FontHandler.CodeBlockFontFamilyKey"/> binding.
+        /// </summary>
+        private static void ApplyCodeBlockFont(Paragraph paragraph)
+        {
+            if (paragraph == null)
+                return;
+
+            paragraph.SetResourceReference(TextElement.FontFamilyProperty, FontHandler.CodeBlockFontFamilyKey);
+            foreach (Inline inline in paragraph.Inlines)
+                inline.ClearValue(TextElement.FontFamilyProperty);
+        }
+
         private static void ConsolidateRuns(Paragraph paragraph)
         {
             List<Run> runs = paragraph.Inlines.OfType<Run>().ToList();
@@ -140,24 +159,50 @@ namespace SimpleLLMChatGUI
             paragraph.Inlines.Add(new Run(sb.ToString()));
         }
 
-        private static void ProcessHeaders(Paragraph paragraph, string trimmedText)
+        private static void ProcessHeaders(Paragraph paragraph, string trimmedText, FlowDocument document)
         {
             Match headerMatch = HeaderPattern.Match(trimmedText);
-            if (headerMatch.Success)
+            if (!headerMatch.Success)
+                return;
+
+            int headerLevel = headerMatch.Groups[1].Value.Length; // Number of # characters
+            string headerText = headerMatch.Groups[2].Value.Trim();
+
+            // Tag so ApplyHeaderFontSizes can rescale when the chat font size changes.
+            paragraph.Tag = headerLevel;
+            double baseFontSize = document != null && document.FontSize > 0
+                ? document.FontSize
+                : FontHandler.GetFontSize();
+            paragraph.FontSize = baseFontSize * HeaderMultipliers[Math.Min(headerLevel, 6) - 1];
+            paragraph.FontWeight = FontWeights.Bold;
+
+            // Replace the paragraph content with just the header text (without the # markers)
+            // This allows inline formatting to be processed on the header text afterwards
+            paragraph.Inlines.Clear();
+            paragraph.Inlines.Add(new Run(headerText));
+        }
+
+        /// <summary>
+        /// Recomputes markdown header font sizes from the document base size.
+        /// Needed because headers store an absolute <see cref="TextElement.FontSize"/> that
+        /// does not inherit when <see cref="FlowDocument.FontSize"/> changes.
+        /// </summary>
+        public static void ApplyHeaderFontSizes(FlowDocument document, double baseFontSize)
+        {
+            if (document == null || baseFontSize <= 0)
+                return;
+
+            foreach (Block block in document.Blocks)
             {
-                int headerLevel = headerMatch.Groups[1].Value.Length; // Number of # characters
-                string headerText = headerMatch.Groups[2].Value.Trim();
-                
-                double[] headerMultipliers = { 2.0, 1.667, 1.5, 1.333, 1.167, 1.0 };
-                double fontSize = FontHandler.GetFontSize() * headerMultipliers[Math.Min(headerLevel, 6) - 1];
-                
-                paragraph.FontSize = fontSize;
-                paragraph.FontWeight = FontWeights.Bold;
-                
-                // Replace the paragraph content with just the header text (without the # markers)
-                // This allows inline formatting to be processed on the header text afterwards
-                paragraph.Inlines.Clear();
-                paragraph.Inlines.Add(new Run(headerText));
+                Paragraph paragraph = block as Paragraph;
+                if (paragraph == null || !(paragraph.Tag is int))
+                    continue;
+
+                int headerLevel = (int)paragraph.Tag;
+                if (headerLevel < 1 || headerLevel > HeaderMultipliers.Length)
+                    continue;
+
+                paragraph.FontSize = baseFontSize * HeaderMultipliers[headerLevel - 1];
             }
         }
 

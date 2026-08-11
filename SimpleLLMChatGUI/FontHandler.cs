@@ -8,11 +8,27 @@ namespace SimpleLLMChatGUI
 {
     public static class FontHandler
     {
+        public const string CodeBlockFontFamilyKey = "CodeBlockFontFamily";
+
         public static void ApplyFontToWindow(Window window)
         {
             if (window == null) return;
             window.FontFamily = TryGetFontFamily(App.Config.GetConfigValue("customfontfamily"))
                                 ?? SystemFonts.MessageFontFamily;
+        }
+
+        /// <summary>
+        /// Pushes <c>codeblockfontfamily</c> into the app resource so code blocks
+        /// bound with <see cref="FrameworkElement.SetResourceReference"/> update live.
+        /// </summary>
+        public static void ApplyCodeBlockFontFamily()
+        {
+            if (Application.Current == null)
+                return;
+
+            Application.Current.Resources[CodeBlockFontFamilyKey] =
+                TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"))
+                ?? new FontFamily("Courier New");
         }
 
         public static int GetFontSize()

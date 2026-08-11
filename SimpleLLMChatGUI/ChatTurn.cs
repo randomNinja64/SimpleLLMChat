@@ -201,11 +201,12 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
-        /// Applies font size to the document and any collapsible expander bodies.
+        /// Applies font size to the document, markdown headers, and collapsible expanders.
         /// </summary>
         public void ApplyFontSize(double fontSize)
         {
             Document.FontSize = fontSize;
+            MarkdownHandler.ApplyHeaderFontSizes(Document, fontSize);
             foreach (Block block in Document.Blocks)
             {
                 BlockUIContainer container = block as BlockUIContainer;
