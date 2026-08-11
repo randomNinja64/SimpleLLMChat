@@ -11,7 +11,7 @@ namespace MemoryTools
 
         private static string GetMemoriesDirectory()
         {
-            string configured = ToolHelper.GetConfigString("memoriesDirectory").Trim();
+            string configured = ToolHelper.GetConfigValue("memoriesDirectory").Trim();
             if (!string.IsNullOrEmpty(configured))
                 return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
 

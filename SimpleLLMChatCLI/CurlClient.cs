@@ -2,9 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.IO.Pipes;
-using System.Net;
 using System.Text;
 using System.Threading;
 
@@ -17,43 +15,9 @@ namespace SimpleLLMChatCLI
     /// </summary>
     internal static class CurlClient
     {
-        private static readonly string ExecutablePath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "curl.exe");
-
         public static bool CanFallback(string url, Exception ex)
         {
-            return !string.IsNullOrEmpty(url)
-                && url.StartsWith("https:", StringComparison.OrdinalIgnoreCase)
-                && File.Exists(ExecutablePath)
-                && ShouldFallback(ex);
-        }
-
-        /// <summary>
-        /// True when the failure looks like a TLS/connection issue that curl may work around
-        /// on legacy .NET 4.0 — not for ordinary HTTP API errors.
-        /// </summary>
-        private static bool ShouldFallback(Exception ex)
-        {
-            if (ex == null)
-                return false;
-
-            WebException webEx = ex as WebException;
-            if (webEx != null)
-                return webEx.Status == WebExceptionStatus.SecureChannelFailure
-                    || webEx.Status == WebExceptionStatus.TrustFailure
-                    || webEx.Status == WebExceptionStatus.ConnectFailure
-                    || webEx.Status == WebExceptionStatus.ConnectionClosed
-                    || webEx.Status == WebExceptionStatus.SendFailure
-                    || webEx.Status == WebExceptionStatus.ReceiveFailure
-                    || webEx.Status == WebExceptionStatus.Timeout
-                    || webEx.Status == WebExceptionStatus.ServerProtocolViolation
-                    || (webEx.InnerException != null && webEx.InnerException.GetType().Name.Contains("Authentication"));
-
-            return ex.GetType().Name.Contains("Authentication")
-                || ex.GetType().Name.Contains("Security")
-                || ex.GetType().Name.Contains("IOException")
-                || (ex.Message != null
-                    && ex.Message.IndexOf("connection", StringComparison.OrdinalIgnoreCase) >= 0);
+            return TlsCurlFallback.CanAttempt(url, ex);
         }
 
         /// <summary>
@@ -175,7 +139,7 @@ namespace SimpleLLMChatCLI
 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
-                    FileName = ExecutablePath,
+                    FileName = TlsCurlFallback.DefaultCurlPath,
                     Arguments = args,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,

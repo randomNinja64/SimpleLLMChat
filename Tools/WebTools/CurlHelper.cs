@@ -9,7 +9,7 @@ namespace WebTools
         public static string Execute(string url, out int exitCode,
             string extraFlags = "", bool combineErrorOutput = true, params string[] extraHeaders)
         {
-            string ua = "-H \"User-Agent: " + ToolHelper.GetConfigString("useragent") + "\"";
+            string ua = "-H \"User-Agent: " + ToolHelper.GetConfigValue("useragent") + "\"";
             string hdrs = string.Concat(System.Array.ConvertAll(extraHeaders, h => " -H \"" + h + "\""));
             string flags = string.IsNullOrEmpty(extraFlags) ? "" : extraFlags + " ";
             string arguments = "-s -L " + flags + ua + hdrs + " \"" + url + "\"";

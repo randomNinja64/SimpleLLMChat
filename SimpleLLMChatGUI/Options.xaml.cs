@@ -407,9 +407,9 @@ namespace SimpleLLMChatGUI
             RagAllowedExtensions = string.IsNullOrEmpty(allowedExt)
                 ? AppConstants.DefaultRagAllowedExtensions
                 : allowedExt;
-            EmbeddingsEndpoint = config.GetConfigString("embeddingsEndpoint") ?? string.Empty;
-            EmbeddingsModel = config.GetConfigString("embeddingsModel") ?? string.Empty;
-            EmbeddingsApiKey = config.GetConfigString("embeddingsApiKey") ?? string.Empty;
+            EmbeddingsEndpoint = config.GetConfigValue("embeddingsEndpoint");
+            EmbeddingsModel = config.GetConfigValue("embeddingsModel");
+            EmbeddingsApiKey = config.GetConfigValue("embeddingsApiKey");
 
             ApiKeyPasswordBox.Password = ApiKey;
             EmbeddingsApiKeyPasswordBox.Password = EmbeddingsApiKey;
@@ -634,8 +634,8 @@ namespace SimpleLLMChatGUI
 
                 foreach (var opt in textOpts)
                 {
-                    string configValue = config.GetConfigString(opt.Name);
-                    string currentValue = configValue ?? opt.Default;
+                    string configValue = config.GetConfigValue(opt.Name);
+                    string currentValue = string.IsNullOrEmpty(configValue) ? opt.Default : configValue;
                     var label = new Label { Content = opt.Label + ":" };
                     var textBox = new TextBox { Text = currentValue, Height = 23 };
                     stackPanel.Children.Add(label);
@@ -650,8 +650,8 @@ namespace SimpleLLMChatGUI
 
                     foreach (var opt in boolOpts)
                     {
-                        string configValue = config.GetConfigString(opt.Name);
-                        string currentValue = configValue ?? opt.Default;
+                        string configValue = config.GetConfigValue(opt.Name);
+                        string currentValue = string.IsNullOrEmpty(configValue) ? opt.Default : configValue;
                         var checkBox = new CheckBox
                         {
                             Content = opt.Label,
@@ -717,7 +717,9 @@ namespace SimpleLLMChatGUI
                 Grid.SetRow(label, rowIdx);
                 Grid.SetColumn(label, 0);
 
-                string configVal = config.GetConfigString("tooltimeout." + toolName.ToLowerInvariant()) ?? "0";
+                string configVal = config.GetConfigValue("tooltimeout." + toolName.ToLowerInvariant());
+                if (string.IsNullOrEmpty(configVal))
+                    configVal = "0";
                 var textBox = new TextBox
                 {
                     Text = configVal,
@@ -747,8 +749,7 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
-        /// Scans the tools/ directory (and one level of subdirectories) for *.json manifests
-        /// and returns a sorted list of all discovered tool names.
+        /// Groups tool option definitions by source package for the Options UI.
         /// </summary>
         private IOrderedEnumerable<IGrouping<string, ToolOptionDefinition>> GetToolOptionGroups()
         {

@@ -35,13 +35,13 @@ namespace SimpleLLMChatCLI.RAG
         {
             if (config == null)
                 return null;
-            string endpoint = config.GetConfigString("embeddingsEndpoint");
+            string endpoint = config.GetConfigValue("embeddingsEndpoint");
             if (string.IsNullOrWhiteSpace(endpoint))
-                endpoint = config.GetConfigString("llmserver");
-            string apiKey = config.GetConfigString("embeddingsApiKey");
+                endpoint = config.GetConfigValue("llmserver");
+            string apiKey = config.GetConfigValue("embeddingsApiKey");
             if (string.IsNullOrWhiteSpace(apiKey))
-                apiKey = config.GetConfigString("apikey");
-            string model = config.GetConfigString("embeddingsModel");
+                apiKey = config.GetConfigValue("apikey");
+            string model = config.GetConfigValue("embeddingsModel");
             if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
                 return null;
             return new EmbeddingsClient(endpoint, apiKey, model);

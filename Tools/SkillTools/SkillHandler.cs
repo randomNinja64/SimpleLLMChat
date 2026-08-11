@@ -24,7 +24,7 @@ namespace SkillTools
 
         private static string GetSkillsDirectory()
         {
-            string configured = ToolHelper.GetConfigString("skillsDirectory").Trim();
+            string configured = ToolHelper.GetConfigValue("skillsDirectory").Trim();
             if (!string.IsNullOrEmpty(configured))
                 return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
 

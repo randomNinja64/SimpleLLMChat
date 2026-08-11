@@ -23,7 +23,7 @@ namespace WebTools
                     case "run_web_search":
                         {
                             string query = ToolHelper.GetRequiredArg(argumentsJson, "query");
-                            string searxngInstance = ToolHelper.GetConfigString("searxnginstance");
+                            string searxngInstance = ToolHelper.GetConfigValue("searxnginstance");
                             int maxSearchResults = ToolHelper.GetConfigInt("maxsearchresults", 20);
                             int exitCode;
                             string output = WebBrowser.RunWebSearch(query, searxngInstance, maxSearchResults, out exitCode);

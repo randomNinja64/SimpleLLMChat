@@ -84,6 +84,9 @@
     <Compile Include="..\Shared\TlsConfig.cs">
       <Link>Shared\TlsConfig.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\TlsCurlFallback.cs">
+      <Link>Shared\TlsCurlFallback.cs</Link>
+    </Compile>
     <Compile Include="..\Shared\StatusPipe\StatusPipe.cs">
       <Link>Shared\StatusPipe\StatusPipe.cs</Link>
     </Compile>

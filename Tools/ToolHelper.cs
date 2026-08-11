@@ -110,7 +110,7 @@ public static class ToolHelper
     // Config values passed via the "config" key in stdin JSON
     public static Dictionary<string, string> Config = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-    public static string GetConfigString(string key)
+    public static string GetConfigValue(string key)
     {
         string value;
         if (Config.TryGetValue(key, out value))

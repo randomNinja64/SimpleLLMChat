@@ -43,7 +43,6 @@
       <HintPath>..\packages\Newtonsoft.Json.13.0.4\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
@@ -89,6 +88,9 @@
     </Compile>
     <Compile Include="..\Shared\TlsConfig.cs">
       <Link>Shared\TlsConfig.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\TlsCurlFallback.cs">
+      <Link>Shared\TlsCurlFallback.cs</Link>
     </Compile>
     <Compile Include="..\Shared\ManifestScanner.cs">
       <Link>Shared\ManifestScanner.cs</Link>
@@ -161,11 +163,4 @@
     <Resource Include="sllmc.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

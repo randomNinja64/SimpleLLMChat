@@ -109,7 +109,7 @@ namespace SimpleLLMChatCLI.RAG
 
         public static string ResolveKnowledgePath(ConfigHandler config)
         {
-            string path = config != null ? config.GetConfigString("ragKnowledgePath") : null;
+            string path = config != null ? config.GetConfigValue("ragKnowledgePath") : null;
             if (string.IsNullOrEmpty(path))
                 return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "knowledge");
             try
@@ -185,7 +185,7 @@ namespace SimpleLLMChatCLI.RAG
         {
             if (config == null)
                 return true;
-            string model = config.GetConfigString("embeddingsModel") ?? string.Empty;
+            string model = config.GetConfigValue("embeddingsModel");
             if (!string.Equals(Manifest.EmbeddingsModel ?? string.Empty, model, StringComparison.Ordinal))
                 return true;
             if (Manifest.IndexChunkLines != config.GetConfigInt("indexChunkLines", 60))

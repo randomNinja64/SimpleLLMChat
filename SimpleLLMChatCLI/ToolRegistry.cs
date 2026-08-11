@@ -97,8 +97,8 @@ namespace SimpleLLMChatCLI
             return Regex.Replace(text, @"\{config\.(\w+?)(?:\*(\d+))?\}", match =>
             {
                 string key = match.Groups[1].Value;
-                string value = config.GetConfigString(key);
-                if (value == null)
+                string value = config.GetConfigValue(key);
+                if (string.IsNullOrEmpty(value))
                     return match.Value; // Leave unresolved placeholders as-is
 
                 if (match.Groups[2].Success)
@@ -268,17 +268,7 @@ namespace SimpleLLMChatCLI
         {
             try
             {
-                JObject stdinPayload = new JObject();
-                stdinPayload["arguments"] = new JObject();
-
-                JObject configObj = new JObject();
-                foreach (var kvp in optionDefaults)
-                    configObj[kvp.Key] = kvp.Value;
-                foreach (var kvp in config.GetAllValues())
-                    configObj[kvp.Key] = kvp.Value;
-                stdinPayload["config"] = configObj;
-
-                string stdinData = stdinPayload.ToString(Newtonsoft.Json.Formatting.None);
+                string stdinData = BuildStdinPayload(null);
 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
@@ -311,6 +301,27 @@ namespace SimpleLLMChatCLI
         }
 
         /// <summary>
+        /// Builds the stdin JSON shared by tool calls and context injectors:
+        /// <c>{ "arguments": ..., "config": { optionDefaults + settings } }</c>.
+        /// </summary>
+        private string BuildStdinPayload(string argumentsJson)
+        {
+            JObject stdinPayload = new JObject();
+            stdinPayload["arguments"] = string.IsNullOrWhiteSpace(argumentsJson)
+                ? new JObject()
+                : JToken.Parse(argumentsJson);
+
+            JObject configObj = new JObject();
+            foreach (var kvp in optionDefaults)
+                configObj[kvp.Key] = kvp.Value;
+            foreach (var kvp in config.GetAllValues())
+                configObj[kvp.Key] = kvp.Value;
+            stdinPayload["config"] = configObj;
+
+            return stdinPayload.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        /// <summary>
         /// Executes a tool by spawning its executable with the tool name as argv[1]
         /// and passing argument JSON + config via stdin.
         /// </summary>
@@ -329,19 +340,7 @@ namespace SimpleLLMChatCLI
 
             try
             {
-                // Build stdin payload: arguments + config
-                JObject stdinPayload = new JObject();
-                stdinPayload["arguments"] = string.IsNullOrWhiteSpace(arguments) ? new JObject() : JToken.Parse(arguments);
-
-                // Pass all config values to the tool, with manifest defaults as fallback
-                JObject configObj = new JObject();
-                foreach (var kvp in optionDefaults)
-                    configObj[kvp.Key] = kvp.Value;
-                foreach (var kvp in config.GetAllValues())
-                    configObj[kvp.Key] = kvp.Value;
-                stdinPayload["config"] = configObj;
-
-                string stdinData = stdinPayload.ToString(Newtonsoft.Json.Formatting.None);
+                string stdinData = BuildStdinPayload(arguments);
 
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
@@ -358,7 +357,7 @@ namespace SimpleLLMChatCLI
                 };
 
                 // Determine per-tool timeout from config (key: tooltimeout.<toolname>)
-                string timeoutVal = config.GetConfigString("tooltimeout." + toolName.ToLowerInvariant());
+                string timeoutVal = config.GetConfigValue("tooltimeout." + toolName.ToLowerInvariant());
                 int timeoutSecs = 0;
                 int.TryParse(timeoutVal, out timeoutSecs);
                 int timeoutMs = timeoutSecs > 0 ? timeoutSecs * 1000 : 0;

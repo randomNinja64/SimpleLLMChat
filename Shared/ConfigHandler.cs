@@ -60,16 +60,6 @@ public class ConfigHandler
     }
 
     /// <summary>
-    /// Returns the string value for any config key.
-    /// Returns null if the key has no value. Used for placeholder replacement in tool manifests.
-    /// </summary>
-    public string GetConfigString(string key)
-    {
-        string val = GetConfigValue(key);
-        return string.IsNullOrEmpty(val) ? null : val;
-    }
-
-    /// <summary>
     /// Decodes stored prompts by removing outer wrapping quotes and unescaping all C-style escape sequences.
     /// Preserves inner/trailing quotes verbatim.
     /// </summary>

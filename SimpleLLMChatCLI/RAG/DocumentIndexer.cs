@@ -183,7 +183,7 @@ namespace SimpleLLMChatCLI.RAG
             // retry) via ParamsMismatch on the next reconcile instead of losing this pass's
             // hash/pruning bookkeeping.
             if (embedError == null)
-                index.Manifest.EmbeddingsModel = _config.GetConfigString("embeddingsModel") ?? string.Empty;
+                index.Manifest.EmbeddingsModel = _config.GetConfigValue("embeddingsModel");
             index.Manifest.IndexChunkLines = chunkLines;
             index.Manifest.IndexChunkOverlap = overlap;
             index.Manifest.RagMaxSnippetLength = maxSnippet;
