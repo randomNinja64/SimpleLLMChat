@@ -57,7 +57,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Expander">
-                        <DockPanel LastChildFill="True">
+                        <DockPanel LastChildFill="False">
                             <ToggleButton x:Name="HeaderSite"
                                           DockPanel.Dock="Top"
                                           Style="{StaticResource ThinkingExpandToggleStyle}"
@@ -67,9 +67,11 @@
                                           HorizontalContentAlignment="Left"
                                           Padding="0"/>
                             <ContentPresenter x:Name="ExpandSite"
+                                              DockPanel.Dock="Top"
                                               ContentSource="Content"
                                               Visibility="Collapsed"
-                                              Margin="0"/>
+                                              Margin="0"
+                                              VerticalAlignment="Top"/>
                         </DockPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsExpanded" Value="True">

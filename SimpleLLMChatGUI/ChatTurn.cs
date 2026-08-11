@@ -1,9 +1,7 @@
 using System;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
-using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SimpleLLMChatGUI
@@ -43,7 +41,7 @@ namespace SimpleLLMChatGUI
             public CollapsibleBlockKind Kind;
             public Expander Expander;
             public TextBlock HeaderLabel;
-            public TextBox BodyText;
+            public TextBlock BodyText;
             public DispatcherTimer Timer;
             public int EllipsisCount = 1;
             public DateTime StartedUtc;
@@ -218,7 +216,7 @@ namespace SimpleLLMChatGUI
                 if (expander == null)
                     continue;
 
-                TextBox body = expander.Content as TextBox;
+                TextBlock body = expander.Content as TextBlock;
                 if (body != null)
                     body.FontSize = fontSize;
 
@@ -265,22 +263,14 @@ namespace SimpleLLMChatGUI
             state.HeaderLabel = new TextBlock { FontSize = fontSize };
             state.HeaderLabel.SetResourceReference(TextBlock.ForegroundProperty, "ChatTextColorBrush");
 
-            state.BodyText = new TextBox
+            state.BodyText = new TextBlock
             {
-                IsReadOnly = true,
-                BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent,
                 Padding = new Thickness(0),
                 Margin = new Thickness(0),
                 TextWrapping = TextWrapping.Wrap,
-                AcceptsReturn = true,
-                FontSize = fontSize,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+                FontSize = fontSize
             };
-            state.BodyText.SetResourceReference(Control.ForegroundProperty, "ChatTextColorBrush");
-            state.BodyText.TextChanged += OnBodyTextChanged;
-            state.BodyText.SizeChanged += OnBodySizeChanged;
+            state.BodyText.SetResourceReference(TextBlock.ForegroundProperty, "ChatTextColorBrush");
 
             state.Expander = new Expander
             {
@@ -319,45 +309,7 @@ namespace SimpleLLMChatGUI
             state.HeaderLabel.Text = BuildLabelText(state);
 
             if (state.BodyText.Text != null)
-            {
                 state.BodyText.Text = state.BodyText.Text.TrimEnd('\r', '\n');
-                FitBodyHeight(state.BodyText);
-            }
-        }
-
-        private static void OnBodyTextChanged(object sender, TextChangedEventArgs e)
-        {
-            FitBodyHeight(sender as TextBox);
-        }
-
-        private static void OnBodySizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (e.WidthChanged)
-                FitBodyHeight(sender as TextBox);
-        }
-
-        private static void FitBodyHeight(TextBox box)
-        {
-            if (box == null)
-                return;
-
-            double width = box.ActualWidth;
-            FrameworkElement parent = box.Parent as FrameworkElement;
-            if (width <= 0 && parent != null && parent.ActualWidth > 0)
-                width = parent.ActualWidth;
-            if (width <= 0)
-                return;
-
-            string text = string.IsNullOrEmpty(box.Text) ? " " : box.Text;
-            var formatted = new FormattedText(
-                text,
-                CultureInfo.CurrentCulture,
-                box.FlowDirection,
-                new Typeface(box.FontFamily, box.FontStyle, box.FontWeight, box.FontStretch),
-                box.FontSize > 0 ? box.FontSize : 12,
-                box.Foreground ?? Brushes.Black);
-            formatted.MaxTextWidth = Math.Max(1, width - box.Padding.Left - box.Padding.Right);
-            box.Height = Math.Ceiling(formatted.Height) + 2;
         }
 
         private void OnBlockExpanded(object sender, RoutedEventArgs e)
@@ -369,7 +321,6 @@ namespace SimpleLLMChatGUI
 
             StopEllipsisTimer(state);
             state.HeaderLabel.Text = BuildLabelText(state);
-            FitBodyHeight(state.BodyText);
         }
 
         private void OnBlockCollapsed(object sender, RoutedEventArgs e)
