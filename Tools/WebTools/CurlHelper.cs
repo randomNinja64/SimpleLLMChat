@@ -28,5 +28,12 @@ namespace WebTools
             string arguments = "-s -L -X POST" + hdrs + " -d \"" + escapedJson + "\" \"" + url + "\"";
             return ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput);
         }
+
+        public static string[] FirecrawlAuthHeaders(string apiKey)
+        {
+            return string.IsNullOrWhiteSpace(apiKey)
+                ? new string[0]
+                : new[] { "Authorization: Bearer " + apiKey.Trim() };
+        }
     }
 }

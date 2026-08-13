@@ -163,13 +163,9 @@ namespace WebTools
                     ["limit"] = maxSearchResults > 0 ? maxSearchResults : 20
                 };
 
-                string[] headers = string.IsNullOrWhiteSpace(apiKey)
-                    ? new string[0]
-                    : new[] { "Authorization: Bearer " + apiKey.Trim() };
-
                 response = CurlHelper.PostJson(
                     searchUrl, payload.ToString(Formatting.None), out exitCode,
-                    combineErrorOutput: false, headers);
+                    combineErrorOutput: false, CurlHelper.FirecrawlAuthHeaders(apiKey));
             }
             catch (Exception ex)
             {
@@ -177,16 +173,11 @@ namespace WebTools
                 return "Error running curl.exe for search: " + ex.Message;
             }
 
-            return FinalizeSearch(response,
-                delegate(string json, out int code)
-                {
-                    return ParseFirecrawlResults(json, maxSearchResults, out code);
-                },
-                out exitCode, maxSearchResults);
+            return FinalizeSearch(response, ParseFirecrawlResults, out exitCode, maxSearchResults);
         }
 
         // Parses Firecrawl search JSON (data.web[] with url/title/description)
-        private static string ParseFirecrawlResults(string json, int maxSearchResults, out int exitCode)
+        private static string ParseFirecrawlResults(string json, out int exitCode)
         {
             exitCode = 0;
 
@@ -209,25 +200,18 @@ namespace WebTools
                 return "";
 
             StringBuilder results = new StringBuilder();
-            int count = 0;
             foreach (JToken result in webResults)
             {
-                if (maxSearchResults > 0 && count >= maxSearchResults)
-                    break;
-
                 string url = (result["url"]?.ToString() ?? "").Trim();
-                string title = NormalizeSearchText(result["title"]?.ToString());
-                string content = NormalizeSearchText(
+                string title = NormalizeWhitespace(result["title"]?.ToString());
+                string content = NormalizeWhitespace(
                     FirstNonEmpty(
                         result["description"]?.ToString(),
                         result["snippet"]?.ToString(),
                         result["content"]?.ToString()));
 
                 if (!string.IsNullOrEmpty(url))
-                {
                     results.AppendLine(url + " : " + title + " - " + content);
-                    count++;
-                }
             }
 
             if (results.Length == 0)
@@ -236,11 +220,9 @@ namespace WebTools
             return results.ToString();
         }
 
-        private static string NormalizeSearchText(string text)
+        private static string NormalizeWhitespace(string text)
         {
-            if (string.IsNullOrWhiteSpace(text))
-                return "";
-            return Regex.Replace(text.Trim(), @"\s+", " ");
+            return Regex.Replace(text ?? "", @"\s+", " ").Trim();
         }
 
         private static string FirstNonEmpty(params string[] values)

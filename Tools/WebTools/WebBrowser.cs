@@ -80,13 +80,9 @@ namespace WebTools
                     ["onlyMainContent"] = true
                 };
 
-                string[] headers = string.IsNullOrWhiteSpace(apiKey)
-                    ? new string[0]
-                    : new[] { "Authorization: Bearer " + apiKey.Trim() };
-
                 string response = CurlHelper.PostJson(
                     scrapeUrl, payload.ToString(Formatting.None), out exitCode,
-                    combineErrorOutput: false, headers);
+                    combineErrorOutput: false, CurlHelper.FirecrawlAuthHeaders(apiKey));
 
                 if (exitCode != 0 || string.IsNullOrWhiteSpace(response))
                     return false;
@@ -189,17 +185,7 @@ namespace WebTools
 
             string desc = ExtractMetaDescription(html);
 
-            // Remove non-content blocks
-            html = Regex.Replace(html, @"<!DOCTYPE[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<!--.*?-->", "", RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<script\b[^<]*(?:(?!</script>)<[^<]*)*</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<style\b[^<]*(?:(?!</style>)<[^<]*)*</style>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<svg\b[^<]*(?:(?!</svg>)<[^<]*)*</svg>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<noscript\b[^<]*(?:(?!</noscript>)<[^<]*)*</noscript>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<nav\b[^<]*(?:(?!</nav>)<[^<]*)*</nav>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<header\b[^<]*(?:(?!</header>)<[^<]*)*</header>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<form\b[^<]*(?:(?!</form>)<[^<]*)*</form>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<head\b[^>]*>.*?</head>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = StripNonContentBlocks(html);
 
             Uri baseUri = null;
             if (!string.IsNullOrWhiteSpace(pageUrl))
@@ -446,22 +432,34 @@ namespace WebTools
         }
 
         /// <summary>
-        /// Older HTML stripper used when readable-text conversion throws: remove fluff,
-        /// simplify tags, keep &lt;img src/alt&gt; and &lt;a href&gt;.
+        /// Removes doctype, comments, and common non-content blocks shared by readable and fallback paths.
         /// </summary>
-        private static string FallbackPlainText(string html)
+        private static string StripNonContentBlocks(string html)
         {
             html = Regex.Replace(html, @"<!DOCTYPE[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<html\b[^>]*>", "<html>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<script\b[^<]*(?:(?!</script>)<[^<]*)*</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<style\b[^<]*(?:(?!</style>)<[^<]*)*</style>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<path\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<svg\b[^<]*(?:(?!</svg>)<[^<]*)*</svg>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<noscript\b[^<]*(?:(?!</noscript>)<[^<]*)*</noscript>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<nav\b[^<]*(?:(?!</nav>)<[^<]*)*</nav>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<header\b[^<]*(?:(?!</header>)<[^<]*)*</header>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<form\b[^<]*(?:(?!</form>)<[^<]*)*</form>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<head\b[^>]*>.*?</head>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            return html;
+        }
+
+        /// <summary>
+        /// Older HTML stripper used when readable-text conversion throws: remove fluff,
+        /// simplify tags, keep &lt;img src/alt&gt; and &lt;a href&gt;.
+        /// </summary>
+        private static string FallbackPlainText(string html)
+        {
+            html = StripNonContentBlocks(html);
+            html = Regex.Replace(html, @"<html\b[^>]*>", "<html>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            html = Regex.Replace(html, @"<path\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<meta\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<link\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<form\b[^<]*(?:(?!</form>)<[^<]*)*</form>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"<input\b[^>]*>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             // Keep img with src and alt only
@@ -491,9 +489,7 @@ namespace WebTools
 
             // Remove inline JS/CSS noise attributes
             html = Regex.Replace(html, @"\s(on\w+|style|class|id|method|role)\s*=\s*(['""]).*?\2", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            html = Regex.Replace(html, @"<!--.*?-->", "", RegexOptions.Singleline);
             html = Regex.Replace(html, @"^\s*$[\r\n]*", "", RegexOptions.Multiline);
-            html = Regex.Replace(html, @"<head\b[^>]*>.*?</head>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             html = Regex.Replace(html, @"</?html\b[^>]*>", "", RegexOptions.IgnoreCase);
             html = Regex.Replace(html, @"</?body\b[^>]*>", "", RegexOptions.IgnoreCase);
 
