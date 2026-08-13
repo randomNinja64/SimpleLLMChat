@@ -86,6 +86,9 @@
     <Compile Include="..\Shared\ConfigHandler.cs">
       <Link>Shared\ConfigHandler.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\ChatBlockDisplayMode.cs">
+      <Link>Shared\ChatBlockDisplayMode.cs</Link>
+    </Compile>
     <Compile Include="..\Shared\TlsConfig.cs">
       <Link>Shared\TlsConfig.cs</Link>
     </Compile>

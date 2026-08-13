@@ -59,6 +59,14 @@ public class ConfigHandler
         return list;
     }
 
+    public ChatBlockDisplayMode GetChatBlockDisplayMode(string key, ChatBlockDisplayMode defaultValue)
+    {
+        ChatBlockDisplayMode result;
+        if (configMap.ContainsKey(key) && Enum.TryParse(configMap[key], true, out result))
+            return result;
+        return defaultValue;
+    }
+
     /// <summary>
     /// Decodes stored prompts by removing outer wrapping quotes and unescaping all C-style escape sequences.
     /// Preserves inner/trailing quotes verbatim.

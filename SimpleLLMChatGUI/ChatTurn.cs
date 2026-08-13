@@ -18,17 +18,18 @@ namespace SimpleLLMChatGUI
 
         private static readonly string[] CollapsibleOpenTags =
         {
-            "[thinking]", "<think>", "[tool call]"
+            "[thinking]", "<think>", "[tool call]", "[tool output]"
         };
         private static readonly string[] CollapsibleCloseTags =
         {
-            "[/thinking]", "</think>", "[/tool call]"
+            "[/thinking]", "</think>", "[/tool call]", "[/tool output]"
         };
 
         internal enum CollapsibleBlockKind
         {
             Thinking,
-            ToolCall
+            ToolCall,
+            ToolOutput
         }
 
         /// <summary>
@@ -122,11 +123,22 @@ namespace SimpleLLMChatGUI
                         return remaining.Substring(openIndex);
 
                     remaining = remaining.Substring(openIndex + openLength);
-                    if (IsToolCallOpenTag(openTag))
+                    if (openTag.Equals("[tool call]", StringComparison.OrdinalIgnoreCase))
                     {
                         string name;
                         remaining = TakeToolCallName(remaining, out name);
                         StartCollapsibleBlock(name, CollapsibleBlockKind.ToolCall);
+                    }
+                    else if (openTag.Equals("[tool output]", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (App.Config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown) == ChatBlockDisplayMode.Hidden)
+                        {
+                            AppendPlain(openTag);
+                            continue;
+                        }
+
+                        remaining = remaining.TrimStart('\r', '\n');
+                        StartCollapsibleBlock(null, CollapsibleBlockKind.ToolOutput);
                     }
                     else
                     {
@@ -246,9 +258,13 @@ namespace SimpleLLMChatGUI
                 Document.Blocks.Remove(last);
             }
 
-            bool collapseByDefault = kind == CollapsibleBlockKind.ToolCall
-                ? App.Config.GetConfigBool("collapsetoolcalls", true)
-                : App.Config.GetConfigBool("collapsethinking", true);
+            ChatBlockDisplayMode mode = kind == CollapsibleBlockKind.ToolCall
+                ? App.Config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed)
+                : kind == CollapsibleBlockKind.ToolOutput
+                    ? App.Config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown)
+                    : App.Config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed);
+            // Shown and Hidden (name-only tool call) start expanded; Collapsed does not.
+            bool expandByDefault = mode != ChatBlockDisplayMode.Collapsed;
 
             var state = new CollapsibleBlockState
             {
@@ -277,7 +293,7 @@ namespace SimpleLLMChatGUI
             {
                 Header = state.HeaderLabel,
                 Content = state.BodyText,
-                IsExpanded = !collapseByDefault,
+                IsExpanded = expandByDefault,
                 Style = ThinkingExpanderStyle,
                 Tag = state
             };
@@ -384,6 +400,13 @@ namespace SimpleLLMChatGUI
                 return baseLabel;
             }
 
+            if (state.Kind == CollapsibleBlockKind.ToolOutput)
+            {
+                if (state.Collapsed && state.Active)
+                    return "tool output" + new string('.', state.EllipsisCount);
+                return "tool output";
+            }
+
             if (state.Collapsed && state.Active)
                 return "thinking" + new string('.', state.EllipsisCount);
 
@@ -424,11 +447,6 @@ namespace SimpleLLMChatGUI
             if (rest.Length > 0 && rest[0] == '\r')
                 rest = rest.Substring(1);
             return rest;
-        }
-
-        private static bool IsToolCallOpenTag(string openTag)
-        {
-            return openTag.Equals(CollapsibleOpenTags[2], StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryFindTag(string text, string[] tags, out int index, out int length)

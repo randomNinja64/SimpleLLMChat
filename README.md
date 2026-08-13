@@ -16,7 +16,7 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 - **Markdown Rendering** - The GUI can render Markdown formatting for easier reading.
 - **OpenAI-Compatible Endpoint Support** - In addition to OpenAI, any service/server offering the OpenAI v1 chat endpoint can be used, including [llama.cpp](https://github.com/ggerganov/llama.cpp) and [LM Studio](https://lmstudio.ai/).
 - **Retrieval Augmented Generation (RAG)** - Retrieve information from documents via a local knowledge folder (see [RAG](#rag)).
-- **Script-Friendly** - Output without tool calls and reasoning can be piped out of the CLI using the `-o` or `--output-only` flag.
+- **Script-Friendly** - Output without tool calls, tool outputs, and reasoning can be piped out of the CLI using the `-o` or `--output-only` flag. **Note**: Tool calls requiring approval will automatically be denied.
 - **Streaming Responses** - Responses are streamed from the LLM server in real-time.
 - **Tools** - A modular, extensible tool system is available. For information about the included tools, see [Tools](#tools).
 
@@ -54,10 +54,9 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `customfontfamily`: Font used for all non-code block text in the GUI
 - `fontsize`: Font size for chat and input text
 - `markdownparsing`: Enables/disables Markdown rendering in the GUI (`1` or `0`)
-- `showreasoningoutput`: Enables/disables reasoning output display (`1` or `0`)
-- `collapsethinking`: Collapse thinking/reasoning blocks by default in the GUI (`1` or `0`, default `1`)
-- `showtooloutput`: Enables/disables full tool execution output in chat (`1` or `0`)
-- `collapsetoolcalls`: Collapse tool-call blocks by default in the GUI (`1` or `0`, default `1`)
+- `thinkingdisplay`: Model reasoning appearance (`shown`, `collapsed`, or `hidden`; default `collapsed`). Hidden shows a short `[thought for N seconds]` stub instead of the full reasoning.
+- `toolcalldisplay`: Model tool call appearance (`shown`, `collapsed`, or `hidden`; default `collapsed`). Hidden shows an expanded tool-call header with the tool name only (no arguments).
+- `tooloutputdisplay`: Tool result appearance (`shown`, `collapsed`, or `hidden`; default `shown`). Hidden shows `[tool output]` with the exit code only.
 
 **RAG**
 - `ragenabled`: Enables RAG (`1` or `0`, default off)
@@ -117,7 +116,7 @@ To pass in an image alongside a prompt, use `SimpleLLMChatCLI.exe --image <path>
 
 CLI mode provides the following additional flags:
 - `--no-banners`: Suppresses instructional prompts
-- `-o`, `--output-only`: Outputs only the model's response (useful for scripting)
+- `-o`, `--output-only`: Outputs only the model's response text (no thinking, tool-call, or tool-output UI). Tools that do not require approval still run silently. If the model calls a tool that requires approval, the session ends with `Error: Model called <tool> which requires approval`.
 - `--reasoning-effort`: Sets initial reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`)
 
 ## Tools

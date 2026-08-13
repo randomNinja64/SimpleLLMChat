@@ -109,9 +109,6 @@ namespace SimpleLLMChatCLI
             // Get tools requiring approval
             List<string> toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
 
-            // Get show tool output setting
-            bool showToolOutput = Config.GetConfigBool("showtooloutput");
-
             string assistantName = Config.GetConfigValue("assistantname");
             if (string.IsNullOrWhiteSpace(assistantName))
                 assistantName = AppConstants.DefaultAssistantName;
@@ -212,8 +209,7 @@ namespace SimpleLLMChatCLI
                         assistantName,
                         enabledTools,
                         toolsRequiringApproval,
-                        outputOnly,
-                        showToolOutput);
+                        outputOnly);
                     return;
                 }
             }
@@ -264,7 +260,6 @@ namespace SimpleLLMChatCLI
                     registry.LoadToolsFromDirectory(toolsDir);
                     enabledTools = Config.GetConfigList("tools");
                     toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
-                    showToolOutput = Config.GetConfigBool("showtooloutput");
                     assistantName = Config.GetConfigValue("assistantname");
                     if (string.IsNullOrWhiteSpace(assistantName))
                         assistantName = AppConstants.DefaultAssistantName;
@@ -336,8 +331,7 @@ namespace SimpleLLMChatCLI
                                 assistantName,
                                 enabledTools,
                                 toolsRequiringApproval,
-                                false,
-                                showToolOutput);
+                                false);
             }
         }
     }

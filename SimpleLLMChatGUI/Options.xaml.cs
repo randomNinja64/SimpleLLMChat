@@ -18,10 +18,9 @@ namespace SimpleLLMChatGUI
         private string _sysPrompt;
         private int _contextWindowSize;
         private string _assistantName;
-        private bool _showToolOutput;
-        private bool _showReasoningOutput;
-        private bool _collapseThinking;
-        private bool _collapseToolCalls;
+        private string _thinkingDisplayModeText = "Collapsed";
+        private string _toolCallDisplayModeText = "Collapsed";
+        private string _toolOutputDisplayModeText = "Shown";
         private bool _markdownParsing;
         private string _codeFontFamily;
         private string _customFontFamily;
@@ -45,6 +44,8 @@ namespace SimpleLLMChatGUI
 
         private readonly List<string> _availableTools;
         private readonly List<string> _systemFonts;
+        private static readonly List<string> DisplayModeOptionList =
+            new List<string> { "Shown", "Collapsed", "Hidden" };
 
         // Dynamic tool options loaded from manifests
         private List<ToolOptionDefinition> _toolOptions;
@@ -102,28 +103,27 @@ namespace SimpleLLMChatGUI
             set { _assistantName = value; OnPropertyChanged(nameof(AssistantName)); }
         }
 
-        public bool ShowToolOutput
+        public List<string> DisplayModeOptions
         {
-            get { return _showToolOutput; }
-            set { _showToolOutput = value; OnPropertyChanged(nameof(ShowToolOutput)); }
+            get { return DisplayModeOptionList; }
         }
 
-        public bool ShowReasoningOutput
+        public string ThinkingDisplayModeText
         {
-            get { return _showReasoningOutput; }
-            set { _showReasoningOutput = value; OnPropertyChanged(nameof(ShowReasoningOutput)); }
+            get { return _thinkingDisplayModeText; }
+            set { _thinkingDisplayModeText = value; OnPropertyChanged(nameof(ThinkingDisplayModeText)); }
         }
 
-        public bool CollapseThinking
+        public string ToolCallDisplayModeText
         {
-            get { return _collapseThinking; }
-            set { _collapseThinking = value; OnPropertyChanged(nameof(CollapseThinking)); }
+            get { return _toolCallDisplayModeText; }
+            set { _toolCallDisplayModeText = value; OnPropertyChanged(nameof(ToolCallDisplayModeText)); }
         }
 
-        public bool CollapseToolCalls
+        public string ToolOutputDisplayModeText
         {
-            get { return _collapseToolCalls; }
-            set { _collapseToolCalls = value; OnPropertyChanged(nameof(CollapseToolCalls)); }
+            get { return _toolOutputDisplayModeText; }
+            set { _toolOutputDisplayModeText = value; OnPropertyChanged(nameof(ToolOutputDisplayModeText)); }
         }
 
         public bool MarkdownParsing
@@ -253,10 +253,9 @@ namespace SimpleLLMChatGUI
             SysPrompt = "";
             ContextWindowSize = 0;
             AssistantName = AppConstants.DefaultAssistantName;
-            ShowToolOutput = true;
-            ShowReasoningOutput = true;
-            CollapseThinking = true;
-            CollapseToolCalls = true;
+            ThinkingDisplayModeText = "Collapsed";
+            ToolCallDisplayModeText = "Collapsed";
+            ToolOutputDisplayModeText = "Shown";
             MarkdownParsing = true;
             CodeFontFamily = "";
             CustomFontFamily = "";
@@ -387,10 +386,9 @@ namespace SimpleLLMChatGUI
             AssistantName = config.GetConfigValue("assistantname");
             if (string.IsNullOrWhiteSpace(AssistantName))
                 AssistantName = AppConstants.DefaultAssistantName;
-            ShowToolOutput = config.GetConfigBool("showtooloutput");
-            ShowReasoningOutput = config.GetConfigBool("showreasoningoutput");
-            CollapseThinking = config.GetConfigBool("collapsethinking", true);
-            CollapseToolCalls = config.GetConfigBool("collapsetoolcalls", true);
+            ThinkingDisplayModeText = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed).ToString();
+            ToolCallDisplayModeText = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed).ToString();
+            ToolOutputDisplayModeText = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown).ToString();
             MarkdownParsing = config.GetConfigBool("markdownparsing", true);
             CodeFontFamily = config.GetConfigValue("codeblockfontfamily");
             CustomFontFamily = config.GetConfigValue("customfontfamily");
@@ -526,10 +524,9 @@ namespace SimpleLLMChatGUI
                 "customfontfamily=" + CustomFontFamily,
                 "fontsize=" + ChatFontSize,
                 "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
-                "showreasoningoutput=" + (ShowReasoningOutput ? "1" : "0"),
-                "collapsethinking=" + (CollapseThinking ? "1" : "0"),
-                "showtooloutput=" + (ShowToolOutput ? "1" : "0"),
-                "collapsetoolcalls=" + (CollapseToolCalls ? "1" : "0"),
+                "thinkingdisplay=" + (ThinkingDisplayModeText ?? "Collapsed").ToLowerInvariant(),
+                "toolcalldisplay=" + (ToolCallDisplayModeText ?? "Collapsed").ToLowerInvariant(),
+                "tooloutputdisplay=" + (ToolOutputDisplayModeText ?? "Shown").ToLowerInvariant(),
             };
         }
 

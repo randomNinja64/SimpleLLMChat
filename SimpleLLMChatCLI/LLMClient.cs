@@ -68,9 +68,11 @@ public class LLMClient
         string assistantName,
         List<string> enabledTools,
         List<string> toolsRequiringApproval,
-        bool outputOnly,
-        bool showToolOutput)
+        bool outputOnly)
     {
+        ChatBlockDisplayMode toolCallDisplay = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed);
+        ChatBlockDisplayMode toolOutputDisplay = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown);
+
         // If prior context is already high, summarize it silently first, then run the user prompt.
         MaybeSummarizeInBackground(
             conversation,
@@ -144,6 +146,7 @@ public class LLMClient
             // Stream tool calls with explicit open/close markers as they arrive, rather than
             // waiting for the full response before printing them. A tool that requires approval
             // is suppressed here since the approval prompt below shows its name + args instead.
+            // Hidden: name only (no args). outputOnly: no tool-call UI at all.
             bool toolCallUiOpen = false;
             bool toolCallArgsEndedWithNewline = true;
             bool currentToolCallSuppressed = false;
@@ -176,7 +179,9 @@ public class LLMClient
                             toolCallUiOpen = false;
                         }
                     }
-                    else if (!string.IsNullOrEmpty(toolCall.Arguments) && !currentToolCallSuppressed)
+                    else if (!string.IsNullOrEmpty(toolCall.Arguments)
+                        && !currentToolCallSuppressed
+                        && toolCallDisplay != ChatBlockDisplayMode.Hidden)
                     {
                         ChatOutput.Write(toolCall.Arguments);
                         toolCallArgsEndedWithNewline = toolCall.Arguments.EndsWith("\n");
@@ -184,7 +189,7 @@ public class LLMClient
                 };
             }
 
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback, onContentStart, startBlock);
+            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback, onContentStart, startBlock, outputOnly);
 
             if (toolCallUiOpen)
             {
@@ -217,6 +222,12 @@ public class LLMClient
                     ToolRegistry.ToolCall call = response.ToolCalls[i];
                     bool needsApproval = toolsRequiringApproval != null
                         && toolsRequiringApproval.Contains(call.Name);
+
+                    if (needsApproval && outputOnly)
+                    {
+                        ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
+                        return;
+                    }
 
                     // The tool call block itself was already streamed above (if not suppressed
                     // for approval); only pad a blank line before the approval prompt here.
@@ -267,23 +278,21 @@ public class LLMClient
                     if (!outputOnly)
                     {
                         startBlock();
-                        ChatOutput.WriteLine("[tool output]");
-                        if (showToolOutput)
+                        if (toolOutputDisplay == ChatBlockDisplayMode.Hidden)
                         {
-                            ChatOutput.Write(toolContent);
-                            if (!toolContent.EndsWith("\n"))
-                            {
-                                ChatOutput.WriteLine(); // Add newline if not present
-                            }
+                            ChatOutput.WriteLine("[tool output]");
+                            ChatOutput.WriteLine("Exit Code: " + exitCode);
                         }
                         else
                         {
-                            // Show only the exit code
-                            ChatOutput.WriteLine("Exit Code: " + exitCode);
+                            ChatOutput.WriteLine("[tool output]");
+                            ChatOutput.Write(toolContent ?? "");
+                            if (string.IsNullOrEmpty(toolContent) || !toolContent.EndsWith("\n"))
+                                ChatOutput.WriteLine();
+                            ChatOutput.WriteLine("[/tool output]");
                         }
                     }
                 }
-
                 // Mid-turn (after tools): compact context silently, then continue the user request.
                 MaybeSummarizeInBackground(
                     conversation,
@@ -591,26 +600,31 @@ public class LLMClient
         Action<string> outputCallback = null,
         Action<ToolRegistry.ToolCall> toolCallCallback = null,
         Action onContentStart = null,
-        Action startBlock = null)
+        Action startBlock = null,
+        bool outputOnly = false)
     {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback, toolCallCallback, onContentStart, startBlock);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback, toolCallCallback, onContentStart, startBlock, outputOnly);
     }
 
     private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null,
         Action<ToolRegistry.ToolCall> toolCallCallback = null,
-        Action onContentStart = null, Action startBlock = null)
+        Action onContentStart = null, Action startBlock = null, bool outputOnly = false)
     {
-        // NyoCoder-style: wire reasoning from config when streaming output is enabled.
-        bool showReasoning = outputCallback != null && config.GetConfigBool("showreasoningoutput");
-        Action<string> onReasoningChunk = showReasoning ? outputCallback : null;
+        Action<string> onReasoningChunk = null;
         Action<int> onReasoningSummary = null;
-        if (outputCallback != null && !showReasoning)
+        if (outputCallback != null && !outputOnly)
         {
-            onReasoningSummary = s =>
+            bool showThinking = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed)
+                != ChatBlockDisplayMode.Hidden;
+            onReasoningChunk = showThinking ? outputCallback : null;
+            if (!showThinking)
             {
-                startBlock?.Invoke();
-                outputCallback("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]\n");
-            };
+                onReasoningSummary = s =>
+                {
+                    if (startBlock != null) startBlock();
+                    outputCallback("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]\n");
+                };
+            }
         }
 
         try
