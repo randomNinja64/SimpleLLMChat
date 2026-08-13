@@ -24,6 +24,10 @@ namespace SimpleLLMChatGUI
         private static readonly Regex ItalicPattern = new Regex(@"(?<![a-zA-Z0-9_])(?<!\*)\*(.+?)\*(?![a-zA-Z0-9_])(?!\*)|(?<![a-zA-Z0-9_])(?<!_)_(.+?)_(?![a-zA-Z0-9_])(?!_)", RegexOptions.Compiled);
         private static readonly Regex StrikethroughPattern = new Regex(@"~~(.+?)~~", RegexOptions.Compiled);
         private static readonly Regex InlineCodePattern = new Regex(@"`([^`]+)`", RegexOptions.Compiled);
+        // Bold italic link: ***[text](url)*** or ___[text](url)___
+        private static readonly Regex BoldItalicLinkPattern = new Regex(@"(?<![a-zA-Z0-9_])(\*\*\*|___)\[([^\[\]]+)\]\(([^()]+)\)\1(?![a-zA-Z0-9_])", RegexOptions.Compiled);
+        // Bold link: **[text](url)** or __[text](url)__
+        private static readonly Regex BoldLinkPattern = new Regex(@"(?<![a-zA-Z0-9_])(?<!\*)\*\*\[([^\[\]]+)\]\(([^()]+)\)\*\*(?![a-zA-Z0-9_])(?!\*)|(?<![a-zA-Z0-9_])(?<!_)__\[([^\[\]]+)\]\(([^()]+)\)__(?![a-zA-Z0-9_])(?!_)", RegexOptions.Compiled);
         private static readonly Regex LinkPattern = new Regex(@"\[([^\[\]]+)\]\(([^()]+)\)", RegexOptions.Compiled);
         private static readonly Regex BareUrlPattern = new Regex(@"https?://[^\s<>""'()\[\]{}]+(?<![.,;:!?])", RegexOptions.Compiled);
         private static readonly Regex HorizontalRulePattern = new Regex(@"^(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$", RegexOptions.Compiled);
@@ -114,9 +118,16 @@ namespace SimpleLLMChatGUI
                     return codeSpan;
                 });
 
-                // Process links before inline formatting so link text doesn't get formatted
+                // Emphasized links before plain links (e.g. **[text](url)** / ***[text](url)***).
+                ReplaceInRuns(paragraph, BoldItalicLinkPattern, match =>
+                    (Inline)CreateHyperlink(match.Groups[2].Value, match.Groups[3].Value.Trim(), FontWeights.Bold, FontStyles.Italic)
+                    ?? new Run(match.Value));
+                ReplaceInRuns(paragraph, BoldLinkPattern, match =>
+                    (Inline)CreateHyperlink(BoldLinkText(match), BoldLinkUrl(match), FontWeights.Bold)
+                    ?? new Run(match.Value));
+                // Plain links; unwrap [**text**](url) / [***text***](url) into emphasized hyperlinks.
                 ReplaceInRuns(paragraph, LinkPattern, match =>
-                    (Inline)CreateHyperlink(match.Groups[1].Value, match.Groups[2].Value.Trim()) ?? new Run(match.Value));
+                    (Inline)CreateLinkInline(match.Groups[1].Value, match.Groups[2].Value.Trim()) ?? new Run(match.Value));
                 ReplaceInRuns(paragraph, BareUrlPattern, match =>
                     (Inline)CreateHyperlink(match.Value, match.Value) ?? new Run(match.Value));
 
@@ -221,16 +232,72 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        private static Hyperlink CreateHyperlink(string displayText, string url)
+        private static Hyperlink CreateLinkInline(string displayText, string url)
+        {
+            string text = displayText;
+            FontWeight fontWeight = FontWeights.Normal;
+            FontStyle fontStyle = FontStyles.Normal;
+
+            if (TryStripWrappedMarkers(ref text, "***") || TryStripWrappedMarkers(ref text, "___"))
+            {
+                fontWeight = FontWeights.Bold;
+                fontStyle = FontStyles.Italic;
+            }
+            else if (TryStripWrappedMarkers(ref text, "**") || TryStripWrappedMarkers(ref text, "__"))
+            {
+                fontWeight = FontWeights.Bold;
+            }
+
+            return CreateHyperlink(text, url, fontWeight, fontStyle);
+        }
+
+        private static bool TryStripWrappedMarkers(ref string text, string marker)
+        {
+            if (text == null || marker == null || text.Length <= marker.Length * 2)
+                return false;
+            if (!text.StartsWith(marker, StringComparison.Ordinal) ||
+                !text.EndsWith(marker, StringComparison.Ordinal))
+                return false;
+
+            text = text.Substring(marker.Length, text.Length - marker.Length * 2);
+            return true;
+        }
+
+        private static string BoldLinkText(Match match)
+        {
+            return !string.IsNullOrEmpty(match.Groups[1].Value)
+                ? match.Groups[1].Value
+                : match.Groups[3].Value;
+        }
+
+        private static string BoldLinkUrl(Match match)
+        {
+            return !string.IsNullOrEmpty(match.Groups[2].Value)
+                ? match.Groups[2].Value.Trim()
+                : match.Groups[4].Value.Trim();
+        }
+
+        private static Hyperlink CreateHyperlink(
+            string displayText,
+            string url,
+            FontWeight fontWeight = default(FontWeight),
+            FontStyle fontStyle = default(FontStyle))
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ||
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 return null;
 
+            if (fontWeight == default(FontWeight))
+                fontWeight = FontWeights.Normal;
+            if (fontStyle == default(FontStyle))
+                fontStyle = FontStyles.Normal;
+
             var hyperlink = new Hyperlink(new Run(displayText))
             {
                 NavigateUri = uri,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                FontWeight = fontWeight,
+                FontStyle = fontStyle
             };
             hyperlink.SetResourceReference(TextElement.ForegroundProperty, "ChatTextColorBrush");
             AttachTooltip(hyperlink, uri.AbsoluteUri);

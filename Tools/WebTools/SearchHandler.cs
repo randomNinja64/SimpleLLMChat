@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Text;
@@ -11,13 +12,11 @@ namespace WebTools
         // Delegate for parsing search results from raw response
         private delegate string ResultParser(string response, out int exitCode);
 
-        // Generic search template - executes curl and parses results
+        // Generic search template - GET via curl, then parse/truncate like the other engines
         private static string ExecuteSearch(string url, ResultParser parser, out int exitCode, int maxSearchResults, params string[] headers)
         {
-            exitCode = 0;
             string response = "";
 
-            // Execute curl request
             try
             {
                 response = CurlHelper.Execute(url, out exitCode, combineErrorOutput: false, extraHeaders: headers);
@@ -28,21 +27,24 @@ namespace WebTools
                 return "Error running curl.exe for search: " + ex.Message;
             }
 
-            // Check for empty response
+            return FinalizeSearch(response, parser, out exitCode, maxSearchResults);
+        }
+
+        // Shared parse + line truncate used by GET engines and Firecrawl POST
+        private static string FinalizeSearch(string response, ResultParser parser, out int exitCode, int maxSearchResults)
+        {
             if (string.IsNullOrWhiteSpace(response))
             {
                 exitCode = -1;
                 return "";
             }
 
-            // Parse the response using the provided parser
             try
             {
                 string parsed = parser(response, out exitCode);
 
-                // Truncate to max search results
                 string[] lines = parsed.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                if (lines.Length > maxSearchResults)
+                if (maxSearchResults > 0 && lines.Length > maxSearchResults)
                     parsed = string.Join("\n", lines, 0, maxSearchResults) + "\n";
 
                 return parsed;
@@ -139,6 +141,118 @@ namespace WebTools
             }
 
             return results.ToString();
+        }
+
+        // Searches the web with Firecrawl /v2/search (POST; same parse/truncate path as GET engines)
+        public static string RunFirecrawlSearch(string query, string endpoint, string apiKey,
+            int maxSearchResults, out int exitCode)
+        {
+            if (string.IsNullOrWhiteSpace(endpoint))
+            {
+                exitCode = -1;
+                return "";
+            }
+
+            string response = "";
+            try
+            {
+                string searchUrl = endpoint.TrimEnd('/') + "/v2/search";
+                JObject payload = new JObject
+                {
+                    ["query"] = query,
+                    ["limit"] = maxSearchResults > 0 ? maxSearchResults : 20
+                };
+
+                string[] headers = string.IsNullOrWhiteSpace(apiKey)
+                    ? new string[0]
+                    : new[] { "Authorization: Bearer " + apiKey.Trim() };
+
+                response = CurlHelper.PostJson(
+                    searchUrl, payload.ToString(Formatting.None), out exitCode,
+                    combineErrorOutput: false, headers);
+            }
+            catch (Exception ex)
+            {
+                exitCode = -1;
+                return "Error running curl.exe for search: " + ex.Message;
+            }
+
+            return FinalizeSearch(response,
+                delegate(string json, out int code)
+                {
+                    return ParseFirecrawlResults(json, maxSearchResults, out code);
+                },
+                out exitCode, maxSearchResults);
+        }
+
+        // Parses Firecrawl search JSON (data.web[] with url/title/description)
+        private static string ParseFirecrawlResults(string json, int maxSearchResults, out int exitCode)
+        {
+            exitCode = 0;
+
+            JObject root = JObject.Parse(json);
+            if (root["success"] != null && root["success"].Type == JTokenType.Boolean
+                && !(bool)root["success"])
+            {
+                exitCode = -1;
+                return "";
+            }
+
+            JArray webResults = null;
+            JToken data = root["data"];
+            if (data is JObject)
+                webResults = data["web"] as JArray;
+            else if (data is JArray)
+                webResults = (JArray)data;
+
+            if (webResults == null || webResults.Count == 0)
+                return "";
+
+            StringBuilder results = new StringBuilder();
+            int count = 0;
+            foreach (JToken result in webResults)
+            {
+                if (maxSearchResults > 0 && count >= maxSearchResults)
+                    break;
+
+                string url = (result["url"]?.ToString() ?? "").Trim();
+                string title = NormalizeSearchText(result["title"]?.ToString());
+                string content = NormalizeSearchText(
+                    FirstNonEmpty(
+                        result["description"]?.ToString(),
+                        result["snippet"]?.ToString(),
+                        result["content"]?.ToString()));
+
+                if (!string.IsNullOrEmpty(url))
+                {
+                    results.AppendLine(url + " : " + title + " - " + content);
+                    count++;
+                }
+            }
+
+            if (results.Length == 0)
+                return "";
+
+            return results.ToString();
+        }
+
+        private static string NormalizeSearchText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+            return Regex.Replace(text.Trim(), @"\s+", " ");
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            if (values == null)
+                return "";
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(values[i]))
+                    return values[i];
+            }
+            return "";
         }
 
         // Searches the web with SearXNG

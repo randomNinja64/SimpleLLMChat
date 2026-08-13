@@ -173,13 +173,15 @@ SimpleLLMChat includes the following 6 tool packages:
     - `download_file`: Downloads a file using cURL
     - `download_video`: Downloads an online video using YT-DLP and saves it to the user's desktop
     - `read_website`: Reads a webpage as Title/Description, body text (image alt+src kept), and a Links section with a configurable cap
-    - `run_web_search`: Searches the web using SearXNG, with DDG and Wiby as fallbacks
+    - `run_web_search`: Searches the web using SearXNG, with Firecrawl, DDG, and Wiby as fallbacks
   - Configuration Options
     - `maxSearchResults`: Maximum number of search results to retrieve (default: `20`)
     - `maxWebContentLength`: Maximum number of characters to return when reading a webpage (default: `10000`; `0` = no limit)
     - `maxLinks`: Maximum number of unique links to include at the end of a webpage read (default: `40`)
+    - `FirecrawlEndpoint`: Firecrawl API base URL (e.g. `http://localhost:3002`). If set, `read_website` will attempt to use it to view page content. (default: none)
+    - `FirecrawlApiKey`: Firecrawl API key (optional) (default: none)
     - `SearXNGInstance`: SearXNG instance to use for running web searches (must support JSON API) (default: none)
-    - `userAgent`: User agent to use when making web requests (default: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36`)
+    - `userAgent`: User agent to use when making web requests (default: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36`)
   - Dependencies
     - `curl-ca-bundle.crt`: used for cURL
     - `curl.exe`:  used to download web content

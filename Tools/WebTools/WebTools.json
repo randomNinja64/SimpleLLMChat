@@ -5,8 +5,10 @@
         { "name": "maxWebContentLength", "label": "Maximum Processing Length for Web Content (0 = no limit)", "type": "int", "default": "10000" },
         { "name": "maxLinks", "label": "Maximum Links from Webpage", "type": "int", "default": "40" },
         { "name": "maxSearchResults", "label": "Maximum Search Results", "type": "int", "default": "20" },
+        { "name": "FirecrawlEndpoint", "label": "Firecrawl API base URL (optional)", "type": "string", "default": "" },
+        { "name": "FirecrawlApiKey", "label": "Firecrawl API key (optional)", "type": "string", "default": "" },
         { "name": "SearXNGInstance", "label": "SearXNG Instance (optional, must support JSON API)", "type": "string", "default": "" },
-        { "name": "userAgent", "label": "User Agent", "type": "string", "default": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36" }
+        { "name": "userAgent", "label": "User Agent", "type": "string", "default": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36" }
     ],
     "tools": [
         {

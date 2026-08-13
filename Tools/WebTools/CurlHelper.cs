@@ -15,5 +15,18 @@ namespace WebTools
             string arguments = "-s -L " + flags + ua + hdrs + " \"" + url + "\"";
             return ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput);
         }
+
+        /// <summary>
+        /// POSTs a JSON body via curl (-d inline). Optional extra headers (e.g. Authorization).
+        /// </summary>
+        public static string PostJson(string url, string jsonBody, out int exitCode,
+            bool combineErrorOutput = true, params string[] extraHeaders)
+        {
+            string hdrs = " -H \"Content-Type: application/json\""
+                + string.Concat(System.Array.ConvertAll(extraHeaders, h => " -H \"" + h + "\""));
+            string escapedJson = (jsonBody ?? "").Replace("\"", "\\\"");
+            string arguments = "-s -L -X POST" + hdrs + " -d \"" + escapedJson + "\" \"" + url + "\"";
+            return ToolHelper.ExecuteProcess("curl.exe", arguments, out exitCode, combineErrorOutput);
+        }
     }
 }
