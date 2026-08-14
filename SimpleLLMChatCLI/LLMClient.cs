@@ -73,6 +73,11 @@ public class LLMClient
         ChatBlockDisplayMode toolCallDisplay = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed);
         ChatBlockDisplayMode toolOutputDisplay = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown);
 
+        HashSet<string> enabledSet = new HashSet<string>(
+            enabledTools ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> approvalSet = new HashSet<string>(
+            toolsRequiringApproval ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+
         // If prior context is already high, summarize it silently first, then run the user prompt.
         MaybeSummarizeInBackground(
             conversation,
@@ -164,8 +169,7 @@ public class LLMClient
                             ChatOutput.WriteLine("[/tool call]");
                         }
 
-                        currentToolCallSuppressed = toolsRequiringApproval != null
-                            && toolsRequiringApproval.Contains(toolCall.Name);
+                        currentToolCallSuppressed = approvalSet.Contains(toolCall.Name);
 
                         if (!currentToolCallSuppressed)
                         {
@@ -220,8 +224,7 @@ public class LLMClient
                 for (int i = 0; i < response.ToolCalls.Count; i++)
                 {
                     ToolRegistry.ToolCall call = response.ToolCalls[i];
-                    bool needsApproval = toolsRequiringApproval != null
-                        && toolsRequiringApproval.Contains(call.Name);
+                    bool needsApproval = approvalSet.Contains(call.Name);
 
                     if (needsApproval && outputOnly)
                     {
@@ -237,7 +240,7 @@ public class LLMClient
                     int exitCode = 0;
                     string toolContent;
 
-                    if (!enabledTools.Contains(call.Name))
+                    if (!enabledSet.Contains(call.Name))
                     {
                         exitCode = -1;
                         toolContent = ToolRegistry.FormatCommandResult(

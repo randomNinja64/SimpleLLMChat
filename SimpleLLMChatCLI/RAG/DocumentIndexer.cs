@@ -161,7 +161,6 @@ namespace SimpleLLMChatCLI.RAG
             foreach (string key in toRemove)
                 index.RemoveFileData(key);
 
-            string embedError = null;
             if (pendingTexts.Count > 0)
             {
                 try
@@ -175,15 +174,18 @@ namespace SimpleLLMChatCLI.RAG
                 }
                 catch (EmbeddingsException ex)
                 {
-                    embedError = "Embeddings failed: " + ex.Message + " (index saved without new embeddings).";
+                    // Discard this pass: hashes were stamped before embed, so saving would
+                    // skip those files forever on the next reconcile.
+                    Report(new IndexProgress
+                    {
+                        Phase = "error",
+                        Message = "Embeddings failed: " + ex.Message + " (index not saved)."
+                    });
+                    return;
                 }
             }
 
-            // Only stamp the model on success; leaving it stale forces a full rebuild (and
-            // retry) via ParamsMismatch on the next reconcile instead of losing this pass's
-            // hash/pruning bookkeeping.
-            if (embedError == null)
-                index.Manifest.EmbeddingsModel = _config.GetConfigValue("embeddingsModel");
+            index.Manifest.EmbeddingsModel = _config.GetConfigValue("embeddingsModel");
             index.Manifest.IndexChunkLines = chunkLines;
             index.Manifest.IndexChunkOverlap = overlap;
             index.Manifest.RagMaxSnippetLength = maxSnippet;
@@ -195,9 +197,6 @@ namespace SimpleLLMChatCLI.RAG
                 Phase = "done",
                 FileCount = index.Manifest.Files.Count
             });
-
-            if (embedError != null)
-                Report(new IndexProgress { Phase = "error", Message = embedError });
         }
 
         public void ClearIndex()
