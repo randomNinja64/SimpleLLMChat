@@ -14,7 +14,7 @@ namespace ShellTools
                         {
                             string command = ToolHelper.GetRequiredArg(argumentsJson, "command");
                             int exitCode;
-                            string output = ToolHelper.ExecuteProcess("cmd.exe", "/c " + command, out exitCode);
+                            string output = ToolHelper.ExecuteProcess("cmd.exe", "/s /c " + command, out exitCode);
                             return new ToolResult(output, exitCode);
                         }
 
