@@ -15,10 +15,31 @@
         },
         {
             "name": "write_file",
-            "description": "Write the given content to a local file, creating or overwriting it.",
+            "description": "Write the given content to a local file, creating or overwriting it. Prefer this for new files or deliberate full-file rewrites. For targeted edits to an existing file, prefer edit_file when available.",
             "parameters": [
                 { "name": "filename", "type": "string", "description": "The full path of the file to write to. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
                 { "name": "content", "type": "string", "description": "The content to write into the file.", "required": true }
+            ]
+        },
+        {
+            "name": "edit_file",
+            "description": "Replace exact text in an existing file. Prefer this over write_file for targeted edits. Provide one or more edits; each edit's old_string must match exactly (including whitespace, indentation, and line endings) and occur exactly once in the file. Multiple edits can be provided to make multiple changes to the same file in one call.",
+            "parameters": [
+                { "name": "filename", "type": "string", "description": "The full path of the file to modify. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
+                {
+                    "name": "edits",
+                    "type": "array",
+                    "description": "One or more edits to apply. Each edit's old_string must be unique in the file.",
+                    "required": true,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "old_string": { "type": "string", "description": "The exact text to find, including whitespace and indentation. Must occur exactly once in the file." },
+                            "new_string": { "type": "string", "description": "The text to replace old_string with." }
+                        },
+                        "required": ["old_string", "new_string"]
+                    }
+                }
             ]
         },
         {

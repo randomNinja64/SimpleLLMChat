@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using System;
 
 namespace FileTools
@@ -26,6 +27,18 @@ namespace FileTools
                             string content = ToolHelper.JsonExtractString(argumentsJson, "content")?.Trim() ?? "";
                             int exitCode;
                             string output = FileHandler.WriteFile(filename, content, out exitCode);
+                            return new ToolResult(output, exitCode);
+                        }
+
+                    case "edit_file":
+                        {
+                            string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
+                            JArray edits = ToolHelper.JsonExtractArray(argumentsJson, "edits");
+                            if (edits == null || edits.Count == 0)
+                                return new ToolResult("error: missing or empty 'edits' argument.", 1);
+
+                            int exitCode;
+                            string output = EditFileTool.Apply(filename, edits, out exitCode);
                             return new ToolResult(output, exitCode);
                         }
 

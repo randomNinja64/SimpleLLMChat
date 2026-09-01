@@ -43,6 +43,8 @@
     <Compile Include="Program.cs" />
     <Compile Include="..\ToolHelper.cs" />
     <Compile Include="FileHandler.cs" />
+    <Compile Include="EditFileTool.cs" />
+    <Compile Include="TextNormalization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

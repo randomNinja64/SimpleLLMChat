@@ -31,6 +31,7 @@ namespace SimpleLLMChatCLI
             public string Type;
             public string Description;
             public bool Required;
+            public JObject Items;
         }
 
         public struct ToolDefinition
@@ -167,7 +168,8 @@ namespace SimpleLLMChatCLI
                             Name = (string)paramObj["name"] ?? "",
                             Type = (string)paramObj["type"] ?? "string",
                             Description = ReplacePlaceholders((string)paramObj["description"] ?? ""),
-                            Required = paramObj["required"]?.Value<bool>() ?? false
+                            Required = paramObj["required"]?.Value<bool>() ?? false,
+                            Items = paramObj["items"] as JObject
                         });
                     }
                 }
@@ -199,6 +201,8 @@ namespace SimpleLLMChatCLI
                         ["type"] = param.Type,
                         ["description"] = param.Description
                     };
+                    if (param.Items != null)
+                        propObj["items"] = param.Items;
                     props[param.Name] = propObj;
 
                     if (param.Required)

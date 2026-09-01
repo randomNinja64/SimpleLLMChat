@@ -127,6 +127,7 @@ SimpleLLMChat includes the following 6 tool packages:
   - Tools
     - `copy_file`: Copies a file from one location to another
     - `delete_file`: Deletes a file from the file system
+    - `edit_file`: Replaces exact text in an existing file via one or more old_string/new_string edits
     - `extract_file`: Extracts an archive to a destination directory
     - `list_directory`: Lists all files and subdirectories in a given directory
     - `move_file`: Moves a file from one location to another
