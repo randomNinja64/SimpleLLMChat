@@ -113,6 +113,12 @@ public class LLMClient
             Image = image
         });
 
+        // Context injectors (memory/skills summaries) are fetched once per user message
+        // and reused across agent-loop iterations (tool rounds) for this turn.
+        List<string> contextInjections = registry != null
+            ? registry.GetContextInjections(enabledTools)
+            : new List<string>();
+
         // The assistant name is printed once per turn:
         //   "LLM: output"  when the response starts with plain output, or
         //   "LLM:" on its own block when a [thinking]/[tool ...] block comes first.
@@ -193,7 +199,7 @@ public class LLMClient
                 };
             }
 
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback, onContentStart, startBlock, outputOnly);
+            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback, onContentStart, startBlock, outputOnly, contextInjections);
 
             if (toolCallUiOpen)
             {
@@ -406,7 +412,10 @@ public class LLMClient
     /// </summary>
     public void RefreshBaseCharacterOverhead(List<string> enabledTools)
     {
-        string systemPrompt = BuildSystemPrompt(enabledTools);
+        List<string> contextInjections = registry != null
+            ? registry.GetContextInjections(enabledTools)
+            : new List<string>();
+        string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
         int toolsChars = 0;
         if (enabledTools != null && enabledTools.Count > 0 && registry != null)
         {
@@ -417,13 +426,14 @@ public class LLMClient
         BaseOverheadChars = systemPrompt.Length + toolsChars;
     }
 
-    private string BuildSystemPrompt(List<string> enabledTools)
+    private string BuildSystemPrompt(List<string> enabledTools, List<string> contextInjections = null)
     {
         string sysprompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt")) ?? "";
 
         if (registry != null)
         {
-            foreach (string injection in registry.GetContextInjections(enabledTools))
+            List<string> injections = contextInjections ?? registry.GetContextInjections(enabledTools);
+            foreach (string injection in injections)
                 sysprompt += "\n\n" + injection;
         }
 
@@ -438,14 +448,14 @@ public class LLMClient
         return sysprompt;
     }
 
-    private JObject BuildRequestPayload(List<ChatMessage> conversation, List<string> enabledTools)
+    private JObject BuildRequestPayload(List<ChatMessage> conversation, List<string> enabledTools, List<string> contextInjections = null)
     {
         JObject payload = new JObject
         {
             ["model"] = config.GetConfigValue("model")
         };
 
-        string systemPrompt = BuildSystemPrompt(enabledTools);
+        string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
 
         JArray messages = new JArray();
         messages.Add(new JObject
@@ -604,9 +614,10 @@ public class LLMClient
         Action<ToolRegistry.ToolCall> toolCallCallback = null,
         Action onContentStart = null,
         Action startBlock = null,
-        bool outputOnly = false)
+        bool outputOnly = false,
+        List<string> contextInjections = null)
     {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), outputCallback, toolCallCallback, onContentStart, startBlock, outputOnly);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools, contextInjections), outputCallback, toolCallCallback, onContentStart, startBlock, outputOnly);
     }
 
     private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null,

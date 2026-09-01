@@ -82,15 +82,30 @@ namespace SimpleLLMChatCLI.RAG
         {
             try
             {
-                string[] lines = File.ReadAllLines(file);
                 int from = Math.Max(1, startLine);
-                int to = Math.Min(Math.Min(endLine, from + SnippetLines - 1), lines.Length);
-                if (from > lines.Length)
-                    return null;
+                int to = Math.Min(endLine, from + SnippetLines - 1);
 
                 var sb = new StringBuilder();
-                for (int i = from; i <= to; i++)
-                    sb.AppendLine("    " + lines[i - 1]);
+                int lineNum = 0;
+
+                using (StreamReader reader = new StreamReader(file, Encoding.UTF8, true))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        lineNum++;
+                        if (lineNum < from)
+                            continue;
+                        if (lineNum > to)
+                            break;
+
+                        sb.AppendLine("    " + line);
+                    }
+                }
+
+                if (lineNum < from)
+                    return null;
+
                 if (endLine > to)
                     sb.AppendLine("    ...");
 
