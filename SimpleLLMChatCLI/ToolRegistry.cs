@@ -42,7 +42,7 @@ namespace SimpleLLMChatCLI
             public string ExecutablePath;
         }
 
-        public readonly Dictionary<string, ToolDefinition> Tools = new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, ToolDefinition> Tools = new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase);
 
         // Context injectors declared by manifests via the "context_injector" field (executablePath -> commandName).
         private readonly Dictionary<string, string> contextInjectorsByExecutable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

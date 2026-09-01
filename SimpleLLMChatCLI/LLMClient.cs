@@ -505,7 +505,7 @@ public class LLMClient
     /// Asks the model for a concise summary of the conversation (tools disabled).
     /// Runs silently — summary text is not streamed to the user.
     /// </summary>
-    public string SummarizeConversation(List<ChatMessage> conversation)
+    private string SummarizeConversation(List<ChatMessage> conversation)
     {
         if (conversation == null || conversation.Count == 0)
             return string.Empty;

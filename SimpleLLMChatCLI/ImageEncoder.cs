@@ -3,7 +3,7 @@ using System.IO;
 
 namespace SimpleLLMChatCLI
 {
-    internal class ImageEncoder
+    internal static class ImageEncoder
     {
         public static string ImageFileToBase64(string path)
         {
