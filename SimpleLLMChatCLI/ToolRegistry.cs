@@ -295,7 +295,12 @@ namespace SimpleLLMChatCLI
 
                     var stdoutTask = Task.Factory.StartNew(() => process.StandardOutput.ReadToEnd());
                     process.WaitForExit();
-                    return stdoutTask.Result;
+                    string raw = stdoutTask.Result;
+                    string text;
+                    string imageBase64;
+                    string imageMime;
+                    ToolResultParser.Parse(raw, out text, out imageBase64, out imageMime);
+                    return text;
                 }
             }
             catch
@@ -331,8 +336,18 @@ namespace SimpleLLMChatCLI
         /// </summary>
         public void ExecuteToolCall(string toolName, string arguments, out string toolContent, out int exitCode)
         {
+            string imageBase64;
+            string imageMime;
+            ExecuteToolCall(toolName, arguments, out toolContent, out exitCode, out imageBase64, out imageMime);
+        }
+
+        public void ExecuteToolCall(string toolName, string arguments, out string toolContent, out int exitCode,
+            out string imageBase64, out string imageMime)
+        {
             toolContent = "";
             exitCode = 0;
+            imageBase64 = null;
+            imageMime = null;
 
             ToolDefinition def;
             if (!Tools.TryGetValue(toolName, out def))
@@ -397,10 +412,13 @@ namespace SimpleLLMChatCLI
                     string stderr = stderrTask.Result;
                     exitCode = process.ExitCode;
 
-                    string output = stdout;
+                    string output = stdout ?? "";
                     if (!string.IsNullOrEmpty(stderr))
                         output += stderr;
-                    toolContent = FormatCommandResult(toolName, output, exitCode);
+
+                    string text;
+                    ToolResultParser.Parse(output, out text, out imageBase64, out imageMime);
+                    toolContent = FormatCommandResult(toolName, text, exitCode);
                 }
             }
             catch (Exception ex)

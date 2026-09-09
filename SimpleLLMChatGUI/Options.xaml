@@ -79,8 +79,7 @@
                     <CheckBox x:Name="MarkdownParsingCheckBox"
                               Content="Enable Markdown Parsing"
                               IsChecked="{Binding MarkdownParsing, UpdateSourceTrigger=PropertyChanged}"
-                              Height="23"
-                              VerticalContentAlignment="Center"/>
+                              Margin="0,4,0,4"/>
 
                     <Label Content="Thinking display:"/>
                     <ComboBox x:Name="ThinkingDisplayComboBox"

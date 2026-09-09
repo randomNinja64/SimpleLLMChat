@@ -498,8 +498,20 @@ namespace SimpleLLMChatGUI
         {
             return listBox.SelectedItems
                 .OfType<string>()
+                .Select(GetBareToolName)
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .ToList();
+        }
+
+        /// <summary>
+        /// List items are shown as "Package Name/tool_name"; config/CLI use bare tool names.
+        /// </summary>
+        private static string GetBareToolName(string displayOrName)
+        {
+            if (string.IsNullOrEmpty(displayOrName))
+                return displayOrName;
+            int slash = displayOrName.LastIndexOf('/');
+            return slash >= 0 ? displayOrName.Substring(slash + 1) : displayOrName;
         }
 
         private void SaveIni(string path)
@@ -699,14 +711,15 @@ namespace SimpleLLMChatGUI
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
 
-            foreach (string toolName in _availableTools)
+            foreach (string displayName in _availableTools)
             {
+                string toolName = GetBareToolName(displayName);
                 int rowIdx = grid.RowDefinitions.Count;
                 grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
                 var label = new TextBlock
                 {
-                    Text = toolName,
+                    Text = displayName,
                     Padding = new Thickness(0, 2, 4, 2),
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -769,11 +782,16 @@ namespace SimpleLLMChatGUI
                     JArray tools = manifest["tools"] as JArray;
                     if (tools == null) continue;
 
+                    string packageName = (string)manifest["name"];
+                    if (string.IsNullOrWhiteSpace(packageName))
+                        packageName = Path.GetFileNameWithoutExtension(jsonFile) ?? "Tools";
+
                     foreach (JObject tool in tools)
                     {
                         string name = (string)tool["name"];
-                        if (!string.IsNullOrEmpty(name) && seen.Add(name))
-                            toolNames.Add(name);
+                        if (string.IsNullOrEmpty(name) || !seen.Add(name))
+                            continue;
+                        toolNames.Add(packageName + "/" + name);
                     }
                 }
                 catch
@@ -782,7 +800,7 @@ namespace SimpleLLMChatGUI
                 }
             }
 
-            toolNames.Sort();
+            toolNames.Sort(StringComparer.OrdinalIgnoreCase);
             return toolNames;
         }
 
@@ -794,8 +812,10 @@ namespace SimpleLLMChatGUI
             var selectedTools = new HashSet<string>(tools, StringComparer.OrdinalIgnoreCase);
             foreach (var item in listBox.Items)
             {
-                var toolName = item as string;
-                if (toolName != null && selectedTools.Contains(toolName))
+                var displayName = item as string;
+                if (displayName == null)
+                    continue;
+                if (selectedTools.Contains(displayName) || selectedTools.Contains(GetBareToolName(displayName)))
                     listBox.SelectedItems.Add(item);
             }
         }

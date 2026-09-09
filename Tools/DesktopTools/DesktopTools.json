@@ -1,0 +1,213 @@
+{
+    "name": "Desktop Tools",
+    "executable": "DesktopTools.exe",
+    "context_injector": "get_desktop_context",
+    "options": [
+        {
+            "name": "maxTreeDepth",
+            "label": "Max control tree depth",
+            "type": "int",
+            "default": "8"
+        },
+        {
+            "name": "maxControls",
+            "label": "Max controls per query",
+            "type": "int",
+            "default": "80"
+        }
+    ],
+    "tools": [
+        {
+            "name": "list_windows",
+            "description": "List visible top-level windows with hwnd and title. Optional filter by window_title. Use only when you need to browse or disambiguate windows; otherwise pass window_title directly to list_controls or navigate(action=focus).",
+            "parameters": [
+                {
+                    "name": "window_title",
+                    "type": "string",
+                    "description": "Partial window title filter",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "list_controls",
+            "description": "List a window's controls by window_title or hwnd. Returns element indices (#N), roles, labels and @x,y WxH in the same space as a window screenshot. max_depth=0 returns the window itself only. Re-call before navigate(element=N) if the UI changed.",
+            "parameters": [
+                {
+                    "name": "hwnd",
+                    "type": "string",
+                    "description": "Window or control handle in hex (0x...) or decimal.",
+                    "required": false
+                },
+                {
+                    "name": "window_title",
+                    "type": "string",
+                    "description": "Partial window title if hwnd is not provided.",
+                    "required": false
+                },
+                {
+                    "name": "max_depth",
+                    "type": "number",
+                    "description": "Max tree depth override. Use 0 with a control hwnd to refresh that control only.",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "navigate",
+            "description": "Pointer and focus actions. action=click|double_click|drag|scroll|focus. Target with element=# from list_controls (needs hwnd/window_title), hwnd, or x/y in the same space as screenshot for that scope. drag needs a start target plus to_element or to_x/to_y. click/double_click/drag optional button=left|right|middle and optional modifiers (ctrl/shift/alt/win). scroll needs direction=up|down|left|right and optional amount (default 3). Success may note new dialog/window hwnds.",
+            "parameters": [
+                {
+                    "name": "action",
+                    "type": "string",
+                    "description": "click, double_click, drag, scroll, or focus.",
+                    "required": true
+                },
+                {
+                    "name": "hwnd",
+                    "type": "string",
+                    "description": "Control/window handle; also scopes element and x/y.",
+                    "required": false
+                },
+                {
+                    "name": "window_title",
+                    "type": "string",
+                    "description": "Partial window title for focus, scroll, element scope, or x/y.",
+                    "required": false
+                },
+                {
+                    "name": "element",
+                    "type": "number",
+                    "description": "1-based element index from the latest list_controls for that window. For drag, this is the start element.",
+                    "required": false
+                },
+                {
+                    "name": "max_depth",
+                    "type": "number",
+                    "description": "Match list_controls max_depth when targeting by element; omit if that listing used the default.",
+                    "required": false
+                },
+                {
+                    "name": "x",
+                    "type": "number",
+                    "description": "X in screenshot space for the current scope. For drag, start X.",
+                    "required": false
+                },
+                {
+                    "name": "y",
+                    "type": "number",
+                    "description": "Y in screenshot space for the current scope. For drag, start Y.",
+                    "required": false
+                },
+                {
+                    "name": "to_element",
+                    "type": "number",
+                    "description": "For drag: 1-based end element index from list_controls (same hwnd/window_title and max_depth as start).",
+                    "required": false
+                },
+                {
+                    "name": "to_x",
+                    "type": "number",
+                    "description": "For drag: end X in the same space as start x/y.",
+                    "required": false
+                },
+                {
+                    "name": "to_y",
+                    "type": "number",
+                    "description": "For drag: end Y in the same space as start x/y.",
+                    "required": false
+                },
+                {
+                    "name": "button",
+                    "type": "string",
+                    "description": "Mouse button for click/double_click/drag: left (default), right, or middle.",
+                    "required": false
+                },
+                {
+                    "name": "modifiers",
+                    "type": "string",
+                    "description": "Keys held during click/double_click/drag: ctrl, shift, alt, and/or win (e.g. ctrl+shift). Forces synthetic mouse input (skips UIA invoke).",
+                    "required": false
+                },
+                {
+                    "name": "direction",
+                    "type": "string",
+                    "description": "Scroll direction: up, down, left, or right.",
+                    "required": false
+                },
+                {
+                    "name": "amount",
+                    "type": "number",
+                    "description": "Scroll wheel ticks (default 3).",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "set_control_text",
+            "description": "Replace the text of an edit control without typing. Target with element=# from list_controls (needs hwnd/window_title) or a control hwnd. Prefer this over send_keys (if available) whenever the control is listed.",
+            "parameters": [
+                {
+                    "name": "hwnd",
+                    "type": "string",
+                    "description": "Control or window handle in hex (0x...) or decimal; also scopes element.",
+                    "required": false
+                },
+                {
+                    "name": "window_title",
+                    "type": "string",
+                    "description": "Partial window title used to scope element.",
+                    "required": false
+                },
+                {
+                    "name": "element",
+                    "type": "number",
+                    "description": "1-based element index from the latest list_controls for that window.",
+                    "required": false
+                },
+                {
+                    "name": "max_depth",
+                    "type": "number",
+                    "description": "Match list_controls max_depth when targeting by element; omit if that listing used the default.",
+                    "required": false
+                },
+                {
+                    "name": "text",
+                    "type": "string",
+                    "description": "Text to set in the control.",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "send_keys",
+            "description": "Send keystrokes to the foreground window. Syntax: plain text, {Enter}, {Tab}, ^c (Ctrl+C), +a (Shift+A), !f (Alt+F). Use navigate(action=focus) first when possible.",
+            "parameters": [
+                {
+                    "name": "keys",
+                    "type": "string",
+                    "description": "Key sequence to send.",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "screenshot",
+            "description": "Capture a window (hwnd/window_title) or the full virtual desktop as a JPEG. Click image x/y with navigate using the same scope. Prefer list_controls when the control tree is usable.",
+            "parameters": [
+                {
+                    "name": "hwnd",
+                    "type": "string",
+                    "description": "Window handle in hex (0x...) or decimal.",
+                    "required": false
+                },
+                {
+                    "name": "window_title",
+                    "type": "string",
+                    "description": "Partial window title if hwnd is not provided.",
+                    "required": false
+                }
+            ]
+        }
+    ]
+}

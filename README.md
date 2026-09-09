@@ -158,6 +158,19 @@ SimpleLLMChat includes the following 6 tool packages:
 - Shell Tools
   - Tools
     - `run_shell_command`: Executes a shell command
+- Desktop Tools
+  - Tools
+    - `list_windows`: Lists visible top-level windows; optional `window_title` filter. Use for browsing or disambiguation — other tools accept `window_title` directly.
+    - `list_controls`: Lists controls with element indices (`#N`), roles and capture-relative rects (`@x,y` same space as a window screenshot)
+    - `navigate`: Pointer/focus — `click`, `double_click`, `scroll`, `focus` (target via `element`, `hwnd`, or `x`/`y`); `drag` with start (`element` or `x`/`y`) and end (`to_element` or `to_x`/`to_y`); optional `modifiers` (`ctrl`/`shift`/`alt`/`win`) on click/drag. `x`/`y` use the same pixel space as `screenshot` for that scope (window image if `hwnd`/`window_title` is set; desktop image if not).
+    - `set_control_text`: Sets text in a control (target via `element` or `hwnd`)
+    - `send_keys`: Sends keystrokes to the foreground window
+    - `screenshot`: Capture a window or the virtual desktop as JPEG; click with `navigate` using image `x`/`y` and the same scope
+  - Configuration Options
+    - `maxTreeDepth`: Maximum depth when listing control trees (default: `8`)
+    - `maxControls`: Maximum number of controls returned per query (default: `80`)
+  - Context Injector
+    - `get_desktop_context`: Injects a one-line summary of open windows (up to 5 titles, then "and N more")
 - Skill Tools
   - Tools
     - `create_skill`: Creates a new agent skill

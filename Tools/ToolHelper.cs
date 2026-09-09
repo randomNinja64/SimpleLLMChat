@@ -5,16 +5,29 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 
 public struct ToolResult
 {
     public string Output;
     public int ExitCode;
+    public string ImageBase64;
+    public string ImageMime;
 
     public ToolResult(string output, int exitCode)
     {
         Output = output;
         ExitCode = exitCode;
+        ImageBase64 = null;
+        ImageMime = null;
+    }
+
+    public ToolResult(string output, int exitCode, string imageBase64, string imageMime)
+    {
+        Output = output;
+        ExitCode = exitCode;
+        ImageBase64 = imageBase64;
+        ImageMime = imageMime;
     }
 }
 
@@ -68,22 +81,40 @@ public static class ToolHelper
         }
 
         int exitCode = 0;
-        string output = "";
+        ToolResult result = new ToolResult("", 0);
 
         try
         {
-            ToolResult result = dispatch(toolName, argumentsJson);
-            output = result.Output;
+            result = dispatch(toolName, argumentsJson);
             exitCode = result.ExitCode;
         }
         catch (Exception e)
         {
-            output = "error: " + e.Message;
+            result = new ToolResult("error: " + e.Message, 1);
             exitCode = 1;
         }
 
-        Console.Write(output);
+        Console.Write(FormatResultJson(result));
         return exitCode;
+    }
+
+    /// <summary>Serialize a tool result as the JSON-first stdout protocol.</summary>
+    public static string FormatResultJson(ToolResult result)
+    {
+        var obj = new JObject();
+        obj["text"] = result.Output ?? "";
+
+        if (!string.IsNullOrEmpty(result.ImageBase64))
+        {
+            string mime = string.IsNullOrEmpty(result.ImageMime) ? "image/png" : result.ImageMime;
+            obj["image"] = new JObject
+            {
+                ["mime"] = mime,
+                ["data"] = result.ImageBase64
+            };
+        }
+
+        return obj.ToString(Newtonsoft.Json.Formatting.None);
     }
 
     // Loads option defaults from the manifest file sitting next to the executable.
@@ -138,6 +169,11 @@ public static class ToolHelper
         return value;
     }
 
+    // After the direct child exits, wait this long for stdout/stderr EOF.
+    // GUI apps launched via `start` inherit redirected pipe handles and would
+    // otherwise keep ReadToEnd blocked until those apps close.
+    private const int PipeDrainTimeoutMs = 2000;
+
     public static string ExecuteProcess(string fileName, string arguments, out int exitCode, bool combineErrorOutput = true)
     {
         try
@@ -156,10 +192,36 @@ public static class ToolHelper
 
             using (Process process = Process.Start(psi))
             {
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
+                string output = "";
+                string error = "";
+                Thread outThread = new Thread(() =>
+                {
+                    try { output = process.StandardOutput.ReadToEnd(); }
+                    catch { }
+                });
+                Thread errThread = new Thread(() =>
+                {
+                    try { error = process.StandardError.ReadToEnd(); }
+                    catch { }
+                });
+                outThread.IsBackground = true;
+                errThread.IsBackground = true;
+                outThread.Start();
+                errThread.Start();
+
                 process.WaitForExit();
                 exitCode = process.ExitCode;
+
+                if (!outThread.Join(PipeDrainTimeoutMs))
+                {
+                    try { process.StandardOutput.Close(); } catch { }
+                }
+                if (!errThread.Join(PipeDrainTimeoutMs))
+                {
+                    try { process.StandardError.Close(); } catch { }
+                }
+                outThread.Join(500);
+                errThread.Join(500);
 
                 if (combineErrorOutput && !string.IsNullOrEmpty(error))
                 {

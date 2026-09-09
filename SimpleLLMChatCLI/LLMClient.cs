@@ -34,6 +34,7 @@ public class LLMClient
         public string Role;
         public string Content;
         public string Image;
+        public string ImageMime;
         public List<ToolRegistry.ToolCall> ToolCalls;
         public string ToolCallId;
 
@@ -43,6 +44,7 @@ public class LLMClient
             Content = content;
             ToolCallId = "";
             Image = null;
+            ImageMime = null;
             ToolCalls = new List<ToolRegistry.ToolCall>();
         }
     }
@@ -246,6 +248,8 @@ public class LLMClient
                     int exitCode = 0;
                     string toolContent;
 
+                    string toolImage = null;
+                    string toolImageMime = null;
                     if (!enabledSet.Contains(call.Name))
                     {
                         exitCode = -1;
@@ -259,7 +263,7 @@ public class LLMClient
                     {
                         if (requestToolApproval(call.Name, call.Arguments))
                         {
-                            registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode);
+                            registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
                         }
                         else
                         {
@@ -273,14 +277,16 @@ public class LLMClient
                     }
                     else
                     {
-                        registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode);
+                        registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
                     }
 
                     ChatMessage toolMsg = new ChatMessage
                     {
                         Role = "tool",
                         Content = toolContent,
-                        ToolCallId = call.Id
+                        ToolCallId = call.Id,
+                        Image = toolImage,
+                        ImageMime = toolImageMime
                     };
                     conversation.Add(toolMsg);
 
@@ -576,12 +582,13 @@ public class LLMClient
 
             if (!string.IsNullOrEmpty(msg.Image))
             {
+                string mime = string.IsNullOrEmpty(msg.ImageMime) ? "image/png" : msg.ImageMime;
                 JObject imgPart = new JObject
                 {
                     ["type"] = "image_url",
                     ["image_url"] = new JObject
                     {
-                        ["url"] = "data:image/png;base64," + msg.Image
+                        ["url"] = "data:" + mime + ";base64," + msg.Image
                     }
                 };
                 contentArray.Add(imgPart);
