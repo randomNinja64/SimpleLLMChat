@@ -65,22 +65,12 @@ namespace DesktopTools
     {
       string hwndText = ToolHelper.JsonExtractString(argumentsJson, "hwnd");
       string windowTitle = ToolHelper.JsonExtractString(argumentsJson, "window_title");
-      string titleContains = ToolHelper.JsonExtractString(argumentsJson, "title_contains");
 
       return new WindowTarget
       {
         HwndText = string.IsNullOrWhiteSpace(hwndText) ? "" : hwndText.Trim(),
-        WindowTitle = CoalesceWindowTitle(windowTitle, titleContains)
+        WindowTitle = string.IsNullOrWhiteSpace(windowTitle) ? "" : windowTitle.Trim()
       };
-    }
-
-    public static string CoalesceWindowTitle(string windowTitle, string titleContains)
-    {
-      if (!string.IsNullOrWhiteSpace(windowTitle))
-        return windowTitle.Trim();
-      if (!string.IsNullOrWhiteSpace(titleContains))
-        return titleContains.Trim();
-      return "";
     }
 
     public static IntPtr ResolveWindow(string hwndText, string windowTitle)

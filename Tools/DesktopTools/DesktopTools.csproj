@@ -47,7 +47,10 @@
   <ItemGroup>
     <Compile Include="OutputFormat.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="Win32Interop.cs" />
+    <Compile Include="Win32Native.cs" />
+    <Compile Include="Win32Window.cs" />
+    <Compile Include="Win32PostedInput.cs" />
+    <Compile Include="Win32SyntheticInput.cs" />
     <Compile Include="UiaInterop.cs" />
     <Compile Include="MsaaInterop.cs" />
     <Compile Include="WindowEnumerator.cs" />

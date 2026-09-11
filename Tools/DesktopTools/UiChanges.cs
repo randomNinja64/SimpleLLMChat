@@ -24,9 +24,6 @@ namespace DesktopTools
       var windows = new Dictionary<long, string>();
       foreach (IntPtr hwnd in Win32Interop.EnumerateTopLevelWindows())
       {
-        if (!Win32Interop.IsWindowVisible(hwnd))
-          continue;
-
         string title = Win32Interop.GetWindowTitle(hwnd);
         string className = Win32Interop.GetControlClass(hwnd);
         if (!OutputFormat.ShouldIncludeWindow(title, className))

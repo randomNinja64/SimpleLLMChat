@@ -45,7 +45,7 @@ namespace DesktopTools
     {
       string line = Win32Interop.FormatHwnd(hwnd) + " \"" + Truncate(Escape(title)) + "\"";
       if (width > 0 && height > 0)
-        line += " @0,0 " + width + "x" + height;
+        line += " " + width + "x" + height;
       return line;
     }
 
@@ -62,11 +62,11 @@ namespace DesktopTools
     }
 
     /// <summary>
-    /// Screenshot caption: hwnd, title, and absolute capture origin/size.
+    /// Screenshot caption: hwnd, title, and capture size in image space.
     /// </summary>
-    public static string FormatCaptureCaption(IntPtr hwnd, string title, int left, int top, int width, int height)
+    public static string FormatCaptureCaption(IntPtr hwnd, string title, int width, int height)
     {
-      return Win32Interop.FormatHwnd(hwnd) + " \"" + Escape(title) + "\" @" + left + "," + top + " " + width + "x" + height;
+      return Win32Interop.FormatHwnd(hwnd) + " \"" + Escape(title) + "\" " + width + "x" + height;
     }
 
     /// <summary>
@@ -150,7 +150,7 @@ namespace DesktopTools
       return value.Substring(0, MaxTextLength) + "...";
     }
 
-    public static string Escape(string value)
+    private static string Escape(string value)
     {
       if (string.IsNullOrEmpty(value))
         return "";

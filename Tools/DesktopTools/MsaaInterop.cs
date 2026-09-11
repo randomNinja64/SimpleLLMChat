@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Accessibility;
 
 namespace DesktopTools
@@ -14,7 +16,6 @@ namespace DesktopTools
     private const int OBJID_CLIENT = unchecked((int)0xFFFFFFFC);
     private const int SELFLAG_TAKEFOCUS = 0x1;
     private const int SELFLAG_TAKESELECTION = 0x2;
-    private const int STATE_SELECTABLE = 0x200000;
     private const int MaxSearchDepth = 6;
     private const int MatchTolerance = 2;
 
@@ -42,7 +43,19 @@ namespace DesktopTools
     /// </summary>
     public static bool TryActivate(IntPtr containerHwnd, ControlInfo control)
     {
-      if (containerHwnd == IntPtr.Zero || control == null || !control.HasLocation)
+      if (containerHwnd == IntPtr.Zero || control == null)
+        return false;
+
+      // Synthesized grid rows (XP DataGridView) are matched by name/value — cached bounds
+      // are often off-screen until after accSelect scrolls them into view.
+      if (control.Element == null &&
+          (!string.IsNullOrEmpty(control.Label) || !string.IsNullOrEmpty(control.Value)))
+      {
+        if (TryActivateByIdentity(containerHwnd, control))
+          return true;
+      }
+
+      if (!control.HasLocation)
         return false;
 
       IAccessible root = FromWindow(containerHwnd);
@@ -57,6 +70,124 @@ namespace DesktopTools
         return true;
 
       return scale != 1.0 && TryActivateAt(root, Rescale(control, 1.0), control.Label);
+    }
+
+    /// <summary>
+    /// Scroll an MSAA-only control (e.g. DataGridView row) into view via accSelect, then
+    /// refresh cached screen bounds. UIA ScrollItemPattern is unavailable for these rows.
+    /// </summary>
+    public static bool TryEnsureInView(ControlInfo control)
+    {
+      if (control == null)
+        return false;
+
+      IntPtr hwnd = control.Hwnd;
+      if (hwnd == IntPtr.Zero)
+        return false;
+
+      IAccessible owner;
+      int childId;
+      if (!TryFindByIdentity(hwnd, control, out owner, out childId))
+        return false;
+
+      if (!TrySelect(owner, childId))
+        return false;
+
+      // Virtualized grids need a tick to move the row into the client area.
+      Thread.Sleep(50);
+
+      Bounds bounds;
+      if (!TryGetBounds(owner, childId, out bounds))
+        return true;
+
+      control.X = bounds.Left;
+      control.Y = bounds.Top;
+      control.Width = bounds.Width;
+      control.Height = bounds.Height;
+      control.HasLocation = true;
+      return true;
+    }
+
+    private static bool TryActivateByIdentity(IntPtr containerHwnd, ControlInfo control)
+    {
+      IAccessible owner;
+      int childId;
+      if (!TryFindByIdentity(containerHwnd, control, out owner, out childId))
+        return false;
+
+      return TryActivate(owner, childId);
+    }
+
+    private static bool TryFindByIdentity(
+      IntPtr hwnd, ControlInfo control, out IAccessible owner, out int childId)
+    {
+      owner = null;
+      childId = 0;
+
+      IAccessible root = FromWindow(hwnd);
+      if (root == null)
+        return false;
+
+      object[] children = GetChildren(root);
+      if (children == null)
+        return false;
+
+      string label = control.Label ?? "";
+      string value = control.Value ?? "";
+
+      foreach (object child in children)
+      {
+        IAccessible node = child as IAccessible;
+        int id = node == null ? ToChildId(child) : 0;
+        if (node == null && id == 0)
+          continue;
+
+        IAccessible holder = node ?? root;
+        string name = "";
+        string childValue = "";
+        try { name = holder.get_accName(id) ?? ""; }
+        catch { }
+        try { childValue = holder.get_accValue(id) ?? ""; }
+        catch { }
+
+        bool labelMatch = !string.IsNullOrEmpty(label) &&
+                          string.Equals(name, label, StringComparison.Ordinal);
+        bool valueMatch = !string.IsNullOrEmpty(value) &&
+                          (string.Equals(childValue, value, StringComparison.Ordinal) ||
+                           string.Equals(name, value, StringComparison.Ordinal));
+
+        if (!labelMatch && !valueMatch)
+          continue;
+
+        owner = holder;
+        childId = id;
+        return true;
+      }
+
+      return false;
+    }
+
+    private static bool TrySelect(IAccessible owner, int childId)
+    {
+      object child = childId;
+      try
+      {
+        owner.accSelect(SELFLAG_TAKEFOCUS | SELFLAG_TAKESELECTION, child);
+        return true;
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        owner.accSelect(SELFLAG_TAKESELECTION, child);
+        return true;
+      }
+      catch
+      {
+        return false;
+      }
     }
 
     private static bool TryActivateAt(IAccessible root, Bounds target, string name)
@@ -146,27 +277,9 @@ namespace DesktopTools
     {
       object child = childId;
 
-      int state = 0;
-      try
-      {
-        state = Convert.ToInt32(owner.get_accState(child));
-      }
-      catch
-      {
-        // Treated as "not selectable"; the default action below still gets a chance.
-      }
-
-      if ((state & STATE_SELECTABLE) != 0)
-      {
-        try
-        {
-          owner.accSelect(SELFLAG_TAKEFOCUS | SELFLAG_TAKESELECTION, child);
-          return true;
-        }
-        catch
-        {
-        }
-      }
+      // accSelect also scrolls virtualized DataGridView rows into view on XP.
+      if (TrySelect(owner, childId))
+        return true;
 
       try
       {
@@ -188,6 +301,120 @@ namespace DesktopTools
       // Timed out → treat as success so callers do not fall through to another activate.
       StaTimeout.Result result = StaTimeout.Run(action, timeoutMs, preferSta: false);
       return result == StaTimeout.Result.Succeeded || result == StaTimeout.Result.TimedOut;
+    }
+
+    /// <summary>
+    /// List DataGridView (and similar) rows via MSAA when UIA GridPattern is unavailable (e.g. XP).
+    /// </summary>
+    public static int TryAppendGridRows(IntPtr hwnd, int depth, List<ControlInfo> controls)
+    {
+      if (hwnd == IntPtr.Zero || controls == null)
+        return 0;
+
+      IAccessible root = FromWindow(hwnd);
+      if (root == null)
+        return 0;
+
+      object[] children = GetChildren(root);
+      if (children == null || children.Length == 0)
+        return 0;
+
+      int added = 0;
+      int rowIndex = 0;
+      foreach (object child in children)
+      {
+        IAccessible node = child as IAccessible;
+        int id = node == null ? ToChildId(child) : 0;
+        if (node == null && id == 0)
+          continue;
+
+        IAccessible holder = node ?? root;
+
+        int role = 0;
+        string name = "";
+        string value = "";
+        try
+        {
+          object rawRole = holder.get_accRole(id);
+          role = rawRole is int ? (int)rawRole : Convert.ToInt32(rawRole);
+        }
+        catch { }
+        try { name = holder.get_accName(id) ?? ""; }
+        catch { }
+        try { value = holder.get_accValue(id) ?? ""; }
+        catch { }
+
+        if (IsScrollOrChromeRole(role, name))
+          continue;
+
+        bool isHeader = role == RoleColumnHeader ||
+                        (!string.IsNullOrEmpty(name) &&
+                         name.Equals("Top Row", StringComparison.OrdinalIgnoreCase));
+        bool isRow = role == RoleRow ||
+                     (!string.IsNullOrEmpty(name) &&
+                      name.StartsWith("Row ", StringComparison.OrdinalIgnoreCase));
+        bool looksLikeData = !isHeader &&
+                             (isRow ||
+                              (!string.IsNullOrEmpty(value) && value.IndexOf(';') >= 0) ||
+                              (!string.IsNullOrEmpty(name) && name.IndexOf(';') >= 0));
+
+        if (!isHeader && !looksLikeData && !isRow)
+          continue;
+
+        var info = new ControlInfo
+        {
+          Depth = depth,
+          Role = isHeader ? "header" : "custom",
+          Label = string.IsNullOrEmpty(name)
+            ? (isHeader ? "Top Row" : ("Row " + rowIndex))
+            : name,
+          Value = value ?? "",
+          // Grid HWND so navigate/EnsureInView can re-bind via MSAA (no AutomationElement).
+          Hwnd = hwnd,
+          Enabled = true
+        };
+
+        if (!isHeader && string.IsNullOrEmpty(info.Value) && !string.IsNullOrEmpty(name) &&
+            name.IndexOf(';') >= 0)
+        {
+          info.Value = name;
+          if (info.Label.IndexOf(';') >= 0)
+            info.Label = "Row " + rowIndex;
+        }
+
+        Bounds bounds;
+        if (TryGetBounds(holder, id, out bounds))
+        {
+          info.X = bounds.Left;
+          info.Y = bounds.Top;
+          info.Width = bounds.Width;
+          info.Height = bounds.Height;
+          info.HasLocation = true;
+        }
+
+        controls.Add(info);
+        added++;
+        if (!isHeader)
+          rowIndex++;
+      }
+
+      return added;
+    }
+
+    private const int RoleScrollbar = 0x03;
+    private const int RoleColumnHeader = 0x19;
+    private const int RoleRow = 0x1C;
+    private const int RoleSeparator = 0x15;
+    private const int RoleGrip = 0x04;
+
+    private static bool IsScrollOrChromeRole(int role, string name)
+    {
+      if (role == RoleScrollbar || role == RoleSeparator || role == RoleGrip)
+        return true;
+      if (string.IsNullOrEmpty(name))
+        return false;
+      return name.IndexOf("Scroll Bar", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             name.IndexOf("Scrollbar", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static object[] GetChildren(IAccessible parent)

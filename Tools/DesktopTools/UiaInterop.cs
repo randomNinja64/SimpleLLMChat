@@ -54,7 +54,13 @@ namespace DesktopTools
           if (!info.ReportsValue)
           {
             Frame inner = info.Hwnd == IntPtr.Zero ? frame : Frame.For(info.Hwnd, frame.Scale);
+            int before = controls.Count;
             Walk(child, info, depth + 1, maxDepth, inner, controls);
+
+            // DataGridView often only shows scrollbars in ControlView. Prefer GridPattern,
+            // then MSAA (needed on XP where GridPattern is missing).
+            if ((info.Role == "table" || info.Role == "datagrid") && depth < maxDepth)
+              TryAddGridRows(child, depth + 1, inner, controls, before);
           }
         }
 
@@ -75,6 +81,98 @@ namespace DesktopTools
         default:
           return false;
       }
+    }
+
+    private static void TryAddGridRows(
+      AutomationElement table, int depth, Frame frame, List<ControlInfo> controls, int before)
+    {
+      for (int i = before; i < controls.Count; i++)
+        if (controls[i].ReportsValue)
+          return;
+
+      if (TryAddGridRowsViaPattern(table, depth, frame, controls))
+        return;
+
+      IntPtr hwnd = IntPtr.Zero;
+      try
+      {
+        hwnd = new IntPtr(table.Current.NativeWindowHandle);
+      }
+      catch
+      {
+      }
+
+      if (hwnd == IntPtr.Zero)
+        hwnd = FindContainerHwnd(table);
+
+      MsaaInterop.TryAppendGridRows(hwnd, depth, controls);
+    }
+
+    private static bool TryAddGridRowsViaPattern(
+      AutomationElement table, int depth, Frame frame, List<ControlInfo> controls)
+    {
+      object pattern;
+      try
+      {
+        if (!table.TryGetCurrentPattern(GridPattern.Pattern, out pattern))
+          return false;
+      }
+      catch
+      {
+        return false;
+      }
+
+      var grid = (GridPattern)pattern;
+      int rows, cols;
+      try
+      {
+        rows = grid.Current.RowCount;
+        cols = grid.Current.ColumnCount;
+      }
+      catch
+      {
+        return false;
+      }
+
+      if (rows < 1 || cols < 1)
+        return false;
+      if (rows > 500)
+        rows = 500;
+
+      int added = 0;
+      for (int r = 0; r < rows; r++)
+      {
+        try
+        {
+          var parts = new string[cols];
+          AutomationElement first = null;
+          for (int c = 0; c < cols; c++)
+          {
+            AutomationElement cell = grid.GetItem(r, c);
+            if (c == 0)
+              first = cell;
+            string text = cell == null ? "" : ReadValue(cell);
+            if (string.IsNullOrEmpty(text) && cell != null)
+              text = cell.Current.Name ?? "";
+            parts[c] = text ?? "";
+          }
+
+          ControlInfo row = first != null ? Describe(first, depth, frame) : null;
+          if (row == null)
+            row = new ControlInfo { Depth = depth, Role = "custom", Element = first };
+          row.Role = "custom";
+          row.Label = "Row " + r;
+          row.Value = string.Join(";", parts);
+          row.Element = first;
+          controls.Add(row);
+          added++;
+        }
+        catch
+        {
+        }
+      }
+
+      return added > 0;
     }
 
     /// <summary>The label element a framework nests inside a control to draw its own caption.</summary>
@@ -287,6 +385,22 @@ namespace DesktopTools
       return StaTimeout.Result.Succeeded;
     }
 
+    public static StaTimeout.Result TryInvokeHwnd(IntPtr hwnd, int timeoutMs)
+    {
+      if (hwnd == IntPtr.Zero || !Win32Interop.IsWindow(hwnd))
+        return StaTimeout.Result.Failed;
+
+      try
+      {
+        AutomationElement element = AutomationElement.FromHandle(hwnd);
+        return TryInvokeTimed(element, timeoutMs);
+      }
+      catch
+      {
+        return StaTimeout.Result.Failed;
+      }
+    }
+
     public static bool TrySetValue(AutomationElement element, string text)
     {
       if (element == null)
@@ -359,10 +473,24 @@ namespace DesktopTools
       for (int depth = 0; depth < 12 && node != null; depth++)
       {
         object pattern;
-        if (node.TryGetCurrentPattern(ScrollItemPattern.Pattern, out pattern))
+        bool hasScrollItem;
+        try
         {
-          if (StaTimeout.Run(delegate { ((ScrollItemPattern)pattern).ScrollIntoView(); },
-                DefaultActionTimeoutMs, preferSta: true) == StaTimeout.Result.Succeeded)
+          hasScrollItem = node.TryGetCurrentPattern(ScrollItemPattern.Pattern, out pattern);
+        }
+        catch
+        {
+          pattern = null;
+          hasScrollItem = false;
+        }
+
+        if (hasScrollItem)
+        {
+          StaTimeout.Result result = StaTimeout.Run(
+            delegate { ((ScrollItemPattern)pattern).ScrollIntoView(); },
+            DefaultActionTimeoutMs,
+            preferSta: true);
+          if (result == StaTimeout.Result.Succeeded)
             return true;
         }
 

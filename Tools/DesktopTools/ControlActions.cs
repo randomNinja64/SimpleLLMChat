@@ -81,10 +81,12 @@ namespace DesktopTools
 
       UiChanges.Snapshot before = UiChanges.Capture();
 
-      // UIA/MSAA/BM_CLICK ignore held keys — only use them for unmodified left clicks.
-      bool plainClick = clickCount == 1 && button == Win32Interop.MouseButton.Left && modifiers == Win32Interop.KeyModifiers.None;
+      // AX / window-message paths cannot hold modifier keys — those need SendInput.
+      bool noModifiers = modifiers == Win32Interop.KeyModifiers.None;
+      bool plainLeftClick = clickCount == 1 && button == Win32Interop.MouseButton.Left && noModifiers;
+      IntPtr actionHwnd = ActionHwnd(target);
 
-      if (plainClick && target.Control != null && target.Control.Element != null)
+      if (plainLeftClick && target.Control != null && target.Control.Element != null)
       {
         // Invoke can block forever if the handler opens a modal dialog — time out and
         // treat that as success so we do not double-activate with a mouse click.
@@ -93,15 +95,26 @@ namespace DesktopTools
           return Done("ok", before, target.WindowHwnd);
       }
 
-      if (plainClick && TryActivateThroughMsaa(target.Control))
+      if (plainLeftClick && target.Control == null && actionHwnd != IntPtr.Zero)
+      {
+        StaTimeout.Result invoked = UiaInterop.TryInvokeHwnd(actionHwnd, 2000);
+        if (invoked == StaTimeout.Result.Succeeded || invoked == StaTimeout.Result.TimedOut)
+          return Done("ok", before, target.WindowHwnd);
+      }
+
+      if (plainLeftClick && TryActivateThroughMsaa(target.Control))
         return Done("ok", before, target.WindowHwnd);
 
-      if (plainClick && IsPushButton(target.ControlHwnd))
+      if (plainLeftClick && IsPushButton(actionHwnd))
       {
         // PostMessage BM_CLICK — SendMessage would hang if a modal opens.
-        Win32Interop.PostMessage(target.ControlHwnd, Win32Interop.BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+        Win32Interop.PostMessage(actionHwnd, Win32Interop.BM_CLICK, IntPtr.Zero, IntPtr.Zero);
         return Done("ok", before, target.WindowHwnd);
       }
+
+      // Posted client-message click: no cursor move. Skip when modifiers are held.
+      if (noModifiers && TryClickViaPostedMessage(target, actionHwnd, button, clickCount))
+        return Done("ok", before, target.WindowHwnd);
 
       if (target.HasPoint)
       {
@@ -109,9 +122,9 @@ namespace DesktopTools
         return Done("ok", before, target.WindowHwnd);
       }
 
-      if (target.ControlHwnd != IntPtr.Zero)
+      if (actionHwnd != IntPtr.Zero)
       {
-        Win32Interop.ClickControlCenter(target.ControlHwnd, button, clickCount, modifiers);
+        Win32Interop.ClickControlCenter(actionHwnd, button, clickCount, modifiers);
         return Done("ok", before, target.WindowHwnd);
       }
 
@@ -144,6 +157,7 @@ namespace DesktopTools
         return "error: drag start and end are the same point.";
 
       UiChanges.Snapshot before = UiChanges.Capture();
+      // Drag has no reliable non-cursor path (TransformPattern is rare); SendInput required.
       Win32Interop.DragAtScreenPoints(fromX, fromY, toX, toY, button, modifiers);
       return Done("ok", before, from.WindowHwnd);
     }
@@ -165,17 +179,21 @@ namespace DesktopTools
       if (target.Control != null && UiaInterop.TryScroll(target.Control.Element, direction, amount))
         return Done("ok", before, target.WindowHwnd);
 
+      IntPtr actionHwnd = ActionHwnd(target);
+
+      if (actionHwnd != IntPtr.Zero && Win32Interop.TryPostScroll(actionHwnd, direction, amount))
+        return Done("ok", before, target.WindowHwnd);
+
       if (target.HasPoint)
       {
         Win32Interop.ScrollAtScreenPoint(target.X, target.Y, direction, amount);
         return Done("ok", before, target.WindowHwnd);
       }
 
-      IntPtr hwnd = target.ControlHwnd != IntPtr.Zero ? target.ControlHwnd : target.WindowHwnd;
-      if (hwnd == IntPtr.Zero)
+      if (actionHwnd == IntPtr.Zero)
         return NoScreenLocationError();
 
-      Win32Interop.ScrollControlCenter(hwnd, direction, amount);
+      Win32Interop.ScrollControlCenter(actionHwnd, direction, amount);
       return Done("ok", before, target.WindowHwnd);
     }
 
@@ -205,16 +223,57 @@ namespace DesktopTools
     }
 
     /// <summary>
-    /// Grid rows, list items and similar virtual children expose no actionable UIA pattern,
-    /// so reach the MSAA object beneath them. Real controls skip this and use the rungs below.
+    /// Prefer MSAA before synthetic mouse input. Works for UIA elements and for
+    /// MSAA-synthesized grid rows (Element null, Hwnd = grid).
     /// </summary>
     private static bool TryActivateThroughMsaa(ControlInfo control)
     {
-      if (control == null || control.Element == null || control.Hwnd != IntPtr.Zero)
+      if (control == null)
         return false;
 
-      IntPtr container = UiaInterop.FindContainerHwnd(control.Element);
+      IntPtr container = control.Hwnd;
+      if (container == IntPtr.Zero && control.Element != null)
+        container = UiaInterop.FindContainerHwnd(control.Element);
+      if (container == IntPtr.Zero)
+        return false;
+
       return MsaaInterop.TryActivate(container, control);
+    }
+
+    private static IntPtr ActionHwnd(Target target)
+    {
+      if (target.ControlHwnd != IntPtr.Zero && Win32Interop.IsWindow(target.ControlHwnd))
+        return target.ControlHwnd;
+      if (target.WindowHwnd != IntPtr.Zero && Win32Interop.IsWindow(target.WindowHwnd))
+        return target.WindowHwnd;
+      return IntPtr.Zero;
+    }
+
+    private static bool TryClickViaPostedMessage(
+      Target target, IntPtr actionHwnd, Win32Interop.MouseButton button, int clickCount)
+    {
+      int x, y;
+      if (target.HasPoint)
+      {
+        x = target.X;
+        y = target.Y;
+      }
+      else if (actionHwnd != IntPtr.Zero && Win32Interop.TryGetWindowCenter(actionHwnd, out x, out y))
+      {
+        // center of action hwnd
+      }
+      else
+        return false;
+
+      IntPtr hwnd = actionHwnd;
+      if (hwnd == IntPtr.Zero)
+      {
+        hwnd = Win32Interop.WindowFromPoint(new Win32Interop.POINT { X = x, Y = y });
+        if (hwnd == IntPtr.Zero)
+          return false;
+      }
+
+      return Win32Interop.TryPostMouseClick(hwnd, x, y, button, clickCount);
     }
 
     private static bool IsPushButton(IntPtr hwnd)
@@ -347,12 +406,18 @@ namespace DesktopTools
     }
 
     /// <summary>
-    /// Silent best-effort: scroll list/tree items into view, then refresh cached bounds.
+    /// Silent best-effort: scroll list/tree/grid items into view, then refresh cached bounds.
     /// </summary>
     private static void EnsureControlInView(ControlInfo control, IntPtr windowHwnd)
     {
-      if (control == null || control.Element == null)
+      if (control == null)
         return;
+
+      if (control.Element == null)
+      {
+        MsaaInterop.TryEnsureInView(control);
+        return;
+      }
 
       UiaInterop.TryEnsureInView(control.Element);
       UiaInterop.TryRefreshLocation(control, windowHwnd);
