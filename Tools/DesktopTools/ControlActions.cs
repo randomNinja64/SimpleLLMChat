@@ -95,7 +95,7 @@ namespace DesktopTools
           return Done("ok", before, target.WindowHwnd);
       }
 
-      if (plainLeftClick && target.Control == null && actionHwnd != IntPtr.Zero)
+      if (plainLeftClick && target.Control == null && !target.HasPoint && actionHwnd != IntPtr.Zero)
       {
         StaTimeout.Result invoked = UiaInterop.TryInvokeHwnd(actionHwnd, 2000);
         if (invoked == StaTimeout.Result.Succeeded || invoked == StaTimeout.Result.TimedOut)
