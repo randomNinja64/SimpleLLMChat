@@ -68,7 +68,6 @@
     </Compile>
     <Compile Include="ColorHelper.cs" />
     <Compile Include="FontHandler.cs" />
-    <Compile Include="HotkeyHandler.cs" />
     <Compile Include="ImageHandler.cs" />
     <Compile Include="SettingsIniWriter.cs" />
     <Compile Include="..\Shared\IniFileHandler.cs">

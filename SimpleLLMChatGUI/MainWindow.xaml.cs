@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace SimpleLLMChatGUI
@@ -15,9 +14,6 @@ namespace SimpleLLMChatGUI
     {
         private ProcessHandler processHandler;
         private readonly ImageHandler imageHandler;
-        private HotkeyHandler hotkeyHandler;
-        private HwndSource source;
-        private bool suppressAttachDialog;
         private string _reasoningEffort = "";
         private TokenTracker tokenTracker;
         private ContextMenu reasoningEffortMenu;
@@ -61,7 +57,7 @@ namespace SimpleLLMChatGUI
             // Initialize image handler and centralize UI updates via events
             imageHandler = new ImageHandler();
 
-            imageHandler.ImageSelected += (path) =>
+            imageHandler.ImageSelected += () =>
             {
                 attachButton.ToolTip = "Detach Image";
                 attachButton.IsChecked = true;
@@ -482,25 +478,6 @@ namespace SimpleLLMChatGUI
         {
             base.OnClosed(e);
 
-            // Clean up global hotkey
-            if (hotkeyHandler != null)
-                hotkeyHandler.Dispose();
-
-            // Always try to clean up the screenshot file
-            try
-            {
-                string screenshotPath = Path.Combine(Path.GetTempPath(), "currentscreen.jpg");
-                if (File.Exists(screenshotPath))
-                {
-                    File.Delete(screenshotPath);
-                }
-            }
-            catch (Exception)
-            {
-                // Silently fail if we can't delete the file
-                // Could log this if needed
-            }
-
             if (processHandler != null)
             {
                 processHandler.Dispose();
@@ -510,10 +487,6 @@ namespace SimpleLLMChatGUI
         // Fired when the attach button is toggled ON
         private void attachButton_Checked(object sender, RoutedEventArgs e)
         {
-            if (suppressAttachDialog)
-            {
-                return;
-            }
             if (!imageHandler.SelectImage())
             {
                 attachButton.IsChecked = false;
@@ -587,69 +560,6 @@ namespace SimpleLLMChatGUI
                 else
                     ClearChatAndRestart();
             }
-        }
-
-        // Desktop Assistant Toggle Event Handlers
-        private void DesktopAssistantToggle_Checked(object sender, RoutedEventArgs e)
-        {
-            if (hotkeyHandler != null)
-                hotkeyHandler.Enable();
-        }
-
-        private void DesktopAssistantToggle_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (hotkeyHandler != null)
-                hotkeyHandler.Disable();
-        }
-
-        protected override void OnSourceInitialized(EventArgs e)
-        {
-            base.OnSourceInitialized(e);
-            source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
-
-            // Setup hotkey handler (Ctrl+Shift+D)
-            const int HOTKEY_ID = 1;
-            const int MOD_CONTROL = 0x0002;
-            const int MOD_SHIFT = 0x0004;
-            const int VK_D = 0x44;
-
-            hotkeyHandler = new HotkeyHandler(source, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_D);
-            hotkeyHandler.ScreenshotTaken += (path) =>
-            {
-                Dispatcher.Invoke(new Action(() =>
-                {
-                    // Set suppressed flag to prevent attach dialog
-                    suppressAttachDialog = true;
-
-                    // Bring main window to foreground after screenshot
-                    if (WindowState == WindowState.Minimized)
-                        WindowState = WindowState.Normal;
-                    Activate();
-                    Topmost = true;
-                    Topmost = false;
-                    Focus();
-
-                    // Auto-attach the screenshot; UI is updated via ImageSelected event
-                    imageHandler.AttachImageFromPath(path);
-
-                    // Unset suppressed flag after image is attached
-                    suppressAttachDialog = false;
-
-                    // Focus the chat textbox
-                    chatInput.Focus();
-                }));
-            };
-            hotkeyHandler.ErrorOccurred += (err) =>
-            {
-                Dispatcher.Invoke(new Action(() =>
-                {
-                    MessageBox.Show(err, "Screenshot Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }));
-            };
-
-            // Add event handler for desktop assistant toggle
-            desktopAssistantToggle.Checked += DesktopAssistantToggle_Checked;
-            desktopAssistantToggle.Unchecked += DesktopAssistantToggle_Unchecked;
         }
     }
 }

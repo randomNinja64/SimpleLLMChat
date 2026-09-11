@@ -10,7 +10,6 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 
 ## Features
 - **Customizable GUI** - The GUI's colors and fonts can be customized.
-- **Desktop Assistant Mode** - When enabled, a global Ctrl+Shift+D hotkey can be used to capture a screenshot of the current active window and pass it to the LLM.
 - **GUI/CLI Modes** - The software can be used either via its REPL CLI or a GUI wrapper.
 - **Image Support** - Images can be passed to supported models via both the CLI and GUI.
 - **Markdown Rendering** - The GUI can render Markdown formatting for easier reading.
@@ -93,8 +92,6 @@ Tool-specific configuration options for the included tools are available in the 
 - To adjust application settings, select `Options`.
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
 - To clear the chat, press `Clear Chat`.
-- To enable/disable desktop assistant mode, use the `Desktop Assistant` toggle button.
-  - To use desktop assistant mode, press `Ctrl+Shift+D`. This will focus the application with a screenshot of your last active window attached, allowing you to ask the LLM about it.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
 
 **CLI**: To run the CLI in interactive/REPL mode, open `SimpleLLMChatCLI.exe` directly or from a terminal.

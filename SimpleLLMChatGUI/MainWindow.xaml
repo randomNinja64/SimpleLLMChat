@@ -100,10 +100,8 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Clear Chat -->
             <Button Name="clearButton"
                     Content="Clear Chat"
                     MinWidth="80"
@@ -114,17 +112,6 @@
                     Grid.Column="0"
                     Click="clearButton_Click" />
 
-            <!-- Center: Desktop Assistant -->
-            <ToggleButton Name="desktopAssistantToggle"
-                          Content="Desktop Assistant"
-                          ToolTip="Ctrl+Shift+D — capture a screenshot and ask about it. Requires a vision-capable model."
-                          Padding="8,0"
-                          MinHeight="25"
-                          VerticalAlignment="Center"
-                          HorizontalAlignment="Center"
-                          Grid.Column="1" />
-
-            <!-- Right: Options -->
             <Button Name="optionsButton"
                     Content="Options"
                     MinWidth="80"
@@ -132,7 +119,7 @@
                     Margin="5,0,0,0"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Right"
-                    Grid.Column="2"
+                    Grid.Column="1"
                     Click="optionsButton_Click" />
         </Grid>
 

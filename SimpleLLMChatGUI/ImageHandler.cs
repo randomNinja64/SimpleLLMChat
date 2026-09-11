@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.Win32;
-using System.IO;
 
 namespace SimpleLLMChatGUI
 {
@@ -9,17 +8,8 @@ namespace SimpleLLMChatGUI
         public bool IsImageAttached { get; private set; }
         public string AttachedImagePath { get; private set; }
 
-        public event Action<string> ImageSelected;
+        public event Action ImageSelected;
         public event Action ImageDetached;
-
-        public void AttachImageFromPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-                return;
-            AttachedImagePath = path;
-            IsImageAttached = true;
-            ImageSelected?.Invoke(AttachedImagePath);
-        }
 
         public bool SelectImage()
         {
@@ -31,7 +21,7 @@ namespace SimpleLLMChatGUI
             {
                 AttachedImagePath = openFileDialog.FileName;
                 IsImageAttached = true;
-                ImageSelected?.Invoke(AttachedImagePath);
+                ImageSelected?.Invoke();
                 return true;
             }
 
