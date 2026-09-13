@@ -92,12 +92,13 @@ namespace ShellTools.Tests
                     // Snapshot existing notepad PIDs so we only kill ones we start.
                     System.Collections.Generic.HashSet<int> before = SnapshotPids("notepad");
 
-                    // `start` under redirected stdout inherits pipe handles and cmd waits for
-                    // notepad (ShellTools never exits). Start-Process detaches correctly.
+                    // Use cmd's built-in `start` so this remains compatible with XP, where
+                    // PowerShell is not installed by default. Redirect its standard streams
+                    // to NUL; ToolHelper bounds draining of any other inherited pipe handles.
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "run_shell_command",
                         new JObject
                         {
-                            ["command"] = "powershell -NoProfile -Command Start-Process notepad"
+                            ["command"] = "start \"\" notepad.exe >nul 2>&1"
                         },
                         null,
                         15000);

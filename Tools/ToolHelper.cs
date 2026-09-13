@@ -172,7 +172,8 @@ public static class ToolHelper
     // After the direct child exits, wait this long for stdout/stderr EOF.
     // GUI apps launched via `start` inherit redirected pipe handles and would
     // otherwise keep ReadToEnd blocked until those apps close.
-    private const int PipeDrainTimeoutMs = 2000;
+    private const int PipeDrainTimeoutMs = 500;
+    private const int PipeCloseJoinTimeoutMs = 100;
 
     public static string ExecuteProcess(string fileName, string arguments, out int exitCode, bool combineErrorOutput = true)
     {
@@ -220,8 +221,8 @@ public static class ToolHelper
                 {
                     try { process.StandardError.Close(); } catch { }
                 }
-                outThread.Join(500);
-                errThread.Join(500);
+                outThread.Join(PipeCloseJoinTimeoutMs);
+                errThread.Join(PipeCloseJoinTimeoutMs);
 
                 if (combineErrorOutput && !string.IsNullOrEmpty(error))
                 {

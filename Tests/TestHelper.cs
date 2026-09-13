@@ -343,6 +343,9 @@ public sealed class ToolInvokeResult
 
 public static class ToolClient
 {
+    private const int PipeDrainTimeoutMs = 500;
+    private const int PipeCloseJoinTimeoutMs = 100;
+
     public static string ProductExe(string fileName)
     {
         return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
@@ -426,8 +429,16 @@ public static class ToolClient
                 try { process.WaitForExit(2000); } catch { }
             }
 
-            outThread.Join(2000);
-            errThread.Join(2000);
+            if (!outThread.Join(PipeDrainTimeoutMs))
+            {
+                try { process.StandardOutput.Close(); } catch { }
+            }
+            if (!errThread.Join(PipeDrainTimeoutMs))
+            {
+                try { process.StandardError.Close(); } catch { }
+            }
+            outThread.Join(PipeCloseJoinTimeoutMs);
+            errThread.Join(PipeCloseJoinTimeoutMs);
             sw.Stop();
 
             result.ElapsedMs = sw.ElapsedMilliseconds;
