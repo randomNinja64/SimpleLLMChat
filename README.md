@@ -41,7 +41,20 @@ Alternatively, the project can be built using the `SimpleLLMChat.sln` file direc
 
 Both methods require the .NET 4.0 Targeting Pack to be installed.
 
-**Note**: Builds generated using these methods include only the core executables. Some optional features (such as the cURL fallback or tool-specific dependencies) require additional executables that are not bundled automatically. Tool-specific dependencies are listed in the [Tools](#tools) section.
+**Note**: Builds generated using these methods include only the core executables by default. Optional binaries (`7za.exe`, `curl.exe`, `curl-ca-bundle.crt`, `yt-dlp.exe`) are packaged when present under `deps\` or can be manually placed beside the matching tool's executable. Optional binaries are specified in [Tools](#tools).
+
+## Tests
+
+Test projects live under `Tests\` and are not included in release builds. To build and run tests, from the repo root, run:
+
+```
+build-tests.bat
+run-tests.bat
+```
+
+`build-tests.bat` builds the product and test suites. `run-tests.bat` runs every suite (or one suite when a name is passed, e.g. `run-tests.bat FileTools`) and writes logs under `Tests\logs\`.
+
+**Note**: For cases that need external executables (7za, cURL, YT-DLP), either put them in `deps\` before `build-tests.bat`, or place them beside the matching tool executable before `run-tests.bat`.
 
 ## Configuration
 

@@ -401,3 +401,8 @@ FodyWeavers.xsd
 *.sln.iml
 SimpleLLMChatGUI/Resources/Thumbs.db
 /SimpleLLMChat
+/Tests-Build
+
+# Optional local tool binaries for build.bat / build-tests.bat (keep folder via .gitkeep)
+/deps/*
+!/deps/.gitkeep

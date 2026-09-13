@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <_RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\'))</_RepoRoot>
+    <_TestsBuildRoot>$(_RepoRoot)Tests-Build\</_TestsBuildRoot>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <OutputPath>$(_TestsBuildRoot)$(MSBuildProjectName)\Debug\</OutputPath>
+    <BaseIntermediateOutputPath>$(_TestsBuildRoot)obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>$(_TestsBuildRoot)$(MSBuildProjectName)\</OutputPath>
+    <BaseIntermediateOutputPath>$(_TestsBuildRoot)obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

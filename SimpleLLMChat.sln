@@ -21,6 +21,26 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkillTools", "Tools\SkillTo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DesktopTools", "Tools\DesktopTools\DesktopTools.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileTools.Tests", "Tests\FileTools.Tests\FileTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemoryTools.Tests", "Tests\MemoryTools.Tests\MemoryTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000002}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkillTools.Tests", "Tests\SkillTools.Tests\SkillTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShellTools.Tests", "Tests\ShellTools.Tests\ShellTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000004}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PythonTools.Tests", "Tests\PythonTools.Tests\PythonTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000005}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebTools.Tests", "Tests\WebTools.Tests\WebTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000006}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DesktopTools.Tests", "Tests\DesktopTools.Tests\DesktopTools.Tests.csproj", "{A1000001-0001-4000-8000-000000000007}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DesktopTools.Fixture", "Tests\DesktopTools.Tests\DesktopTools.Fixture\DesktopTools.Fixture.csproj", "{B2000001-0001-4000-8000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatCLI.Tests", "Tests\SimpleLLMChatCLI.Tests\SimpleLLMChatCLI.Tests.csproj", "{C1000001-0001-4000-8000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleLLMChatGUI.Tests", "Tests\SimpleLLMChatGUI.Tests\SimpleLLMChatGUI.Tests.csproj", "{C1000001-0001-4000-8000-000000000002}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -137,6 +157,66 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Win32.Build.0 = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.Build.0 = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000001}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000001}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000001}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000001}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000002}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000002}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000002}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000002}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000002}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000002}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000003}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000003}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000003}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000003}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000003}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000003}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000004}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000004}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000004}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000004}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000004}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000004}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000005}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000005}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000005}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000005}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000005}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000005}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000006}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000006}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000006}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000006}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000006}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000006}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000007}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000007}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000007}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1000001-0001-4000-8000-000000000007}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000007}.Release|Win32.ActiveCfg = Release|Any CPU
+		{A1000001-0001-4000-8000-000000000007}.Release|x86.ActiveCfg = Release|Any CPU
+		{B2000001-0001-4000-8000-000000000001}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{B2000001-0001-4000-8000-000000000001}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{B2000001-0001-4000-8000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B2000001-0001-4000-8000-000000000001}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{B2000001-0001-4000-8000-000000000001}.Release|Win32.ActiveCfg = Release|Any CPU
+		{B2000001-0001-4000-8000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{C1000001-0001-4000-8000-000000000001}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{C1000001-0001-4000-8000-000000000001}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{C1000001-0001-4000-8000-000000000001}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C1000001-0001-4000-8000-000000000001}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{C1000001-0001-4000-8000-000000000001}.Release|Win32.ActiveCfg = Release|Any CPU
+		{C1000001-0001-4000-8000-000000000001}.Release|x86.ActiveCfg = Release|Any CPU
+		{C1000001-0001-4000-8000-000000000002}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{C1000001-0001-4000-8000-000000000002}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{C1000001-0001-4000-8000-000000000002}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C1000001-0001-4000-8000-000000000002}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{C1000001-0001-4000-8000-000000000002}.Release|Win32.ActiveCfg = Release|Any CPU
+		{C1000001-0001-4000-8000-000000000002}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

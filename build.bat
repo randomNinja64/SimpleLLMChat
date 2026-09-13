@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableExtensions
 set ROOT=%~dp0
 set OUT=%ROOT%SimpleLLMChat
 
@@ -26,4 +27,20 @@ for %%T in (FileTools PythonTools ShellTools WebTools MemoryTools SkillTools Des
     copy /Y "%ROOT%Tools\%%T\bin\Release\Newtonsoft.Json.dll" "%OUT%\tools\%%T\" >nul
 )
 
+:: Optional deps from deps\
+echo Packaging optional dependencies ...
+call :CopyIfExists "%ROOT%deps\7za.exe" "%OUT%\tools\FileTools\7za.exe"
+call :CopyIfExists "%ROOT%deps\curl.exe" "%OUT%\tools\WebTools\curl.exe"
+call :CopyIfExists "%ROOT%deps\curl-ca-bundle.crt" "%OUT%\tools\WebTools\curl-ca-bundle.crt"
+call :CopyIfExists "%ROOT%deps\yt-dlp.exe" "%OUT%\tools\WebTools\yt-dlp.exe"
+
+echo.
 echo Done: %OUT%
+exit /b 0
+
+:CopyIfExists
+if exist "%~1" (
+  copy /Y "%~1" "%~2" >nul
+  echo   packaged %~nx2
+)
+exit /b 0
