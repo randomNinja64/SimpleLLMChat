@@ -240,10 +240,87 @@ namespace DesktopTools
       var list = new List<IntPtr>();
       EnumChildWindows(parent, (hWnd, lParam) =>
       {
-        list.Add(hWnd);
+        // EnumChildWindows includes all descendants; the caller recurses by level.
+        if (GetParent(hWnd) == parent)
+          list.Add(hWnd);
         return true;
       }, IntPtr.Zero);
       return list;
+    }
+
+    /// <summary>
+    /// Select a list or combo item by caption via LB_/CB_ messages. UIA SelectionItem on
+    /// XP WinForms ListBox items often reports success without changing SelectedIndex.
+    /// </summary>
+    public static bool TrySelectNamedItem(IntPtr hwnd, string name)
+    {
+      if (hwnd == IntPtr.Zero || !IsWindow(hwnd) || string.IsNullOrEmpty(name))
+        return false;
+
+      string className = GetControlClass(hwnd);
+      if (IsComboBoxClass(className))
+        return TryComboSelect(hwnd, name);
+
+      if (IsListBoxClass(className))
+      {
+        if (TryListSelect(hwnd, name))
+          return true;
+
+        IntPtr parent = GetParent(hwnd);
+        if (parent != IntPtr.Zero && IsComboBoxClass(GetControlClass(parent)))
+          return TryComboSelect(parent, name);
+      }
+
+      return false;
+    }
+
+    private static bool IsListBoxClass(string className)
+    {
+      if (string.IsNullOrEmpty(className))
+        return false;
+      return className.Equals("ListBox", StringComparison.OrdinalIgnoreCase) ||
+             className.Equals("ComboLBox", StringComparison.OrdinalIgnoreCase) ||
+             className.StartsWith("WindowsForms10.LISTBOX", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsComboBoxClass(string className)
+    {
+      if (string.IsNullOrEmpty(className))
+        return false;
+      return className.Equals("ComboBox", StringComparison.OrdinalIgnoreCase) ||
+             className.StartsWith("WindowsForms10.COMBOBOX", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryListSelect(IntPtr hwnd, string name)
+    {
+      int index = (int)SendMessage(hwnd, LB_FINDSTRINGEXACT, (IntPtr)(-1), name);
+      if (index < 0)
+        return false;
+      if ((int)SendMessage(hwnd, LB_SETCURSEL, (IntPtr)index, IntPtr.Zero) == LB_ERR)
+        return false;
+      NotifySelectionChanged(hwnd, LBN_SELCHANGE);
+      return true;
+    }
+
+    private static bool TryComboSelect(IntPtr hwnd, string name)
+    {
+      int index = (int)SendMessage(hwnd, CB_FINDSTRINGEXACT, (IntPtr)(-1), name);
+      if (index < 0)
+        return false;
+      if ((int)SendMessage(hwnd, CB_SETCURSEL, (IntPtr)index, IntPtr.Zero) == LB_ERR)
+        return false;
+      NotifySelectionChanged(hwnd, CBN_SELCHANGE);
+      return true;
+    }
+
+    private static void NotifySelectionChanged(IntPtr hwnd, int notification)
+    {
+      IntPtr parent = GetParent(hwnd);
+      if (parent == IntPtr.Zero)
+        return;
+      int id = GetDlgCtrlID(hwnd);
+      IntPtr wParam = (IntPtr)((notification << 16) | (id & 0xFFFF));
+      SendMessage(parent, WM_COMMAND, wParam, hwnd);
     }
 
     public static bool SetControlText(IntPtr hwnd, string text)
@@ -260,26 +337,28 @@ namespace DesktopTools
       if (!IsWindow(hwnd))
         return false;
 
-      ShowWindow(hwnd, SW_RESTORE);
-      ShowWindow(hwnd, SW_SHOW);
+      IntPtr root = GetAncestor(hwnd, 2); // GA_ROOT excludes an owned dialog's owner.
+      ShowWindow(root, SW_RESTORE);
+      ShowWindow(root, SW_SHOW);
 
       IntPtr foreground = GetForegroundWindow();
-      if (foreground == hwnd)
+      if (foreground == hwnd && root == hwnd)
         return true;
 
       uint dummyPid;
-      uint foregroundThread = GetWindowThreadProcessId(foreground, out dummyPid);
       uint targetThread = GetWindowThreadProcessId(hwnd, out dummyPid);
       uint currentThread = GetCurrentThreadId();
 
       bool attached = false;
       try
       {
-        if (foregroundThread != targetThread)
+        if (currentThread != targetThread)
           attached = AttachThreadInput(currentThread, targetThread, true);
 
-        BringWindowToTop(hwnd);
-        SetForegroundWindow(hwnd);
+        BringWindowToTop(root);
+        SetForegroundWindow(root);
+        SetFocus(hwnd);
+        return GetFocus() == hwnd;
       }
       finally
       {
@@ -287,7 +366,6 @@ namespace DesktopTools
           AttachThreadInput(currentThread, targetThread, false);
       }
 
-      return GetForegroundWindow() == hwnd;
     }
   }
 }

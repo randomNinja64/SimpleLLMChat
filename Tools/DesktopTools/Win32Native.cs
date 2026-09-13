@@ -11,8 +11,17 @@ namespace DesktopTools
   internal static partial class Win32Interop
   {
     public const int WM_GETTEXT = 0x000D;
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetFocus(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetFocus();
     public const int WM_GETTEXTLENGTH = 0x000E;
     public const int WM_SETTEXT = 0x000C;
+    public const int WM_COMMAND = 0x0111;
     public const int BM_CLICK = 0x00F5;
     public const int WM_LBUTTONDOWN = 0x0201;
     public const int WM_LBUTTONUP = 0x0202;
@@ -35,6 +44,13 @@ namespace DesktopTools
     public const int CB_GETCURSEL = 0x0147;
     public const int CB_GETLBTEXT = 0x0148;
     public const int CB_GETLBTEXTLEN = 0x0149;
+    public const int CB_SETCURSEL = 0x014E;
+    public const int CB_FINDSTRINGEXACT = 0x0158;
+    public const int LB_ERR = -1;
+    public const int LB_SETCURSEL = 0x0186;
+    public const int LB_FINDSTRINGEXACT = 0x01A2;
+    public const int LBN_SELCHANGE = 1;
+    public const int CBN_SELCHANGE = 1;
 
     public const int SW_RESTORE = 9;
     public const int SW_SHOW = 5;
@@ -161,6 +177,12 @@ namespace DesktopTools
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, StringBuilder lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+
+    [DllImport("user32.dll")]
+    private static extern int GetDlgCtrlID(IntPtr hWnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessageTimeout(

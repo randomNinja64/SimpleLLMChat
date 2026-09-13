@@ -47,7 +47,13 @@ namespace DesktopTools.Fixture
                 Location = new Point(20, 40),
                 Size = new Size(120, 32)
             };
-            btn.Click += (s, e) => SetStatus("clicked");
+            // Invoke/BM_CLICK/accDoDefaultAction can fire Click without moving Win32
+            // focus. Take focus here so later navigate.focus on txtEdit still raises GotFocus.
+            btn.Click += (s, e) =>
+            {
+                btn.Focus();
+                SetStatus("clicked");
+            };
 
             Label dbl = new Label
             {
@@ -60,6 +66,14 @@ namespace DesktopTools.Fixture
                 BackColor = Color.LightYellow
             };
             dbl.DoubleClick += (s, e) => SetStatus("double_clicked");
+            dbl.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Right)
+                    SetStatus("context");
+            };
+            var context = new ContextMenu();
+            context.MenuItems.Add("Ping", (s, e) => SetStatus("context"));
+            dbl.ContextMenu = context;
 
             TextBox edit = new TextBox
             {
@@ -71,6 +85,20 @@ namespace DesktopTools.Fixture
             };
             edit.GotFocus += (s, e) => SetStatus("focused");
 
+            RadioButton radio = new RadioButton
+            {
+                Name = "rdoChoice",
+                AccessibleName = "rdoChoice",
+                Text = "Choice A",
+                Location = new Point(160, 128),
+                AutoSize = true
+            };
+            radio.CheckedChanged += (s, e) =>
+            {
+                if (radio.Checked)
+                    SetStatus("radio");
+            };
+
             CheckBox check = new CheckBox
             {
                 Name = "chkOption",
@@ -78,6 +106,62 @@ namespace DesktopTools.Fixture
                 Text = "Option",
                 Location = new Point(20, 130),
                 AutoSize = true
+            };
+            ListBox virtualList = null;
+            ComboBox combo = null;
+            check.CheckedChanged += (s, e) =>
+            {
+                if (check.Checked)
+                {
+                    combo = new ComboBox
+                    {
+                        Name = "cboItems",
+                        AccessibleName = "cboItems",
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Location = new Point(330, 40),
+                        Size = new Size(160, 21)
+                    };
+                    combo.Items.Add("combo-alpha");
+                    combo.Items.Add("combo-beta");
+                    combo.SelectedIndex = 0;
+                    combo.SelectedIndexChanged += (cs, ce) =>
+                    {
+                        if (combo.SelectedItem != null &&
+                            combo.SelectedItem.ToString() == "combo-beta")
+                            SetStatus("combo");
+                    };
+                    Controls.Add(combo);
+
+                    virtualList = new ListBox
+                    {
+                        Name = "virtualList",
+                        AccessibleName = "virtualList",
+                        Location = new Point(330, 90),
+                        Size = new Size(160, 70)
+                    };
+                    virtualList.Items.Add("virtual-item-one");
+                    virtualList.Items.Add("virtual-item-two");
+                    virtualList.SelectedIndexChanged += (ls, le) =>
+                    {
+                        if (virtualList.SelectedIndex >= 0)
+                            SetStatus("list_item");
+                    };
+                    Controls.Add(virtualList);
+                    virtualList.BringToFront();
+                }
+                else
+                {
+                    if (virtualList != null)
+                    {
+                        virtualList.Dispose();
+                        virtualList = null;
+                    }
+                    if (combo != null)
+                    {
+                        combo.Dispose();
+                        combo = null;
+                    }
+                }
             };
 
             Panel dragPanel = new Panel
@@ -173,6 +257,7 @@ namespace DesktopTools.Fixture
             Controls.Add(dbl);
             Controls.Add(edit);
             Controls.Add(check);
+            Controls.Add(radio);
             Controls.Add(dragPanel);
             Controls.Add(dropPanel);
             Controls.Add(scrollHost);

@@ -91,6 +91,10 @@ namespace DesktopTools
       if (!info.Enabled)
         parts.Add("[off]");
 
+      // Synthesized MSAA rows carry their container HWND, not an individual handle.
+      if (info.Hwnd != IntPtr.Zero && (info.IsNativeWindow || info.Element != null))
+        parts.Add("hwnd=" + Win32Interop.FormatHwnd(info.Hwnd));
+
       return string.Join(" ", parts.ToArray());
     }
 

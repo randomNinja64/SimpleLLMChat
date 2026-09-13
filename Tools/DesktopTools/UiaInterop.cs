@@ -350,9 +350,11 @@ namespace DesktopTools
       {
         object pattern;
 
-        if (element.TryGetCurrentPattern(InvokePattern.Pattern, out pattern))
+        // Selectable items (list/tree/combo) often also expose a no-op Invoke on XP.
+        // accSelect / SelectionItem must run first or the item never becomes current.
+        if (element.TryGetCurrentPattern(SelectionItemPattern.Pattern, out pattern))
         {
-          ((InvokePattern)pattern).Invoke();
+          ((SelectionItemPattern)pattern).Select();
           applied = true;
           return;
         }
@@ -364,9 +366,9 @@ namespace DesktopTools
           return;
         }
 
-        if (element.TryGetCurrentPattern(SelectionItemPattern.Pattern, out pattern))
+        if (element.TryGetCurrentPattern(InvokePattern.Pattern, out pattern))
         {
-          ((SelectionItemPattern)pattern).Select();
+          ((InvokePattern)pattern).Invoke();
           applied = true;
           return;
         }

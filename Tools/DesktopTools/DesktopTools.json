@@ -31,7 +31,7 @@
         },
         {
             "name": "list_controls",
-            "description": "List a window's controls by window_title or hwnd. Returns element indices (#N), roles, labels and @x,y WxH in the same space as a window screenshot. max_depth=0 returns the window itself only. Re-call before navigate(element=N) if the UI changed.",
+            "description": "List a window's controls by window_title or hwnd. Returns element indices (#N), roles, labels, control hwnds where available and window-relative @x,y WxH. Prefer control hwnds for subsequent actions. Refresh element indices after UI changes.",
             "parameters": [
                 {
                     "name": "hwnd",
@@ -55,7 +55,7 @@
         },
         {
             "name": "navigate",
-            "description": "Pointer and focus actions. action=click|double_click|drag|scroll|focus. Target with element=# from list_controls (needs hwnd/window_title), hwnd, or x/y in the same space as screenshot for that scope. drag needs a start target plus to_element or to_x/to_y. click/double_click/drag optional button=left|right|middle and optional modifiers (ctrl/shift/alt/win). scroll needs direction=up|down|left|right and optional amount (default 3). Success may note new dialog/window hwnds.",
+            "description": "Pointer and focus actions. action=click|double_click|drag|scroll|focus. Target with element=# from list_controls (needs hwnd/window_title), hwnd, or x/y in the same space as screenshot for that scope. Drag from the target to to_element, to_x/to_y, or the center of to_hwnd/to_window_title, in that order. click/double_click/drag optional button=left|right|middle and optional modifiers (ctrl/shift/alt/win). scroll needs direction=up|down|left|right and optional amount (default 3). Success may note new dialog/window hwnds.",
             "parameters": [
                 {
                     "name": "action",
@@ -102,19 +102,31 @@
                 {
                     "name": "to_element",
                     "type": "number",
-                    "description": "For drag: 1-based end element index from list_controls (same hwnd/window_title and max_depth as start).",
+                    "description": "For drag: 1-based element index within the destination window. Match its list_controls max_depth.",
+                    "required": false
+                },
+                {
+                    "name": "to_hwnd",
+                    "type": "string",
+                    "description": "For drag: destination control/window handle; scopes to_element and to_x/to_y, or targets its center when neither is supplied.",
+                    "required": false
+                },
+                {
+                    "name": "to_window_title",
+                    "type": "string",
+                    "description": "For drag: partial destination window title if to_hwnd is not provided.",
                     "required": false
                 },
                 {
                     "name": "to_x",
                     "type": "number",
-                    "description": "For drag: end X in the same space as start x/y.",
+                    "description": "For drag: end X relative to the destination window, or the starting scope if no destination window is supplied.",
                     "required": false
                 },
                 {
                     "name": "to_y",
                     "type": "number",
-                    "description": "For drag: end Y in the same space as start x/y.",
+                    "description": "For drag: end Y relative to the destination window, or the starting scope if no destination window is supplied.",
                     "required": false
                 },
                 {

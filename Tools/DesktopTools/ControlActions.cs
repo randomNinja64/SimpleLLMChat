@@ -5,8 +5,8 @@ using Newtonsoft.Json.Linq;
 namespace DesktopTools
 {
   /// <summary>
-  /// Every action walks the same ladder: UI Automation pattern first (works without stealing
-  /// focus), then a window message to the control's HWND, then synthetic input at coordinates.
+    /// UIA elements use patterns; direct HWND/native targets use MSAA and window messages.
+    /// Synthetic input is the final fallback and supplies dragging and modifier clicks.
   /// </summary>
   internal static class ControlActions
   {
@@ -14,6 +14,7 @@ namespace DesktopTools
     {
       public IntPtr WindowHwnd;
       public ControlInfo Control;
+      public List<ControlInfo> Controls;
       public int X;
       public int Y;
       public bool HasPoint;
@@ -86,23 +87,31 @@ namespace DesktopTools
       bool plainLeftClick = clickCount == 1 && button == Win32Interop.MouseButton.Left && noModifiers;
       IntPtr actionHwnd = ActionHwnd(target);
 
+      // Direct HWND and native discovery use the XP-era MSAA action without UIA startup.
+      bool nativeTarget = (target.Control == null && !target.HasPoint) ||
+                          (target.Control != null && target.Control.IsNativeWindow);
+      if (plainLeftClick && nativeTarget && actionHwnd != IntPtr.Zero &&
+          MsaaInterop.TryDefaultActionHwnd(actionHwnd))
+        return Done("ok", before, target.WindowHwnd);
+
       if (plainLeftClick && target.Control != null && target.Control.Element != null)
       {
         // Invoke can block forever if the handler opens a modal dialog — time out and
         // treat that as success so we do not double-activate with a mouse click.
         StaTimeout.Result invoked = UiaInterop.TryInvokeTimed(target.Control.Element, 2000);
-        if (invoked == StaTimeout.Result.Succeeded || invoked == StaTimeout.Result.TimedOut)
+        if (invoked == StaTimeout.Result.TimedOut)
+          return Done("ok", before, target.WindowHwnd);
+
+        // XP WinForms list items expose SelectionItem but Select does not change
+        // LB_GETCURSEL. Drive the real list/combo HWND by caption instead.
+        if (TrySelectNativeNamedItem(target.Control))
+          return Done("ok", before, target.WindowHwnd);
+
+        if (invoked == StaTimeout.Result.Succeeded && !IsHwndlessSelectableItem(target.Control))
           return Done("ok", before, target.WindowHwnd);
       }
 
-      if (plainLeftClick && target.Control == null && !target.HasPoint && actionHwnd != IntPtr.Zero)
-      {
-        StaTimeout.Result invoked = UiaInterop.TryInvokeHwnd(actionHwnd, 2000);
-        if (invoked == StaTimeout.Result.Succeeded || invoked == StaTimeout.Result.TimedOut)
-          return Done("ok", before, target.WindowHwnd);
-      }
-
-      if (plainLeftClick && TryActivateThroughMsaa(target.Control))
+      if (plainLeftClick && !nativeTarget && TryActivateThroughMsaa(target.Control))
         return Done("ok", before, target.WindowHwnd);
 
       if (plainLeftClick && IsPushButton(actionHwnd))
@@ -149,7 +158,7 @@ namespace DesktopTools
         return NoScreenLocationError();
 
       int toX, toY;
-      string endError = ResolveDragEnd(argumentsJson, from.WindowHwnd, out toX, out toY);
+      string endError = ResolveDragEnd(argumentsJson, from.WindowHwnd, from.Controls, out toX, out toY);
       if (endError != null)
         return endError;
 
@@ -220,6 +229,25 @@ namespace DesktopTools
     private static string Done(string result, UiChanges.Snapshot before, IntPtr relatedWindow)
     {
       return UiChanges.Annotate(result, before, relatedWindow);
+    }
+
+    private static bool IsHwndlessSelectableItem(ControlInfo control)
+    {
+      if (control == null || control.Hwnd != IntPtr.Zero)
+        return false;
+      string role = control.Role ?? "";
+      return role == "listitem" || role == "treeitem" || role == "dataitem";
+    }
+
+    private static bool TrySelectNativeNamedItem(ControlInfo control)
+    {
+      if (control == null || string.IsNullOrEmpty(control.Label) || !IsHwndlessSelectableItem(control))
+        return false;
+
+      IntPtr hwnd = control.Hwnd;
+      if (hwnd == IntPtr.Zero && control.Element != null)
+        hwnd = UiaInterop.FindContainerHwnd(control.Element);
+      return Win32Interop.TrySelectNamedItem(hwnd, control.Label);
     }
 
     /// <summary>
@@ -317,8 +345,10 @@ namespace DesktopTools
 
       if (hasElement)
       {
+        TreeScope scope = ControlTree.ParseScope(argumentsJson);
+        target.Controls = ControlTree.Collect(target.WindowHwnd, scope.MaxDepth, scope.MaxControls);
         ControlInfo control;
-        string elementError = TryResolveElement(target.WindowHwnd, elementIndex, argumentsJson, "element", out control);
+        string elementError = TryResolveElement(target.WindowHwnd, elementIndex, argumentsJson, "element", out control, target.Controls);
         if (elementError != null)
           return Fail(elementError);
 
@@ -343,13 +373,27 @@ namespace DesktopTools
     }
 
     /// <summary>
-    /// End point for drag: to_element (same window scope as start) or to_x/to_y in the same
-    /// capture space as start (outer-window or virtual-desktop pixels).
+    /// End point uses element, coordinates, then window center, just like the start.
+    /// An explicit destination window changes scope; otherwise inherit the start scope.
     /// </summary>
-    private static string ResolveDragEnd(string argumentsJson, IntPtr windowHwnd, out int toX, out int toY)
+    private static string ResolveDragEnd(string argumentsJson, IntPtr windowHwnd, List<ControlInfo> controls, out int toX, out int toY)
     {
       toX = 0;
       toY = 0;
+
+      string toHwnd = ToolHelper.JsonExtractString(argumentsJson, "to_hwnd");
+      string toTitle = ToolHelper.JsonExtractString(argumentsJson, "to_window_title");
+      bool hasWindow = !string.IsNullOrWhiteSpace(toHwnd) || !string.IsNullOrWhiteSpace(toTitle);
+      if (hasWindow)
+      {
+        try
+        {
+          IntPtr end = WindowEnumerator.ResolveWindow(toHwnd, toTitle);
+          if (end != windowHwnd) controls = null;
+          windowHwnd = end;
+        }
+        catch (Exception ex) { return "error: " + ex.Message; }
+      }
 
       int toElement;
       bool hasToElement = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "to_element"), out toElement) && toElement > 0;
@@ -359,12 +403,14 @@ namespace DesktopTools
                        int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "to_y"), out y);
 
       if (!hasToElement && !hasCoords)
-        return "error: drag requires to_element or to_x/to_y.";
+        return hasWindow
+          ? (Win32Interop.TryGetWindowCenter(windowHwnd, out toX, out toY) ? null : NoScreenLocationError())
+          : "error: drag requires to_hwnd, to_window_title, to_element or to_x/to_y.";
 
       if (hasToElement)
       {
         ControlInfo control;
-        string elementError = TryResolveElement(windowHwnd, toElement, argumentsJson, "to_element", out control);
+        string elementError = TryResolveElement(windowHwnd, toElement, argumentsJson, "to_element", out control, controls);
         if (elementError != null)
           return elementError;
 
@@ -389,7 +435,7 @@ namespace DesktopTools
       int elementIndex,
       string argumentsJson,
       string paramName,
-      out ControlInfo control)
+      out ControlInfo control, List<ControlInfo> controls = null)
     {
       control = null;
 
@@ -397,7 +443,10 @@ namespace DesktopTools
         return "error: " + paramName + " requires hwnd or window_title to scope the control tree.";
 
       TreeScope scope = ControlTree.ParseScope(argumentsJson);
-      control = ControlTree.Find(windowHwnd, elementIndex, scope.MaxDepth, scope.MaxControls);
+      if (controls == null)
+        controls = ControlTree.Collect(windowHwnd, scope.MaxDepth, scope.MaxControls);
+      if (elementIndex > 0 && elementIndex <= controls.Count && controls[elementIndex - 1].Index == elementIndex)
+        control = controls[elementIndex - 1];
       if (control == null)
         return "error: " + paramName + " #" + elementIndex + " not found. Re-run list_controls first (pass the same max_depth).";
 
@@ -411,6 +460,9 @@ namespace DesktopTools
     private static void EnsureControlInView(ControlInfo control, IntPtr windowHwnd)
     {
       if (control == null)
+        return;
+
+      if (control.IsNativeWindow)
         return;
 
       if (control.Element == null)
@@ -435,6 +487,10 @@ namespace DesktopTools
       if (target.ControlHwnd != IntPtr.Zero &&
           Win32Interop.IsWindow(target.ControlHwnd) &&
           Win32Interop.TryGetWindowCenter(target.ControlHwnd, out x, out y))
+        return true;
+
+      if (target.Control == null && target.WindowHwnd != IntPtr.Zero && Win32Interop.IsWindow(target.WindowHwnd) &&
+          Win32Interop.TryGetWindowCenter(target.WindowHwnd, out x, out y))
         return true;
 
       x = 0;

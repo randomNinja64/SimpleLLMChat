@@ -13,6 +13,8 @@ namespace DesktopTools
     public string Label = "";
     public string Value = "";
     public IntPtr Hwnd;
+    public bool IsNativeWindow;
+    public bool SupportsNativeDiscovery;
     public bool Enabled = true;
     public int X;
     public int Y;
@@ -46,9 +48,8 @@ namespace DesktopTools
   }
 
   /// <summary>
-  /// Builds the control tree for a window. UI Automation is tried first because it sees
-  /// WPF, WinForms and classic Win32; raw child-window enumeration is the fallback for
-  /// processes that expose no accessibility tree at all.
+  /// Uses native discovery for recognized simple controls and UI Automation for richer
+  /// or unknown interfaces. Listing and element resolution share this selection policy.
   /// </summary>
   internal static class ControlTree
   {
@@ -71,7 +72,17 @@ namespace DesktopTools
 
     public static List<ControlInfo> Collect(IntPtr windowHwnd, int maxDepth, int maxControls)
     {
-      List<ControlInfo> controls = UiaInterop.WalkTree(windowHwnd, maxDepth);
+      List<ControlInfo> controls = null;
+      // Inspect only familiar native hosts. Unknown/custom and virtual controls retain UIA.
+      string host = Win32Interop.GetControlClass(windowHwnd);
+      if (host == "#32770" || host.StartsWith("WindowsForms10.", StringComparison.OrdinalIgnoreCase))
+      {
+        List<ControlInfo> native = CollectWin32(windowHwnd, maxDepth);
+        if (native.Count > 0 && native.TrueForAll(c => c.SupportsNativeDiscovery))
+          controls = native;
+      }
+      if (controls == null)
+        controls = UiaInterop.WalkTree(windowHwnd, maxDepth);
 
       if (controls.Count == 0)
         controls = CollectWin32(windowHwnd, maxDepth);
@@ -204,11 +215,14 @@ namespace DesktopTools
       var info = new ControlInfo
       {
         Hwnd = hwnd,
+        IsNativeWindow = true,
         Depth = depth,
         Role = OutputFormat.RoleFromClassName(Win32Interop.GetControlClass(hwnd)),
         Label = Win32Interop.GetControlText(hwnd),
         Enabled = Win32Interop.IsWindowEnabled(hwnd)
       };
+
+      MsaaInterop.DescribeWindow(hwnd, info);
 
       Win32Interop.RECT rect;
       if (Win32Interop.GetWindowRect(hwnd, out rect))

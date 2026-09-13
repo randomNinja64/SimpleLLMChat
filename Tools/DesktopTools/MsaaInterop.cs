@@ -19,6 +19,44 @@ namespace DesktopTools
     private const int MaxSearchDepth = 6;
     private const int MatchTolerance = 2;
 
+    // Read just CHILDID_SELF for an HWND: no UIA bridge or accessibility tree walk.
+    public static void DescribeWindow(IntPtr hwnd, ControlInfo info)
+    {
+      IAccessible accessible = FromWindow(hwnd);
+      if (accessible == null) return;
+      try
+      {
+        // Do not treat a grid/list/browser as a plain HWND just because it has one.
+        int role = Convert.ToInt32(accessible.get_accRole(0));
+        bool simpleClass = info.Role == "text" || info.Role == "edit" || info.Role == "button" ||
+                           info.Role == "window" || info.Role == "#32770";
+        info.SupportsNativeDiscovery = simpleClass &&
+          (role == 9 || role == 10 || role == 16 || role == 20 || role == 41 || role == 42 ||
+           role == 43 || role == 44 || role == 45);
+      }
+      catch { }
+      try
+      {
+        string name = accessible.get_accName(0);
+        if (!string.IsNullOrEmpty(name)) info.Label = name;
+      }
+      catch { }
+      try { info.Value = accessible.get_accValue(0) ?? ""; }
+      catch { }
+    }
+
+    public static bool TryDefaultActionHwnd(IntPtr hwnd)
+    {
+      IAccessible accessible = FromWindow(hwnd);
+      if (accessible == null) return false;
+      try
+      {
+        if (string.IsNullOrEmpty(accessible.get_accDefaultAction(0))) return false;
+        return RunTimed(delegate { accessible.accDoDefaultAction(0); }, 2000);
+      }
+      catch { return false; }
+    }
+
     private static readonly Guid IID_IAccessible = new Guid("618736E0-3C3D-11CF-810C-00AA00389B71");
 
     [DllImport("oleacc.dll")]

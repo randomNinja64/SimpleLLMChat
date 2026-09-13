@@ -110,6 +110,41 @@ public static class TestLog
         }
     }
 
+    /// <summary>
+    /// Tool screenshots put tens of KB of JPEG base64 in stdout. Keep a short prefix in the
+    /// log so the file stays readable; callers still parse the full payload.
+    /// </summary>
+    public static string FormatStdoutForLog(string stdout)
+    {
+        if (string.IsNullOrEmpty(stdout))
+            return stdout ?? "";
+
+        string trimmed = stdout.Trim();
+        if (trimmed.Length == 0 || trimmed[0] != '{')
+            return stdout;
+
+        try
+        {
+            JObject obj = JObject.Parse(trimmed);
+            JObject image = obj["image"] as JObject;
+            if (image == null)
+                return stdout;
+
+            string data = image["data"] != null && image["data"].Type == JTokenType.String
+                ? image["data"].Value<string>()
+                : null;
+            if (string.IsNullOrEmpty(data) || data.Length <= 48)
+                return stdout;
+
+            image["data"] = data.Substring(0, 24) + "... (" + data.Length + " chars)";
+            return obj.ToString(Newtonsoft.Json.Formatting.None);
+        }
+        catch
+        {
+            return stdout;
+        }
+    }
+
     public static void Result(string caseName, string status, long caseMs, long processMs, string detail)
     {
         bool slow = caseMs >= SlowThresholdMs;
@@ -406,7 +441,7 @@ public static class ToolClient
         TestRunner.AddProcessMs(result.ElapsedMs);
         TestLog.Detail("exit=" + result.ExitCode + " elapsed_ms=" + result.ElapsedMs +
             (result.TimedOut ? " TIMED_OUT" : ""));
-        TestLog.Detail("stdout: " + result.Stdout);
+        TestLog.Detail("stdout: " + TestLog.FormatStdoutForLog(result.Stdout));
         if (!string.IsNullOrEmpty(result.Stderr))
             TestLog.Detail("stderr: " + result.Stderr);
 
@@ -586,7 +621,7 @@ public static class ProcessRunner
 
         TestRunner.AddProcessMs(result.ElapsedMs);
         TestLog.Detail("exit=" + result.ExitCode + " elapsed_ms=" + result.ElapsedMs);
-        TestLog.Detail("stdout: " + result.Stdout);
+        TestLog.Detail("stdout: " + TestLog.FormatStdoutForLog(result.Stdout));
         if (!string.IsNullOrEmpty(result.Stderr))
             TestLog.Detail("stderr: " + result.Stderr);
         return result;

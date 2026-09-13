@@ -57,6 +57,7 @@ namespace DesktopTools.Tests
                     TestAssert.ContainsIgnoreCase(r.Text, "btnClick", "button");
                     TestAssert.ContainsIgnoreCase(r.Text, "txtEdit", "edit");
                     TestAssert.ContainsIgnoreCase(r.Text, "lblDouble", "double-click label");
+                    TestAssert.ContainsIgnoreCase(r.Text, "rdoChoice", "radio");
                     TestAssert.ContainsIgnoreCase(r.Text, "pnlDrag", "drag panel");
                     TestAssert.ContainsIgnoreCase(r.Text, "lblStatus", "status label");
                 });
@@ -161,17 +162,19 @@ namespace DesktopTools.Tests
                 {
                     EnsureHwnd(ref hwnd, fixture);
                     // Clear prior "dragged" so this case must re-trigger via x/y → to_x/to_y.
+                    // Do not reset via focus on txtEdit: it often already has focus after
+                    // navigate.focus, so GotFocus (and the title) will not change.
                     ToolInvokeResult before = ListControls(hwnd);
-                    int? edit = FindElementIndex(before.Text, "txtEdit");
-                    TestAssert.True(edit.HasValue, "txtEdit for status reset");
+                    int? button = FindElementIndex(before.Text, "btnClick");
+                    TestAssert.True(button.HasValue, "btnClick for status reset");
                     NavigateOk(new JObject
                     {
-                        ["action"] = "focus",
+                        ["action"] = "click",
                         ["hwnd"] = hwnd,
-                        ["element"] = edit.Value
+                        ["element"] = button.Value
                     });
                     Thread.Sleep(200);
-                    AssertStatus(hwnd, "focused");
+                    AssertStatus(hwnd, "clicked");
 
                     ToolInvokeResult list = ListControls(hwnd);
                     int fromX, fromY, toX, toY;
@@ -214,6 +217,158 @@ namespace DesktopTools.Tests
                     AssertStatus(hwnd, "scrolled");
                 });
 
+                string nativeTree = null;
+                TestRunner.Run("list_controls.auto_native", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "list_controls",
+                        new JObject { ["hwnd"] = hwnd });
+                    TestAssert.Equal(0, r.ExitCode, "native listing exit");
+                    nativeTree = r.Text;
+                    TestAssert.True(nativeTree.IndexOf("titlebar", StringComparison.OrdinalIgnoreCase) < 0,
+                        "simple fixture should select native discovery automatically");
+                    var handles = new System.Collections.Generic.HashSet<string>();
+                    foreach (string line in nativeTree.Split('\n'))
+                    {
+                        int start = line.IndexOf("hwnd=", StringComparison.Ordinal);
+                        if (start < 0) continue;
+                        TestAssert.True(handles.Add(line.Substring(start).Trim()), "duplicate native HWND: " + line);
+                    }
+                    TestAssert.True(handles.Count >= 8, "native controls discovered");
+                    TestAssert.True(!string.IsNullOrEmpty(FindControlHwnd(nativeTree, "txtEdit")), "MSAA edit name");
+                });
+
+                TestRunner.Run("drag.destination_resolution", () =>
+                {
+                    // Check exact endpoints without relying on the fixture's drag-start event.
+                    var assembly = System.Reflection.Assembly.LoadFrom(ToolClient.ProductExe(Exe));
+                    var resolve = assembly.GetType("DesktopTools.ControlActions").GetMethod("ResolveDragEnd",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                    IntPtr start = new IntPtr(Convert.ToInt64(hwnd.Substring(2), 16));
+                    Func<JObject, int[]> point = args =>
+                    {
+                        object[] values = { args.ToString(), start, null, 0, 0 };
+                        string error = (string)resolve.Invoke(null, values);
+                        TestAssert.True(error == null, error ?? "destination resolved");
+                        return new[] { (int)values[3], (int)values[4] };
+                    };
+                    int[] byHandle = point(new JObject { ["to_hwnd"] = hwnd });
+                    int[] byTitle = point(new JObject { ["to_window_title"] = FixtureTitle });
+                    TestAssert.True(byHandle[0] == byTitle[0] && byHandle[1] == byTitle[1], "title matches handle center");
+
+                    string drop = FindControlHwnd(nativeTree, "pnlDrop");
+                    int[] origin = point(new JObject { ["to_hwnd"] = drop, ["to_x"] = 0, ["to_y"] = 0 });
+                    int[] offset = point(new JObject { ["to_hwnd"] = drop, ["to_x"] = 17, ["to_y"] = 23 });
+                    TestAssert.True(offset[0] - origin[0] == 17 && offset[1] - origin[1] == 23,
+                        "coordinates override handle center in destination scope");
+
+                    int element = FindElementIndex(nativeTree, "pnlDrop").Value;
+                    int[] inherited = point(new JObject { ["to_element"] = element });
+                    int[] explicitScope = point(new JObject { ["to_hwnd"] = hwnd, ["to_element"] = element,
+                        ["to_x"] = 0, ["to_y"] = 0 });
+                    TestAssert.True(inherited[0] == explicitScope[0] && inherited[1] == explicitScope[1],
+                        "element overrides coordinates; implicit scope preserved");
+                });
+
+                TestRunner.Run("set_control_text.hwnd", () =>
+                {
+                    string editHwnd = FindControlHwnd(nativeTree, "txtEdit");
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "set_control_text",
+                        new JObject { ["hwnd"] = editHwnd, ["text"] = "native-text" });
+                    TestAssert.Equal(0, r.ExitCode, "set text exit");
+                    ToolInvokeResult read = ToolClient.InvokeProduct(Exe, "list_controls",
+                        new JObject { ["hwnd"] = editHwnd, ["max_depth"] = 0 });
+                    TestAssert.Contains(read.Text, "native-text", "text readback");
+                });
+
+                string[] nativeActions = { "click", "focus", "double_click", "scroll", "drag" };
+                string[] nativeMarkers = { "btnClick", "txtEdit", "lblDouble", "pnlScroll", "pnlDrag" };
+                string[] nativeStatuses = { "clicked", "focused", "double_clicked", "scrolled", "dragged" };
+                for (int i = 0; i < nativeActions.Length; i++)
+                {
+                    int index = i;
+                    TestRunner.Run("navigate." + nativeActions[index] + ".hwnd", () =>
+                    {
+                        var args = new JObject
+                        {
+                            ["action"] = nativeActions[index],
+                            ["hwnd"] = FindControlHwnd(nativeTree, nativeMarkers[index])
+                        };
+                        if (nativeActions[index] == "scroll")
+                        {
+                            args["direction"] = "up";
+                            args["amount"] = 3;
+                        }
+                        if (nativeActions[index] == "drag")
+                            args["to_hwnd"] = FindControlHwnd(nativeTree, "pnlDrop");
+                        NavigateOk(args);
+                        Thread.Sleep(350);
+                        AssertStatus(hwnd, nativeStatuses[index]);
+                    });
+                }
+
+                TestRunner.Run("navigate.click.auto_element", () =>
+                {
+                    int? button = FindElementIndex(nativeTree, "btnClick");
+                    TestAssert.True(button.HasValue, "native button index");
+                    NavigateOk(new JObject { ["hwnd"] = hwnd, ["element"] = button.Value,
+                        ["action"] = "click" });
+                    Thread.Sleep(250);
+                    AssertStatus(hwnd, "clicked");
+                });
+
+                TestRunner.Run("navigate.click.radio", () =>
+                {
+                    NavigateOk(new JObject
+                    {
+                        ["action"] = "click",
+                        ["hwnd"] = FindControlHwnd(nativeTree, "rdoChoice")
+                    });
+                    Thread.Sleep(250);
+                    AssertStatus(hwnd, "radio");
+                });
+
+                TestRunner.Run("send_keys.edit", () =>
+                {
+                    NavigateOk(new JObject
+                    {
+                        ["action"] = "focus",
+                        ["hwnd"] = FindControlHwnd(nativeTree, "txtEdit")
+                    });
+                    Thread.Sleep(150);
+                    ToolInvokeResult keys = ToolClient.InvokeProduct(Exe, "send_keys",
+                        new JObject { ["keys"] = "{HOME}+{END}from-keys" });
+                    TestAssert.Equal(0, keys.ExitCode, "send_keys exit");
+                    Thread.Sleep(200);
+                    ToolInvokeResult read = ToolClient.InvokeProduct(Exe, "list_controls",
+                        new JObject
+                        {
+                            ["hwnd"] = FindControlHwnd(nativeTree, "txtEdit"),
+                            ["max_depth"] = 0
+                        });
+                    TestAssert.Contains(read.Text, "from-keys", "typed text");
+                });
+
+                TestRunner.Run("navigate.click.right", () =>
+                {
+                    NavigateOk(new JObject
+                    {
+                        ["action"] = "click",
+                        ["button"] = "right",
+                        ["hwnd"] = FindControlHwnd(nativeTree, "lblDouble")
+                    });
+                    Thread.Sleep(250);
+                    AssertStatus(hwnd, "context");
+                    ToolClient.InvokeProduct(Exe, "send_keys",
+                        new JObject { ["keys"] = "{Esc}" });
+                });
+
+                TestRunner.Run("navigate.invalid_hwnd", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "navigate",
+                        new JObject { ["action"] = "click", ["hwnd"] = "0x0" });
+                    TestAssert.True(r.ExitCode != 0, "invalid HWND rejected");
+                });
+
                 TestRunner.Run("navigate.unknown_action", () =>
                 {
                     EnsureHwnd(ref hwnd, fixture);
@@ -242,6 +397,59 @@ namespace DesktopTools.Tests
                     TestAssert.Equal(0, r.ExitCode, "exit");
                     TestAssert.True(!string.IsNullOrEmpty(r.ImageBase64), "image data");
                 });
+
+                string virtualTree = null;
+                TestRunner.Run("list_controls.auto_virtual", () =>
+                {
+                    NavigateOk(new JObject { ["action"] = "click",
+                        ["hwnd"] = FindControlHwnd(nativeTree, "chkOption") });
+                    Thread.Sleep(250);
+                    ToolInvokeResult r = ListControls(hwnd);
+                    TestAssert.Equal(0, r.ExitCode, "automatic virtual listing exit");
+                    virtualTree = r.Text;
+                    TestAssert.Contains(virtualTree, "virtual-item-one", "UIA exposes virtual list item");
+                    TestAssert.Contains(virtualTree, "cboItems", "combo listed after Option");
+                });
+
+                TestRunner.Run("navigate.click.listitem", () =>
+                {
+                    int? item = FindElementIndex(virtualTree, "virtual-item-one");
+                    TestAssert.True(item.HasValue, "virtual-item-one element");
+                    NavigateOk(new JObject
+                    {
+                        ["action"] = "click",
+                        ["hwnd"] = hwnd,
+                        ["element"] = item.Value
+                    });
+                    Thread.Sleep(350);
+                    AssertStatus(hwnd, "list_item");
+                });
+
+                TestRunner.Run("navigate.click.comboitem", () =>
+                {
+                    ToolInvokeResult list = ListControls(hwnd);
+                    int? item = FindElementIndex(list.Text, "combo-beta");
+                    if (!item.HasValue)
+                    {
+                        NavigateOk(new JObject
+                        {
+                            ["action"] = "click",
+                            ["hwnd"] = FindControlHwnd(list.Text, "cboItems")
+                        });
+                        Thread.Sleep(250);
+                        list = ListControls(hwnd);
+                        item = FindElementIndex(list.Text, "combo-beta");
+                    }
+                    TestAssert.True(item.HasValue, "combo-beta element");
+                    NavigateOk(new JObject
+                    {
+                        ["action"] = "click",
+                        ["hwnd"] = hwnd,
+                        ["element"] = item.Value
+                    });
+                    Thread.Sleep(350);
+                    AssertStatus(hwnd, "combo");
+                });
             }
             finally
             {
@@ -256,6 +464,17 @@ namespace DesktopTools.Tests
                     try { fixture.Dispose(); } catch { }
                 }
             }
+        }
+
+        static string FindControlHwnd(string tree, string marker)
+        {
+            foreach (string line in (tree ?? "").Split('\n'))
+            {
+                if (line.IndexOf("\"" + marker + "\"", StringComparison.Ordinal) < 0) continue;
+                int start = line.IndexOf("hwnd=", StringComparison.Ordinal);
+                if (start >= 0) return line.Substring(start + 5).Trim();
+            }
+            throw new TestFailureException("No direct HWND for " + marker);
         }
 
         static ToolInvokeResult ListControls(string hwnd)
