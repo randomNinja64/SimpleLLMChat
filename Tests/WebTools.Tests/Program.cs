@@ -43,7 +43,7 @@ namespace WebTools.Tests
                     TestRunner.Skip("curl.exe not packaged beside test EXE");
 
                 using (TempWorkspace ws = new TempWorkspace("webdl"))
-                using (LocalHttpServer server = new LocalHttpServer("download-body"))
+                using (LocalHttpServer server = new LocalHttpServer("download-body", "application/octet-stream"))
                 {
                     string dest = ws.Combine("out.bin");
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "download_file",
@@ -86,12 +86,21 @@ namespace WebTools.Tests
             private readonly Thread _thread;
             private volatile bool _running;
             private readonly string _body;
+            private readonly string _contentType;
 
             public string Url { get; private set; }
 
             public LocalHttpServer(string body)
+                : this(body, "text/html; charset=utf-8")
+            {
+            }
+
+            public LocalHttpServer(string body, string contentType)
             {
                 _body = body ?? "";
+                _contentType = string.IsNullOrEmpty(contentType)
+                    ? "text/html; charset=utf-8"
+                    : contentType;
                 string baseUrl;
                 _listener = TestHttpListener.StartLoopback(out baseUrl);
                 Url = baseUrl + "/";
@@ -109,9 +118,22 @@ namespace WebTools.Tests
                         HttpListenerContext ctx = _listener.GetContext();
                         byte[] bytes = Encoding.UTF8.GetBytes(_body);
                         ctx.Response.StatusCode = 200;
-                        ctx.Response.ContentType = "text/html; charset=utf-8";
-                        ctx.Response.ContentLength64 = bytes.Length;
-                        ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+                        ctx.Response.ContentType = _contentType;
+                        ctx.Response.KeepAlive = false;
+                        bool head = string.Equals(ctx.Request.HttpMethod, "HEAD",
+                            StringComparison.OrdinalIgnoreCase);
+                        if (head)
+                        {
+                            // download_file probes MIME with curl -I. HTTP.SYS on XP
+                            // can deadlock if a HEAD response writes a body (or a
+                            // non-zero Content-Length) that curl never reads.
+                            ctx.Response.ContentLength64 = 0;
+                        }
+                        else
+                        {
+                            ctx.Response.ContentLength64 = bytes.Length;
+                            ctx.Response.OutputStream.Write(bytes, 0, bytes.Length);
+                        }
                         ctx.Response.Close();
                     }
                     catch

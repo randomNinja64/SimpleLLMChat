@@ -24,6 +24,12 @@ set FAILED=0
 set ALLPERF=%LOGDIR%\all.perf.tsv
 > "%ALLPERF%" echo suite	case	status	case_ms	process_ms
 
+set ISSUES=%LOGDIR%\failed-or-slow.log
+set ISSUESFOUND=0
+> "%ISSUES%" echo SimpleLLMChat failed or slow tests %RUNID%
+>> "%ISSUES%" echo Slow threshold: 5000 ms
+>> "%ISSUES%" echo.
+
 set SUMMARY=%LOGDIR%\summary.txt
 > "%SUMMARY%" echo SimpleLLMChat test run %RUNID%
 >> "%SUMMARY%" echo.
@@ -42,9 +48,21 @@ call :RunSuite SimpleLLMChatGUI SimpleLLMChatGUI.Tests
 >> "%SUMMARY%" echo Hot spots (all suites) - slowest 20 by process_ms:
 call :SummarizePerf
 
+if !ISSUESFOUND! equ 0 (
+  >> "%ISSUES%" echo (none)
+  >> "%SUMMARY%" echo.
+  >> "%SUMMARY%" echo Failed or slow: none
+) else (
+  >> "%SUMMARY%" echo.
+  >> "%SUMMARY%" echo Failed or slow: %ISSUES%
+)
+
 echo.
 echo === Summary ===
 type "%SUMMARY%"
+echo.
+echo === Failed or slow ===
+type "%ISSUES%"
 echo.
 echo Logs: %LOGDIR%
 
@@ -74,6 +92,13 @@ echo --- %NAME% ---
 set EC=!ERRORLEVEL!
 
 if exist "%LOGDIR%\%NAME%.perf.tsv" call :AppendPerf "%LOGDIR%\%NAME%.perf.tsv" "%NAME%"
+
+if exist "%LOGDIR%\%NAME%.issues.log" (
+  set ISSUESFOUND=1
+  >> "%ISSUES%" echo ----- %NAME% -----
+  type "%LOGDIR%\%NAME%.issues.log" >> "%ISSUES%"
+  >> "%ISSUES%" echo.
+)
 
 if !EC! neq 0 (
   >> "%SUMMARY%" echo %NAME%: FAIL exit=!EC! log=%LOG%

@@ -16,8 +16,10 @@ public static class TestLog
 
     private static StreamWriter _writer;
     private static StreamWriter _perfWriter;
+    private static StreamWriter _issuesWriter;
     private static string _logPath;
     private static string _perfPath;
+    private static string _issuesPath;
     private static string _suiteName = "Suite";
     private static readonly object _gate = new object();
     private static readonly List<PerfRow> _rows = new List<PerfRow>();
@@ -28,10 +30,12 @@ public static class TestLog
         public string Status;
         public long CaseMs;
         public long ProcessMs;
+        public bool Slow;
     }
 
     public static string LogPath { get { return _logPath; } }
     public static string PerfPath { get { return _perfPath; } }
+    public static string IssuesPath { get { return _issuesPath; } }
 
     public static void Open(string suiteName, string logPath)
     {
@@ -51,12 +55,22 @@ public static class TestLog
             Directory.CreateDirectory(dir);
 
         _logPath = Path.GetFullPath(logPath);
-        _perfPath = Path.ChangeExtension(_logPath, ".perf.tsv");
-        if (_perfPath.EndsWith(".log.perf.tsv", StringComparison.OrdinalIgnoreCase))
-            _perfPath = _logPath.Substring(0, _logPath.Length - 4) + ".perf.tsv";
-        // Prefer Suite.perf.tsv beside Suite.log
+        // Prefer Suite.perf.tsv / Suite.issues.log beside Suite.log
         string baseName = Path.GetFileNameWithoutExtension(_logPath);
-        _perfPath = Path.Combine(Path.GetDirectoryName(_logPath) ?? ".", baseName + ".perf.tsv");
+        string logDir = Path.GetDirectoryName(_logPath) ?? ".";
+        _perfPath = Path.Combine(logDir, baseName + ".perf.tsv");
+        _issuesPath = Path.Combine(logDir, baseName + ".issues.log");
+
+        if (_issuesWriter != null)
+        {
+            _issuesWriter.Dispose();
+            _issuesWriter = null;
+        }
+        if (File.Exists(_issuesPath))
+        {
+            try { File.Delete(_issuesPath); }
+            catch { }
+        }
 
         _writer = new StreamWriter(_logPath, false, Encoding.UTF8) { AutoFlush = true };
         _perfWriter = new StreamWriter(_perfPath, false, Encoding.UTF8) { AutoFlush = true };
@@ -72,11 +86,13 @@ public static class TestLog
         Info("BaseDirectory=" + AppDomain.CurrentDomain.BaseDirectory);
         Info("WorkingDirectory=" + Environment.CurrentDirectory);
         Info("Perf=" + _perfPath);
+        Info("Issues=" + _issuesPath + " (written if any FAIL or case_ms>=" + SlowThresholdMs + ")");
     }
 
     public static void Close(int pass, int fail, int skip, long suiteMs)
     {
         WriteHotSpots(10);
+        WriteFailedOrSlow();
         Info(string.Format("DONE pass={0} fail={1} skip={2} suite_ms={3}", pass, fail, skip, suiteMs));
         if (_writer != null)
         {
@@ -87,6 +103,11 @@ public static class TestLog
         {
             _perfWriter.Dispose();
             _perfWriter = null;
+        }
+        if (_issuesWriter != null)
+        {
+            _issuesWriter.Dispose();
+            _issuesWriter = null;
         }
     }
 
@@ -149,7 +170,7 @@ public static class TestLog
     {
         bool slow = caseMs >= SlowThresholdMs;
         string tag = status;
-        if (slow && (status == "PASS" || status == "FAIL"))
+        if (slow)
             tag = status + "+SLOW";
 
         string console = string.Format("[{0}] {1}  (case_ms={2} process_ms={3})",
@@ -174,8 +195,12 @@ public static class TestLog
                 Case = caseName,
                 Status = status,
                 CaseMs = caseMs,
-                ProcessMs = processMs
+                ProcessMs = processMs,
+                Slow = slow
             });
+
+            if (status == "FAIL" || slow)
+                WriteIssue(tag, caseName, caseMs, processMs, detail);
         }
     }
 
@@ -197,6 +222,67 @@ public static class TestLog
             Info(string.Format("  {0}. {1} status={2} process_ms={3} case_ms={4}",
                 i + 1, r.Case, r.Status, r.ProcessMs, r.CaseMs));
         }
+    }
+
+    private static void WriteFailedOrSlow()
+    {
+        List<PerfRow> notable = new List<PerfRow>();
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            PerfRow r = _rows[i];
+            if (r.Status == "FAIL" || r.Slow)
+                notable.Add(r);
+        }
+
+        if (notable.Count == 0)
+        {
+            Info("Failed or slow: none");
+            return;
+        }
+
+        notable.Sort((a, b) =>
+        {
+            int af = a.Status == "FAIL" ? 0 : 1;
+            int bf = b.Status == "FAIL" ? 0 : 1;
+            int cmp = af.CompareTo(bf);
+            if (cmp != 0) return cmp;
+            return b.CaseMs.CompareTo(a.CaseMs);
+        });
+
+        Info("Failed or slow (" + notable.Count + ", threshold_ms=" + SlowThresholdMs + "):");
+        for (int i = 0; i < notable.Count; i++)
+        {
+            PerfRow r = notable[i];
+            string tag = r.Slow ? r.Status + "+SLOW" : r.Status;
+            Info(string.Format("  {0}  {1}  case_ms={2} process_ms={3}",
+                tag, r.Case, r.CaseMs, r.ProcessMs));
+        }
+
+        lock (_gate)
+        {
+            if (_issuesWriter != null)
+                _issuesWriter.WriteLine("# count=" + notable.Count);
+        }
+    }
+
+    private static void WriteIssue(string tag, string caseName, long caseMs, long processMs, string detail)
+    {
+        EnsureIssuesWriter();
+        _issuesWriter.WriteLine(string.Format("{0}  {1}  case_ms={2} process_ms={3}",
+            tag, caseName, caseMs, processMs));
+        if (!string.IsNullOrEmpty(detail))
+            _issuesWriter.WriteLine(detail);
+    }
+
+    private static void EnsureIssuesWriter()
+    {
+        if (_issuesWriter != null)
+            return;
+
+        _issuesWriter = new StreamWriter(_issuesPath, false, Encoding.UTF8) { AutoFlush = true };
+        _issuesWriter.WriteLine("Failed or slow tests (threshold_ms=" + SlowThresholdMs + ")");
+        _issuesWriter.WriteLine("Suite=" + _suiteName);
+        _issuesWriter.WriteLine();
     }
 }
 
@@ -936,12 +1022,15 @@ public static class SuiteMain
         {
             TestLog.Info("SUITE EXCEPTION: " + ex);
             TestRunner.FailCount++;
+            TestLog.Result("(suite)", "FAIL", sw.ElapsedMilliseconds, 0, "  " + ex);
         }
         sw.Stop();
         TestLog.Close(TestRunner.PassCount, TestRunner.FailCount, TestRunner.SkipCount, sw.ElapsedMilliseconds);
         Console.WriteLine(string.Format("[{0}] DONE  {1} pass, {2} fail, {3} skip  ({4} ms)",
             suiteName, TestRunner.PassCount, TestRunner.FailCount, TestRunner.SkipCount, sw.ElapsedMilliseconds));
         Console.WriteLine("Log: " + TestLog.LogPath);
+        if (!string.IsNullOrEmpty(TestLog.IssuesPath) && File.Exists(TestLog.IssuesPath))
+            Console.WriteLine("Issues: " + TestLog.IssuesPath);
         return TestRunner.ExitCode;
     }
 }
