@@ -530,15 +530,28 @@ public sealed class TempWorkspace : IDisposable
 
     public void Dispose()
     {
-        try
+        if (string.IsNullOrEmpty(Path) || !Directory.Exists(Path))
+            return;
+
+        Exception last = null;
+        for (int attempt = 0; attempt < 8; attempt++)
         {
-            if (Directory.Exists(Path))
+            try
+            {
                 Directory.Delete(Path, true);
+                return;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+                // XP keeps an exclusive mapping on an EXE for a short time after
+                // Process.WaitForExit/Dispose. Retry instead of leaking the folder.
+                Thread.Sleep(50 * (attempt + 1));
+            }
         }
-        catch (Exception ex)
-        {
-            TestLog.Detail("TempWorkspace cleanup failed: " + ex.Message);
-        }
+
+        TestLog.Detail("TempWorkspace cleanup failed: " +
+            (last != null ? last.Message : "unknown"));
     }
 }
 
@@ -619,6 +632,12 @@ public static class ProcessRunner
                 try { process.Kill(); } catch { }
                 try { process.WaitForExit(2000); } catch { }
             }
+            else
+            {
+                // Timed WaitForExit can return before redirected stdio is fully
+                // drained / the image mapping is released (especially on XP).
+                process.WaitForExit();
+            }
 
             outThread.Join(2000);
             errThread.Join(2000);
@@ -636,6 +655,55 @@ public static class ProcessRunner
         if (!string.IsNullOrEmpty(result.Stderr))
             TestLog.Detail("stderr: " + result.Stderr);
         return result;
+    }
+}
+
+/// <summary>
+/// Binds <see cref="HttpListener"/> on loopback without the TcpListener-then-HTTP.SYS
+/// handoff. On XP that pattern throws ERROR_SHARING_VIOLATION (32):
+/// "The process cannot access the file because it is being used by another process".
+/// </summary>
+public static class TestHttpListener
+{
+    private const int MinPort = 49152;
+    private const int MaxPort = 65535;
+    private const int MaxAttempts = 40;
+
+    public static HttpListener StartLoopback(out string baseUrl)
+    {
+        Random rng = new Random(Environment.TickCount ^ Thread.CurrentThread.ManagedThreadId);
+        HttpListenerException last = null;
+
+        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        {
+            int port = MinPort + rng.Next(MaxPort - MinPort);
+            string url = "http://127.0.0.1:" + port;
+            HttpListener listener = new HttpListener();
+            listener.Prefixes.Add(url + "/");
+            try
+            {
+                listener.Start();
+                baseUrl = url;
+                return listener;
+            }
+            catch (HttpListenerException ex)
+            {
+                last = ex;
+                TestLog.Detail("HttpListener bind failed port=" + port +
+                    " NativeErrorCode=" + ex.NativeErrorCode + ": " + ex.Message);
+                try { listener.Close(); } catch { }
+
+                // Access denied is a URL-ACL problem; other ports will not help.
+                if (ex.NativeErrorCode == 5)
+                    break;
+            }
+        }
+
+        throw new TestFailureException(
+            "HttpListener bind failed after " + MaxAttempts + " attempts. Last: " +
+            (last != null
+                ? ("NativeErrorCode=" + last.NativeErrorCode + " " + last.Message)
+                : "unknown"));
     }
 }
 
@@ -670,34 +738,13 @@ public sealed class FakeOpenAiServer : IDisposable
         FixedReply = "Hello from FakeOpenAiServer.";
         StreamDelayMs = 30;
         StreamChunkChars = 16;
-        int port = FindFreePort();
-        BaseUrl = "http://127.0.0.1:" + port;
-        _listener = new HttpListener();
-        _listener.Prefixes.Add(BaseUrl + "/");
-        _listener.Start();
+        string baseUrl;
+        _listener = TestHttpListener.StartLoopback(out baseUrl);
+        BaseUrl = baseUrl;
         _running = true;
         _thread = new Thread(ListenLoop) { IsBackground = true };
         _thread.Start();
         TestLog.Detail("FakeOpenAiServer listening at " + BaseUrl);
-    }
-
-    private static int FindFreePort()
-    {
-        TcpListenerProbe probe = new TcpListenerProbe();
-        return probe.Port;
-    }
-
-    private sealed class TcpListenerProbe
-    {
-        public int Port;
-        public TcpListenerProbe()
-        {
-            System.Net.Sockets.TcpListener l =
-                new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
-            l.Start();
-            Port = ((IPEndPoint)l.LocalEndpoint).Port;
-            l.Stop();
-        }
     }
 
     private void ListenLoop()

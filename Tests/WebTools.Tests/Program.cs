@@ -92,16 +92,9 @@ namespace WebTools.Tests
             public LocalHttpServer(string body)
             {
                 _body = body ?? "";
-                System.Net.Sockets.TcpListener probe =
-                    new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
-                probe.Start();
-                int port = ((IPEndPoint)probe.LocalEndpoint).Port;
-                probe.Stop();
-
-                Url = "http://127.0.0.1:" + port + "/";
-                _listener = new HttpListener();
-                _listener.Prefixes.Add(Url);
-                _listener.Start();
+                string baseUrl;
+                _listener = TestHttpListener.StartLoopback(out baseUrl);
+                Url = baseUrl + "/";
                 _running = true;
                 _thread = new Thread(Loop) { IsBackground = true };
                 _thread.Start();
