@@ -1,4 +1,6 @@
 using System;
+using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -8,8 +10,9 @@ namespace SimpleLLMChatGUI
 {
     /// <summary>
     /// One chat turn (user or assistant) backed by its own FlowDocument.
+    /// Off-screen completed turns hibernate to source text so the document tree can be collected.
     /// </summary>
-    public class ChatTurn
+    public class ChatTurn : INotifyPropertyChanged
     {
         /// <summary>
         /// Classic +/- expander style provided by <c>MainWindow</c>.
@@ -54,26 +57,48 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        public FlowDocument Document { get; private set; }
+        private FlowDocument _document;
+        private readonly StringBuilder _source = new StringBuilder();
+        private bool _hasContent;
+        private bool _replaying;
+        private bool _hibernated;
+        private bool _inHibernate;
+        private bool _markdownApplied;
+        private bool _expanderExpanded;
+        private bool _hasExpander;
+        private double _fontSize;
+        private double _pageWidth;
+        private CollapsibleBlockState _activeBlock;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public FlowDocument Document
+        {
+            get { return _document; }
+            private set
+            {
+                if (ReferenceEquals(_document, value))
+                    return;
+                _document = value;
+                PropertyChangedEventHandler handler = PropertyChanged;
+                if (handler != null)
+                    handler(this, new PropertyChangedEventArgs("Document"));
+            }
+        }
 
         /// <summary>
         /// Block index already processed by MarkdownHandler for this turn's document.
         /// </summary>
         public int MarkdownProcessedBlockCount;
 
-        // False until visible text is appended; used to drop the CLI's
-        // inter-turn padding newlines, which would otherwise render as
-        // blank first lines in this turn's document.
-        private bool _hasContent;
-
-        private CollapsibleBlockState _activeBlock;
+        /// <summary>
+        /// True while this turn is the live streaming target; never hibernate then.
+        /// </summary>
+        public bool IsStreaming { get; set; }
 
         public ChatTurn()
         {
-            Document = new FlowDocument
-            {
-                PagePadding = new Thickness(0)
-            };
+            _document = CreateDocument();
         }
 
         /// <summary>
@@ -85,6 +110,18 @@ namespace SimpleLLMChatGUI
         {
             if (string.IsNullOrEmpty(text))
                 return null;
+
+            if (_hibernated)
+                RestoreIfHibernated();
+
+            string leftover = AppendTextCore(text);
+            if (!_replaying)
+                RecordConsumed(text, leftover);
+            return leftover;
+        }
+
+        private string AppendTextCore(string text)
+        {
 
             if (!_hasContent)
             {
@@ -168,11 +205,96 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
+        /// Drops the FlowDocument tree for an off-screen completed turn.
+        /// </summary>
+        public void Hibernate()
+        {
+            if (_hibernated || IsStreaming || _activeBlock != null)
+                return;
+            if (_source.Length == 0 && !_hasContent)
+                return;
+
+            CaptureExpanderState();
+            StopAllExpanderTimers();
+            _hibernated = true;
+            MarkdownProcessedBlockCount = 0;
+            _inHibernate = true;
+            try
+            {
+                Document = CreateDocument();
+            }
+            finally
+            {
+                _inHibernate = false;
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds the FlowDocument from source text when the turn is shown again.
+        /// </summary>
+        public void RestoreIfHibernated()
+        {
+            if (!_hibernated || _inHibernate)
+                return;
+
+            _hibernated = false;
+            _hasContent = false;
+            _activeBlock = null;
+            MarkdownProcessedBlockCount = 0;
+
+            FlowDocument doc = CreateDocument();
+            if (_fontSize > 0)
+                doc.FontSize = _fontSize;
+            if (_pageWidth > 50)
+                doc.PageWidth = _pageWidth;
+            Document = doc;
+
+            _replaying = true;
+            try
+            {
+                if (_source.Length > 0)
+                    AppendTextCore(_source.ToString());
+            }
+            finally
+            {
+                _replaying = false;
+            }
+
+            TrimTrailingBlankParagraphs();
+            if (_markdownApplied)
+                MarkdownHandler.ProcessMarkdown(Document, ref MarkdownProcessedBlockCount);
+            ApplyFontSize(_fontSize > 0 ? _fontSize : FontHandler.GetFontSize());
+            RestoreExpanderState();
+        }
+
+        public void ApplyMarkdown()
+        {
+            if (_hibernated)
+            {
+                _markdownApplied = true;
+                return;
+            }
+
+            MarkdownHandler.ProcessMarkdown(Document, ref MarkdownProcessedBlockCount);
+            _markdownApplied = true;
+        }
+
+        public void SetPageWidth(double width)
+        {
+            _pageWidth = width;
+            if (!_hibernated && width > 50)
+                Document.PageWidth = width;
+        }
+
+        /// <summary>
         /// True once this turn holds something visible — an expander or a
         /// paragraph with text.
         /// </summary>
         public bool HasRenderedContent()
         {
+            if (_hibernated)
+                return _source.Length > 0;
+
             foreach (Block block in Document.Blocks)
             {
                 if (block is BlockUIContainer)
@@ -195,6 +317,9 @@ namespace SimpleLLMChatGUI
         /// </summary>
         public void TrimTrailingBlankParagraphs()
         {
+            if (_hibernated)
+                return;
+
             if (_activeBlock != null)
                 EndCollapsibleBlock();
 
@@ -217,6 +342,10 @@ namespace SimpleLLMChatGUI
         /// </summary>
         public void ApplyFontSize(double fontSize)
         {
+            _fontSize = fontSize;
+            if (_hibernated)
+                return;
+
             Document.FontSize = fontSize;
             MarkdownHandler.ApplyHeaderFontSizes(Document, fontSize);
             foreach (Block block in Document.Blocks)
@@ -479,6 +608,101 @@ namespace SimpleLLMChatGUI
             }
 
             return index >= 0;
+        }
+
+        private FlowDocument CreateDocument()
+        {
+            FlowDocument document = new FlowDocument
+            {
+                PagePadding = new Thickness(0)
+            };
+            if (!_hibernated)
+                document.Tag = this;
+            return document;
+        }
+
+        private void RecordConsumed(string original, string leftover)
+        {
+            if (string.IsNullOrEmpty(original))
+                return;
+
+            if (string.IsNullOrEmpty(leftover))
+            {
+                _source.Append(original);
+                return;
+            }
+
+            int found = original.LastIndexOf(leftover, StringComparison.Ordinal);
+            if (found >= 0)
+            {
+                if (found > 0)
+                    _source.Append(original, 0, found);
+                return;
+            }
+
+            _source.Append(original);
+        }
+
+        private void CaptureExpanderState()
+        {
+            _hasExpander = false;
+            if (Document == null)
+                return;
+
+            foreach (Block block in Document.Blocks)
+            {
+                BlockUIContainer container = block as BlockUIContainer;
+                if (container == null)
+                    continue;
+
+                Expander expander = container.Child as Expander;
+                if (expander == null)
+                    continue;
+
+                _hasExpander = true;
+                _expanderExpanded = expander.IsExpanded;
+                return;
+            }
+        }
+
+        private void RestoreExpanderState()
+        {
+            if (!_hasExpander || Document == null)
+                return;
+
+            foreach (Block block in Document.Blocks)
+            {
+                BlockUIContainer container = block as BlockUIContainer;
+                if (container == null)
+                    continue;
+
+                Expander expander = container.Child as Expander;
+                if (expander == null)
+                    continue;
+
+                expander.IsExpanded = _expanderExpanded;
+                return;
+            }
+        }
+
+        private void StopAllExpanderTimers()
+        {
+            if (Document == null)
+                return;
+
+            foreach (Block block in Document.Blocks)
+            {
+                BlockUIContainer container = block as BlockUIContainer;
+                if (container == null)
+                    continue;
+
+                Expander expander = container.Child as Expander;
+                CollapsibleBlockState state = expander != null
+                    ? expander.Tag as CollapsibleBlockState
+                    : null;
+                if (state != null)
+                    StopEllipsisTimer(state);
+            }
         }
     }
 }
