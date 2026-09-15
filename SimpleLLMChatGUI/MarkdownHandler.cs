@@ -9,6 +9,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace SimpleLLMChatGUI
 {
@@ -46,28 +47,17 @@ namespace SimpleLLMChatGUI
             if (document == null)
                 return;
 
+            List<Block> blocks = document.Blocks.ToList();
             if (startBlockIndex < 0)
                 startBlockIndex = 0;
-
-            int index = 0;
-            Block block = document.Blocks.FirstBlock;
-            while (block != null && index < startBlockIndex)
-            {
-                block = block.NextBlock;
-                index++;
-            }
-
-            if (block == null)
-            {
-                startBlockIndex = index;
-                return;
-            }
+            if (startBlockIndex > blocks.Count)
+                startBlockIndex = blocks.Count;
 
             int activeBacktickFenceLength = 0;
 
-            for (; block != null; block = block.NextBlock, index++)
+            for (int i = startBlockIndex; i < blocks.Count; i++)
             {
-                Paragraph paragraph = block as Paragraph;
+                Paragraph paragraph = blocks[i] as Paragraph;
                 if (paragraph == null)
                     continue;
 
@@ -102,7 +92,6 @@ namespace SimpleLLMChatGUI
                 if (activeBacktickFenceLength > 0)
                 {
                     paragraph.SetResourceReference(TextElement.BackgroundProperty, "CodeBlockBackgroundColorBrush");
-                    ConsolidateRuns(paragraph);
                     ApplyCodeBlockFont(paragraph);
                     continue;
                 }
@@ -149,7 +138,7 @@ namespace SimpleLLMChatGUI
                 ReplaceInRuns(paragraph, StrikethroughPattern, match => new Run(match.Groups[1].Value) { TextDecorations = TextDecorations.Strikethrough });
             }
 
-            startBlockIndex = index;
+            startBlockIndex = blocks.Count;
         }
 
         /// <summary>
@@ -318,9 +307,11 @@ namespace SimpleLLMChatGUI
 
         private static void AttachTooltip(Hyperlink hyperlink, string text)
         {
-            ToolTipService.SetToolTip(hyperlink, text);
-            ToolTipService.SetInitialShowDelay(hyperlink, 1000);
-            ToolTipService.SetPlacement(hyperlink, PlacementMode.Mouse);
+            var tooltip = new ToolTip { Content = text, Placement = PlacementMode.Mouse };
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            timer.Tick += (s, _) => { timer.Stop(); tooltip.IsOpen = true; };
+            hyperlink.MouseEnter += (s, _) => timer.Start();
+            hyperlink.MouseLeave += (s, _) => { timer.Stop(); tooltip.IsOpen = false; };
         }
 
         private static void OnHyperlinkClick(object sender, System.Windows.Input.MouseButtonEventArgs e)

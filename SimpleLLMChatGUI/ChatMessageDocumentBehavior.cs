@@ -6,9 +6,7 @@ namespace SimpleLLMChatGUI
 {
     /// <summary>
     /// Assigns a <see cref="FlowDocument"/> to a templated <see cref="RichTextBox"/>.
-    /// A FlowDocument may only be parented by one RichTextBox at a time, so this
-    /// detaches on unload / recycle and reattaches on load (needed for virtualization).
-    /// Completed off-screen turns hibernate to source text while detached.
+    /// A FlowDocument may only be parented by one RichTextBox at a time (needed for virtualization).
     /// </summary>
     public static class ChatMessageDocumentBehavior
     {
@@ -35,113 +33,19 @@ namespace SimpleLLMChatGUI
             if (richTextBox == null)
                 return;
 
-            richTextBox.Loaded -= OnRichTextBoxLoaded;
-            richTextBox.Unloaded -= OnRichTextBoxUnloaded;
-            richTextBox.Loaded += OnRichTextBoxLoaded;
-            richTextBox.Unloaded += OnRichTextBoxUnloaded;
-
-            HibernateOwner(e.OldValue as FlowDocument, richTextBox.DataContext as ChatTurn);
-
-            if (!richTextBox.IsLoaded)
+            FlowDocument newDocument = e.NewValue as FlowDocument;
+            if (newDocument == null)
             {
-                DetachIfHosting(richTextBox, e.OldValue as FlowDocument);
+                richTextBox.Document = new FlowDocument();
                 return;
             }
 
-            ChatTurn turn = richTextBox.DataContext as ChatTurn;
-            if (turn != null)
-                turn.RestoreIfHibernated();
+            // Detach from any previous host before reassigning.
+            DependencyObject parent = newDocument.Parent;
+            if (parent is RichTextBox oldHost && !ReferenceEquals(oldHost, richTextBox))
+                oldHost.Document = new FlowDocument();
 
-            AttachDocument(richTextBox, GetDocument(richTextBox) ?? (turn != null ? turn.Document : null));
+            richTextBox.Document = newDocument;
         }
-
-        private static void OnRichTextBoxLoaded(object sender, RoutedEventArgs e)
-        {
-            RichTextBox richTextBox = sender as RichTextBox;
-            if (richTextBox == null)
-                return;
-
-            ChatTurn turn = richTextBox.DataContext as ChatTurn;
-            if (turn != null)
-                turn.RestoreIfHibernated();
-
-            AttachDocument(richTextBox, GetDocument(richTextBox) ?? (turn != null ? turn.Document : null));
-        }
-
-        private static void OnRichTextBoxUnloaded(object sender, RoutedEventArgs e)
-        {
-            RichTextBox richTextBox = sender as RichTextBox;
-            if (richTextBox == null)
-                return;
-
-            ChatTurn turn = richTextBox.DataContext as ChatTurn;
-            DetachIfHosting(richTextBox, GetDocument(richTextBox) ?? (turn != null ? turn.Document : null));
-            if (turn != null)
-                turn.Hibernate();
-        }
-
-        private static void HibernateOwner(FlowDocument oldDocument, ChatTurn currentTurn)
-        {
-            ChatTurn oldTurn = oldDocument != null ? oldDocument.Tag as ChatTurn : null;
-            if (oldTurn == null || ReferenceEquals(oldTurn, currentTurn))
-                return;
-
-            oldTurn.Hibernate();
-        }
-
-        private static void AttachDocument(RichTextBox richTextBox, FlowDocument document)
-        {
-            if (document == null)
-            {
-                EnsurePlaceholder(richTextBox);
-                return;
-            }
-
-            DependencyObject parent = document.Parent;
-            if (ReferenceEquals(parent, richTextBox))
-                return;
-
-            if (parent is RichTextBox oldHost)
-                EnsurePlaceholder(oldHost);
-
-            richTextBox.Document = document;
-        }
-
-        private static void DetachIfHosting(RichTextBox richTextBox, FlowDocument document)
-        {
-            if (document == null)
-                return;
-            if (!ReferenceEquals(richTextBox.Document, document))
-                return;
-
-            EnsurePlaceholder(richTextBox);
-        }
-
-        private static void EnsurePlaceholder(RichTextBox richTextBox)
-        {
-            FlowDocument current = richTextBox.Document;
-            if (IsPlaceholder(current) && ReferenceEquals(current.Parent, richTextBox))
-                return;
-
-            richTextBox.Document = CreatePlaceholder();
-        }
-
-        private static bool IsPlaceholder(FlowDocument document)
-        {
-            return document != null
-                && document.Tag as string == PlaceholderTag
-                && document.Blocks.Count == 0;
-        }
-
-        private static FlowDocument CreatePlaceholder()
-        {
-            return new FlowDocument
-            {
-                PagePadding = new Thickness(0),
-                Tag = PlaceholderTag
-            };
-        }
-
-        private const string PlaceholderTag = "chat-doc-placeholder";
     }
 }

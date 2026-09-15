@@ -123,28 +123,20 @@
                     Click="optionsButton_Click" />
         </Grid>
 
-        <!-- Chat history: one ListBox item per turn. Virtualization recycles off-screen RichTextBoxes. -->
+        <!-- Chat history: one ListBox item per turn -->
         <ListBox Name="chatList"
                  AutomationProperties.AutomationId="chatList"
                  Grid.Row="1"
                  Margin="0,0,0,5"
                  Padding="4"
                  BorderThickness="1"
-                 VirtualizingStackPanel.IsVirtualizing="True"
-                 VirtualizingStackPanel.VirtualizationMode="Recycling"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                 ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.CanContentScroll="False"
                  HorizontalContentAlignment="Stretch"
                  Background="{DynamicResource ChatBackgroundColorBrush}"
                  Foreground="{DynamicResource ChatTextColorBrush}"
-                 SizeChanged="chatList_SizeChanged"
-                 PreviewMouseWheel="chatList_PreviewMouseWheel">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <VirtualizingStackPanel VirtualizationMode="Recycling"/>
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
+                 SizeChanged="chatList_SizeChanged">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -170,7 +162,6 @@
                     <RichTextBox IsReadOnly="True"
                                  IsUndoEnabled="False"
                                  IsDocumentEnabled="True"
-                                 SpellCheck.IsEnabled="False"
                                  BorderThickness="0"
                                  Background="Transparent"
                                  Foreground="{DynamicResource ChatTextColorBrush}"
