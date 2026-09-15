@@ -19,6 +19,7 @@ namespace SimpleLLMChatGUI
         private ContextMenu reasoningEffortMenu;
         private readonly ObservableCollection<ChatTurn> _chatTurns = new ObservableCollection<ChatTurn>();
         private ChatTurn _streamingTurn;
+        private ScrollViewer _chatScrollViewer;
 
         private const double ChatTurnGapMin = 8;
         private const double ChatTurnGapMax = 24;
@@ -330,6 +331,62 @@ namespace SimpleLLMChatGUI
         {
             foreach (ChatTurn turn in _chatTurns)
                 ApplyDocumentPageWidth(turn);
+        }
+
+        /// <summary>
+        /// VirtualizingStackPanel scrolls in item units; convert wheel delta to a
+        /// fractional item offset so scrolling still feels pixel-based.
+        /// </summary>
+        private void chatList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (e.Handled)
+                return;
+
+            ScrollViewer scrollViewer = GetChatScrollViewer();
+            if (scrollViewer == null)
+                return;
+
+            int wheelLines = SystemParameters.WheelScrollLines;
+            if (wheelLines == 0)
+            {
+                if (e.Delta < 0)
+                    scrollViewer.PageDown();
+                else
+                    scrollViewer.PageUp();
+                e.Handled = true;
+                return;
+            }
+
+            double itemHeight = EstimateFirstVisibleItemHeight(scrollViewer);
+            double lineHeight = FontSize > 0 ? FontSize * 1.35 : 16;
+            double pixels = -(e.Delta / 120.0) * wheelLines * lineHeight;
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset + pixels / itemHeight);
+            e.Handled = true;
+        }
+
+        private double EstimateFirstVisibleItemHeight(ScrollViewer scrollViewer)
+        {
+            int index = (int)scrollViewer.VerticalOffset;
+            if (index < 0)
+                index = 0;
+            if (index >= _chatTurns.Count)
+                index = _chatTurns.Count - 1;
+
+            if (index >= 0)
+            {
+                ListBoxItem container = chatList.ItemContainerGenerator.ContainerFromIndex(index) as ListBoxItem;
+                if (container != null && container.ActualHeight > 1)
+                    return container.ActualHeight;
+            }
+
+            return 48;
+        }
+
+        private ScrollViewer GetChatScrollViewer()
+        {
+            if (_chatScrollViewer == null)
+                _chatScrollViewer = FindScrollViewer(chatList);
+            return _chatScrollViewer;
         }
 
         private void ApplyDocumentPageWidth(ChatTurn turn)
