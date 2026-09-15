@@ -233,7 +233,7 @@ namespace SimpleLLMChatGUI
             if (_streamingTurn == null)
                 return;
 
-            _streamingTurn.TrimTrailingBlankParagraphs();
+            _streamingTurn.Complete();
             if (!_streamingTurn.HasRenderedContent())
                 _chatTurns.Remove(_streamingTurn);
             _streamingTurn = null;
@@ -294,9 +294,7 @@ namespace SimpleLLMChatGUI
         {
             foreach (ChatTurn turn in _chatTurns)
             {
-                MarkdownHandler.ProcessMarkdown(
-                    turn.Document,
-                    ref turn.MarkdownProcessedBlockCount);
+                turn.ProcessMarkdown();
             }
         }
 
@@ -341,7 +339,7 @@ namespace SimpleLLMChatGUI
                 - SystemParameters.VerticalScrollBarWidth
                 - 16;
             if (width > 50)
-                turn.Document.PageWidth = width;
+                turn.SetPageWidth(width);
         }
 
         private void ScrollChatToEnd()
@@ -427,10 +425,9 @@ namespace SimpleLLMChatGUI
             userTurn.AppendText("You: " + userInput);
             if (IsMarkdownParsingEnabled())
             {
-                MarkdownHandler.ProcessMarkdown(
-                    userTurn.Document,
-                    ref userTurn.MarkdownProcessedBlockCount);
+                userTurn.ProcessMarkdown();
             }
+            userTurn.Complete();
             _streamingTurn = AddTurn();
             ScrollChatToEnd();
 
@@ -521,6 +518,7 @@ namespace SimpleLLMChatGUI
             // while waiting — that caused intermittent crashes when clicking Clear.
             Dispatcher.BeginInvoke((Action)(() =>
             {
+                EndStreamingTurn();
                 _chatTurns.Clear();
                 _streamingTurn = null;
                 SetInputControlsEnabled(false);

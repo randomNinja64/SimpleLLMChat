@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -7,7 +8,7 @@ using System.Windows.Threading;
 namespace SimpleLLMChatGUI
 {
     /// <summary>
-    /// One chat turn (user or assistant) backed by its own FlowDocument.
+    /// A text-backed chat turn with a releasable rendered document.
     /// </summary>
     public class ChatTurn
     {
@@ -54,7 +55,109 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        public FlowDocument Document { get; private set; }
+        private FlowDocument _document;
+        private StringBuilder _source = new StringBuilder();
+        private string _completedSource;
+        private bool _completed;
+        private bool _markdown;
+        private double _fontSize = 12;
+        private double _pageWidth = double.NaN;
+        private bool? _expanded;
+        private int _durationSeconds;
+        private ChatBlockDisplayMode? _blockMode;
+        private CollapsibleBlockKind? _blockKind;
+        private string _blockName;
+        private int _bodyLength;
+        private bool _restoring;
+
+        public bool IsCompleted { get { return _completed; } }
+        public bool HasDocument { get { return _document != null; } }
+        public string SourceText { get { return _completedSource ?? _source.ToString(); } }
+        public FlowDocument Document
+        {
+            get
+            {
+                if (_document == null)
+                {
+                    _document = new FlowDocument { PagePadding = new Thickness(0) };
+                    _hasContent = false;
+                    MarkdownProcessedBlockCount = 0;
+                    _restoring = true;
+                    try
+                    {
+                        if (_blockKind.HasValue)
+                        {
+                            StartCollapsibleBlock(_blockName, _blockKind.Value);
+                            _activeBlock.BodyText.Text = SourceText.Substring(0, _bodyLength);
+                            EndCollapsibleBlock();
+                            AppendPlain(SourceText.Substring(_bodyLength));
+                        }
+                        else if (SourceText.Length != 0)
+                        {
+                            _document.Blocks.Add(new Paragraph());
+                            AppendPlain(SourceText);
+                        }
+                        _hasContent = SourceText.Length != 0 || _blockKind.HasValue;
+                    }
+                    finally { _restoring = false; }
+                    if (_completed) TrimTrailingBlankParagraphs();
+                    foreach (Block block in _document.Blocks)
+                    {
+                        BlockUIContainer container = block as BlockUIContainer;
+                        Expander expander = container != null ? container.Child as Expander : null;
+                        if (expander == null) continue;
+                        CollapsibleBlockState state = (CollapsibleBlockState)expander.Tag;
+                        state.DurationSeconds = _durationSeconds;
+                        if (_expanded.HasValue) expander.IsExpanded = _expanded.Value;
+                        state.HeaderLabel.Text = BuildLabelText(state);
+                    }
+                    ApplyFontSize(_fontSize);
+                    SetPageWidth(_pageWidth);
+                    if (_markdown) ProcessMarkdown();
+                }
+                return _document;
+            }
+        }
+
+        public void Complete()
+        {
+            if (_completed) return;
+            TrimTrailingBlankParagraphs();
+            _completed = true;
+            _completedSource = _source.ToString();
+            _source = null;
+        }
+
+        public void ProcessMarkdown()
+        {
+            _markdown = true;
+            if (_document != null)
+                MarkdownHandler.ProcessMarkdown(_document, ref MarkdownProcessedBlockCount);
+        }
+
+        public void SetPageWidth(double width)
+        {
+            _pageWidth = width;
+            if (_document != null) _document.PageWidth = width;
+        }
+
+        // The view must detach the document before releasing it.
+        public void ReleaseDocument()
+        {
+            if (!_completed || _document == null || _document.Parent != null) return;
+            foreach (Block block in _document.Blocks)
+            {
+                BlockUIContainer container = block as BlockUIContainer;
+                Expander expander = container != null ? container.Child as Expander : null;
+                if (expander == null) continue;
+                CollapsibleBlockState state = (CollapsibleBlockState)expander.Tag;
+                _expanded = expander.IsExpanded;
+                _durationSeconds = state.DurationSeconds;
+                StopEllipsisTimer(state);
+            }
+            _activeBlock = null;
+            _document = null;
+        }
 
         /// <summary>
         /// Block index already processed by MarkdownHandler for this turn's document.
@@ -70,7 +173,7 @@ namespace SimpleLLMChatGUI
 
         public ChatTurn()
         {
-            Document = new FlowDocument
+            _document = new FlowDocument
             {
                 PagePadding = new Thickness(0)
             };
@@ -83,6 +186,7 @@ namespace SimpleLLMChatGUI
         /// </summary>
         public string AppendText(string text)
         {
+            if (_completed) throw new InvalidOperationException("Cannot append to a completed turn.");
             if (string.IsNullOrEmpty(text))
                 return null;
 
@@ -152,12 +256,12 @@ namespace SimpleLLMChatGUI
                     int closeLength;
                     if (!TryFindTag(remaining, CollapsibleCloseTags, out closeIndex, out closeLength))
                     {
-                        _activeBlock.BodyText.Text += remaining;
+                        AppendBody(remaining);
                         return null;
                     }
 
                     if (closeIndex > 0)
-                        _activeBlock.BodyText.Text += remaining.Substring(0, closeIndex);
+                        AppendBody(remaining.Substring(0, closeIndex));
 
                     EndCollapsibleBlock();
                     return remaining.Substring(closeIndex + closeLength).TrimStart('\r', '\n');
@@ -198,6 +302,7 @@ namespace SimpleLLMChatGUI
             if (_activeBlock != null)
                 EndCollapsibleBlock();
 
+            bool removed = false;
             while (Document.Blocks.Count > 1)
             {
                 Paragraph paragraph = Document.Blocks.LastBlock as Paragraph;
@@ -209,6 +314,24 @@ namespace SimpleLLMChatGUI
                     break;
 
                 Document.Blocks.Remove(paragraph);
+                removed = true;
+            }
+
+            // Approval prompts can trim padding before streaming resumes. Keep the
+            // source in sync so restoring history cannot reintroduce that padding.
+            if (removed && _source != null)
+            {
+                string source = _source.ToString();
+                int end = source.Length;
+                while (end > 0)
+                {
+                    int start = end;
+                    while (start > 0 && source[start - 1] != '\r' && source[start - 1] != '\n') start--;
+                    if (source.Substring(start, end - start).Trim().Length != 0) break;
+                    end = start;
+                    while (end > 0 && (source[end - 1] == '\r' || source[end - 1] == '\n')) end--;
+                }
+                _source.Length = Math.Max(_blockKind.HasValue ? _bodyLength : 0, end);
             }
         }
 
@@ -217,6 +340,8 @@ namespace SimpleLLMChatGUI
         /// </summary>
         public void ApplyFontSize(double fontSize)
         {
+            _fontSize = fontSize;
+            if (_document == null) return;
             Document.FontSize = fontSize;
             MarkdownHandler.ApplyHeaderFontSizes(Document, fontSize);
             foreach (Block block in Document.Blocks)
@@ -244,11 +369,21 @@ namespace SimpleLLMChatGUI
             if (string.IsNullOrEmpty(text))
                 return;
 
+            if (!_restoring) _source.Append(text);
             new TextRange(Document.ContentEnd, Document.ContentEnd).Text = text;
+        }
+
+        private void AppendBody(string text)
+        {
+            _source.Append(text);
+            _activeBlock.BodyText.Text += text;
         }
 
         private void StartCollapsibleBlock(string name, CollapsibleBlockKind kind)
         {
+            if (!_restoring) _source.Clear();
+            _blockKind = kind;
+            _blockName = name;
             // Drop an empty trailing paragraph left by content setup so the
             // expander is the next visible block (no blank line above it).
             Paragraph last = Document.Blocks.LastBlock as Paragraph;
@@ -263,6 +398,8 @@ namespace SimpleLLMChatGUI
                 : kind == CollapsibleBlockKind.ToolOutput
                     ? App.Config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown)
                     : App.Config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed);
+            mode = _blockMode ?? mode;
+            _blockMode = mode;
             // Shown and Hidden (name-only tool call) start expanded; Collapsed does not.
             bool expandByDefault = mode != ChatBlockDisplayMode.Collapsed;
 
@@ -319,6 +456,7 @@ namespace SimpleLLMChatGUI
             if (state == null)
                 return;
 
+            if (!_restoring && _source != null) _bodyLength = _source.Length;
             state.Active = false;
             state.DurationSeconds = Math.Max(0, (int)Math.Round((DateTime.UtcNow - state.StartedUtc).TotalSeconds));
             _activeBlock = null;

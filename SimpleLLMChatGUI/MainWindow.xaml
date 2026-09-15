@@ -159,22 +159,7 @@
             </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
                 <DataTemplate DataType="{x:Type local:ChatTurn}">
-                    <RichTextBox IsReadOnly="True"
-                                 IsUndoEnabled="False"
-                                 IsDocumentEnabled="True"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 Foreground="{DynamicResource ChatTextColorBrush}"
-                                 VerticalScrollBarVisibility="Disabled"
-                                 HorizontalScrollBarVisibility="Disabled"
-                                 local:ChatMessageDocumentBehavior.Document="{Binding Document}">
-                        <RichTextBox.Resources>
-                            <Style TargetType="Paragraph">
-                                <Setter Property="Margin" Value="0"/>
-                                <Setter Property="Padding" Value="0"/>
-                            </Style>
-                        </RichTextBox.Resources>
-                    </RichTextBox>
+                    <local:ChatTurnView Turn="{Binding}"/>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
