@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using SimpleLLMChatCLI;
 using SimpleLLMChatCLI.RAG;
 using System;
 using System.Collections.Generic;
@@ -77,6 +78,17 @@ namespace SimpleLLMChatCLI.Tests
                     TestAssert.Equal("k", cfg.GetConfigValue("apikey"), "apikey");
                     TestAssert.Equal("m", cfg.GetConfigValue("model"), "model");
                 }
+            });
+
+            TestRunner.Run("ImageEncoder.mime", () =>
+            {
+                TestAssert.Equal("image/jpeg", ImageEncoder.GuessMime("photo.JPG"), "jpeg");
+                TestAssert.Equal("image/jpeg", ImageEncoder.GuessMime("x.jpeg"), "jpeg long");
+                TestAssert.Equal("image/png", ImageEncoder.GuessMime("shot.PNG"), "png");
+                TestAssert.Equal("image/gif", ImageEncoder.GuessMime("a.gif"), "gif");
+                TestAssert.Equal("image/webp", ImageEncoder.GuessMime("a.webp"), "webp");
+                TestAssert.Equal("image/png", ImageEncoder.GuessMime("unknown.bin"), "default");
+                TestAssert.Equal("image/png", ImageEncoder.GuessMime(null), "null");
             });
 
             TestRunner.Run("cli.bad_reasoning_effort", () =>

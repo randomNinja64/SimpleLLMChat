@@ -64,6 +64,9 @@
     <Compile Include="..\..\Shared\RagExtensionList.cs">
       <Link>Shared\RagExtensionList.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ImageEncoder.cs">
+      <Link>CLI\ImageEncoder.cs</Link>
+    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ToolResultParser.cs">
       <Link>CLI\ToolResultParser.cs</Link>
     </Compile>
