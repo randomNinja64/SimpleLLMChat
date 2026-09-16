@@ -387,22 +387,6 @@ namespace DesktopTools
       return StaTimeout.Result.Succeeded;
     }
 
-    public static StaTimeout.Result TryInvokeHwnd(IntPtr hwnd, int timeoutMs)
-    {
-      if (hwnd == IntPtr.Zero || !Win32Interop.IsWindow(hwnd))
-        return StaTimeout.Result.Failed;
-
-      try
-      {
-        AutomationElement element = AutomationElement.FromHandle(hwnd);
-        return TryInvokeTimed(element, timeoutMs);
-      }
-      catch
-      {
-        return StaTimeout.Result.Failed;
-      }
-    }
-
     public static bool TrySetValue(AutomationElement element, string text)
     {
       if (element == null)
