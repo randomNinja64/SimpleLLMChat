@@ -44,6 +44,43 @@ namespace SimpleLLMChatGUI
             return options;
         }
 
+        public static List<string> LoadToolDisplayNames(string toolsDir)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var toolNames = new List<string>();
+
+            foreach (string jsonFile in ManifestScanner.GetManifestFiles(toolsDir))
+            {
+                try
+                {
+                    string json = File.ReadAllText(jsonFile, Encoding.UTF8);
+                    JObject manifest = JObject.Parse(json);
+                    JArray tools = manifest["tools"] as JArray;
+                    if (tools == null)
+                        continue;
+
+                    string packageName = (string)manifest["name"];
+                    if (string.IsNullOrWhiteSpace(packageName))
+                        packageName = Path.GetFileNameWithoutExtension(jsonFile) ?? "Tools";
+
+                    foreach (JObject tool in tools)
+                    {
+                        string name = (string)tool["name"];
+                        if (string.IsNullOrEmpty(name) || !seen.Add(name))
+                            continue;
+                        toolNames.Add(packageName + "/" + name);
+                    }
+                }
+                catch
+                {
+                    // Skip malformed manifests
+                }
+            }
+
+            toolNames.Sort(StringComparer.OrdinalIgnoreCase);
+            return toolNames;
+        }
+
         private static void LoadManifestOptions(string jsonFilePath, List<ToolOptionDefinition> options)
         {
             string json = File.ReadAllText(jsonFilePath, Encoding.UTF8);

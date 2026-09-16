@@ -9,7 +9,7 @@ using System.Text;
 
 namespace SimpleLLMChatCLI
 {
-public class LLMClient
+public partial class LLMClient
 {
     private readonly ConfigHandler config;
     private readonly ToolRegistry registry;
@@ -28,7 +28,6 @@ public class LLMClient
         this.requestToolApproval = requestToolApproval ?? CliRequestApproval;
     }
 
-    // Struct for chat messages
     public struct ChatMessage
     {
         public string Role;
@@ -81,7 +80,6 @@ public class LLMClient
         HashSet<string> approvalSet = new HashSet<string>(
             toolsRequiringApproval ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
 
-        // If prior context is already high, summarize it silently first, then run the user prompt.
         MaybeSummarizeInBackground(
             conversation,
             outputOnly,
@@ -98,8 +96,7 @@ public class LLMClient
                 "everyturn",
                 StringComparison.OrdinalIgnoreCase);
             bool isNewChat = conversation == null || conversation.Count == 0;
-            
-            // If RAG is enabled and the retrieve mode is set to every turn or it's a new chat, retrieve the context.
+
             if (everyTurn || isNewChat)
             {
                 AutoRagResult rag = AutoRagContext.TryRetrieve(config, userMessage, contentForLlm);
@@ -117,8 +114,6 @@ public class LLMClient
             ImageMime = string.IsNullOrEmpty(imageMime) ? null : imageMime
         });
 
-        // Context injectors (memory/skills summaries) are fetched once per user message
-        // and reused across agent-loop iterations (tool rounds) for this turn.
         List<string> contextInjections = registry != null
             ? registry.GetContextInjections(enabledTools)
             : new List<string>();
@@ -222,7 +217,6 @@ public class LLMClient
 
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
-                // Add assistant tool call message
                 ChatMessage assistantCall = new ChatMessage
                 {
                     Role = "assistant",
@@ -329,7 +323,7 @@ public class LLMClient
 
             if (!outputOnly)
             {
-                ChatOutput.EndLine(); // Terminate the response line if the model didn't
+                ChatOutput.EndLine();
             }
             break;
         }
@@ -405,114 +399,6 @@ public class LLMClient
         return count;
     }
 
-    /// <summary>
-    /// Cached system prompt + tool schema length. 0 until the first request is built
-    /// or <see cref="RefreshBaseCharacterOverhead"/> runs (e.g. after /reload).
-    /// </summary>
-    public int GetBaseCharacterOverhead()
-    {
-        return BaseOverheadChars.HasValue ? BaseOverheadChars.Value : 0;
-    }
-
-    /// <summary>
-    /// Recomputes system prompt + tool schema overhead from the current config/tools.
-    /// Used after /reload so status stays accurate without waiting for the next request.
-    /// </summary>
-    public void RefreshBaseCharacterOverhead(List<string> enabledTools)
-    {
-        List<string> contextInjections = registry != null
-            ? registry.GetContextInjections(enabledTools)
-            : new List<string>();
-        string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
-        int toolsChars = 0;
-        if (enabledTools != null && enabledTools.Count > 0 && registry != null)
-        {
-            JArray toolsArray = registry.BuildToolsArray(enabledTools);
-            if (toolsArray.Count > 0)
-                toolsChars = toolsArray.ToString(Formatting.None).Length;
-        }
-        BaseOverheadChars = systemPrompt.Length + toolsChars;
-    }
-
-    private string BuildSystemPrompt(List<string> enabledTools, List<string> contextInjections = null)
-    {
-        string sysprompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt")) ?? "";
-
-        if (registry != null)
-        {
-            List<string> injections = contextInjections ?? registry.GetContextInjections(enabledTools);
-            foreach (string injection in injections)
-                sysprompt += "\n\n" + injection;
-        }
-
-        string ragHint = RagHost.GetKnowledgePathHint(config);
-        if (!string.IsNullOrEmpty(ragHint))
-        {
-            if (sysprompt.Length > 0)
-                sysprompt += "\n\n";
-            sysprompt += ragHint;
-        }
-
-        return sysprompt;
-    }
-
-    private JObject BuildRequestPayload(List<ChatMessage> conversation, List<string> enabledTools, List<string> contextInjections = null)
-    {
-        JObject payload = new JObject
-        {
-            ["model"] = config.GetConfigValue("model")
-        };
-
-        string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
-
-        JArray messages = new JArray();
-        messages.Add(new JObject
-        {
-            ["role"] = "system",
-            ["content"] = systemPrompt
-        });
-
-        if (conversation != null)
-        {
-            foreach (var msg in conversation)
-                messages.Add(BuildMessageObject(msg));
-        }
-
-        payload["messages"] = messages;
-
-        int toolsChars = 0;
-        if (enabledTools != null && enabledTools.Count > 0 && registry != null)
-        {
-            JArray toolsArray = registry.BuildToolsArray(enabledTools);
-            if (toolsArray.Count > 0)
-            {
-                payload["tools"] = toolsArray;
-                toolsChars = toolsArray.ToString(Formatting.None).Length;
-            }
-        }
-
-        // Capture overhead from a normal request only (not summarization with tools disabled).
-        if (!BaseOverheadChars.HasValue)
-        {
-            List<string> configuredTools = config.GetConfigList("tools");
-            bool summarizationPass = (enabledTools == null || enabledTools.Count == 0)
-                && configuredTools != null && configuredTools.Count > 0;
-            if (!summarizationPass)
-                BaseOverheadChars = systemPrompt.Length + toolsChars;
-        }
-
-        payload["stream"] = true;
-
-        if (!string.IsNullOrEmpty(ReasoningEffort))
-            payload["reasoning_effort"] = ReasoningEffort;
-
-        return payload;
-    }
-
-    /// <summary>
-    /// Asks the model for a concise summary of the conversation (tools disabled).
-    /// Runs silently — summary text is not streamed to the user.
-    /// </summary>
     private string SummarizeConversation(List<ChatMessage> conversation)
     {
         if (conversation == null || conversation.Count == 0)
@@ -531,212 +417,6 @@ public class LLMClient
             return string.Empty;
 
         return response.Content ?? string.Empty;
-    }
-
-    private JObject BuildMessageObject(ChatMessage msg)
-    {
-        JObject msgObj = new JObject
-        {
-            ["role"] = msg.Role
-        };
-
-        if (!string.IsNullOrEmpty(msg.ToolCallId))
-            msgObj["tool_call_id"] = msg.ToolCallId;
-
-        if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
-        {
-            msgObj["content"] = msg.Content ?? "";
-            JArray toolCallsArray = new JArray();
-
-            foreach (var call in msg.ToolCalls)
-            {
-                JObject toolObj = new JObject
-                {
-                    ["id"] = call.Id ?? "",
-                    ["type"] = "function"
-                };
-
-                JObject functionObj = new JObject
-                {
-                    ["name"] = call.Name ?? "",
-                    ["arguments"] = call.Arguments ?? ""
-                };
-
-                toolObj["function"] = functionObj;
-                toolCallsArray.Add(toolObj);
-            }
-
-            msgObj["tool_calls"] = toolCallsArray;
-        }
-        else if (msg.Image != null)
-        {
-            JArray contentArray = new JArray();
-
-            if (!string.IsNullOrEmpty(msg.Content))
-            {
-                JObject textPart = new JObject
-                {
-                    ["type"] = "text",
-                    ["text"] = msg.Content
-                };
-                contentArray.Add(textPart);
-            }
-
-            if (!string.IsNullOrEmpty(msg.Image))
-            {
-                string mime = string.IsNullOrEmpty(msg.ImageMime) ? "image/png" : msg.ImageMime;
-                JObject imgPart = new JObject
-                {
-                    ["type"] = "image_url",
-                    ["image_url"] = new JObject
-                    {
-                        ["url"] = "data:" + mime + ";base64," + msg.Image
-                    }
-                };
-                contentArray.Add(imgPart);
-            }
-
-            if (contentArray.Count == 0)
-            {
-                JObject emptyText = new JObject
-                {
-                    ["type"] = "text",
-                    ["text"] = ""
-                };
-                contentArray.Add(emptyText);
-            }
-
-            msgObj["content"] = contentArray;
-        }
-        else
-        {
-            msgObj["content"] = msg.Content ?? "";
-        }
-
-        return msgObj;
-    }
-
-    LLMCompletionResponse sendMessages(
-        List<ChatMessage> conversation,
-        List<string> enabledTools,
-        Action<string> outputCallback = null,
-        Action<ToolRegistry.ToolCall> toolCallCallback = null,
-        Action onContentStart = null,
-        Action startBlock = null,
-        bool outputOnly = false,
-        List<string> contextInjections = null)
-    {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools, contextInjections), outputCallback, toolCallCallback, onContentStart, startBlock, outputOnly);
-    }
-
-    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null,
-        Action<ToolRegistry.ToolCall> toolCallCallback = null,
-        Action onContentStart = null, Action startBlock = null, bool outputOnly = false)
-    {
-        Action<string> onReasoningChunk = null;
-        Action<int> onReasoningSummary = null;
-        if (outputCallback != null && !outputOnly)
-        {
-            bool showThinking = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed)
-                != ChatBlockDisplayMode.Hidden;
-            onReasoningChunk = showThinking ? outputCallback : null;
-            if (!showThinking)
-            {
-                onReasoningSummary = s =>
-                {
-                    if (startBlock != null) startBlock();
-                    outputCallback("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]\n");
-                };
-            }
-        }
-
-        try
-        {
-            var request = (HttpWebRequest)WebRequest.Create($"{config.GetConfigValue("llmserver")}/v1/chat/completions");
-            request.Method = "POST";
-            request.ContentType = "application/json";
-            request.Headers.Add("Authorization", "Bearer " + config.GetConfigValue("apikey"));
-
-            byte[] payloadBytes = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
-            request.ContentLength = payloadBytes.Length;
-
-            using (var stream = request.GetRequestStream())
-            {
-                stream.Write(payloadBytes, 0, payloadBytes.Length);
-            }
-
-            using (var httpResponse = (HttpWebResponse)request.GetResponse())
-            using (var responseStream = httpResponse.GetResponseStream())
-            using (var reader = new StreamReader(responseStream, Encoding.UTF8))
-            {
-                return SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
-            }
-        }
-        catch (Exception ex)
-        {
-            string reason;
-            WebException webEx = ex as WebException;
-            if (webEx != null && webEx.Response is HttpWebResponse errorResponse)
-            {
-                using (var errorStream = errorResponse.GetResponseStream())
-                using (var errorReader = new StreamReader(errorStream, Encoding.UTF8))
-                {
-                    string body = errorReader.ReadToEnd();
-                    reason = "HTTP " + (int)errorResponse.StatusCode + " " + errorResponse.StatusDescription + ": " + body;
-                }
-            }
-            else
-            {
-                reason = ex.Message;
-            }
-
-            // Try curl fallback for HTTPS connection errors
-            string serverUrl = config.GetConfigValue("llmserver") ?? "";
-            if (CurlClient.CanFallback(serverUrl, ex))
-                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
-
-            return new LLMCompletionResponse(reason, null, "request_failed");
-        }
-    }
-
-    /// <summary>
-    /// Console approval prompt routed through ChatOutput so block spacing stays
-    /// accurate. Wire format is FormatApprovalMessage + ApprovalPrompt (the GUI
-    /// parses the "Run tool:" ... "Approve? (Y/N): " block from stdout).
-    /// </summary>
-    private static bool CliRequestApproval(string toolName, string arguments)
-    {
-        ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments));
-        Console.Out.Flush();
-
-        while (true)
-        {
-            ChatOutput.Write(ToolApproval.ApprovalPrompt);
-            Console.Out.Flush();
-
-            string input = Console.ReadLine();
-            ChatOutput.EndInputLine();
-            if (input == null)
-                continue;
-
-            input = input.Trim();
-            if (input.Length == 0)
-                continue;
-
-            if (string.Equals(input, "Y", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(input, "yes", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (string.Equals(input, "N", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(input, "no", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            ChatOutput.WriteLine("Please enter Y or N.");
-        }
     }
 }
 }

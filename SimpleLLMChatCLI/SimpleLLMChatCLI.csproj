@@ -47,6 +47,8 @@
     <Compile Include="ImageEncoder.cs" />
     <Compile Include="CurlClient.cs" />
     <Compile Include="LLMClient.cs" />
+    <Compile Include="LLMClient.Request.cs" />
+    <Compile Include="LLMClient.Http.cs" />
     <Compile Include="SseStreamParser.cs" />
     <Compile Include="StatusPipeServer.cs" />
     <Compile Include="Program.cs" />
