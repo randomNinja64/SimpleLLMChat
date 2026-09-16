@@ -35,7 +35,7 @@ namespace FileTools
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
                             JArray edits = ToolHelper.JsonExtractArray(argumentsJson, "edits");
                             if (edits == null || edits.Count == 0)
-                                return new ToolResult("error: missing or empty 'edits' argument.", 1);
+                                return ToolHelper.Fail("missing or empty 'edits' argument.");
 
                             int exitCode;
                             string output = EditFileTool.Apply(filename, edits, out exitCode);
@@ -86,7 +86,7 @@ namespace FileTools
                         }
 
                     default:
-                        return new ToolResult("error: unknown tool '" + toolName + "'.", 1);
+                        return ToolHelper.Fail("unknown tool '" + toolName + "'.");
                 }
             });
         }

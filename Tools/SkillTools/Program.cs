@@ -53,7 +53,7 @@ namespace SkillTools
                         return new ToolResult(SkillHandler.GetContext() ?? "", 0);
 
                     default:
-                        return new ToolResult("error: unknown tool '" + toolName + "'.", 1);
+                        return ToolHelper.Fail("unknown tool '" + toolName + "'.");
                 }
             });
         }

@@ -87,7 +87,8 @@ namespace FileTools.Tests
                 {
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
                         new JObject { ["filename"] = ws.Combine("nope.txt") });
-                    TestAssert.True(r.ExitCode != 0, "non-zero exit");
+                    ToolClient.AssertToolError(r, "not found");
+                    TestAssert.Equal(1, r.ExitCode, "exit 1");
                 });
 
                 TestRunner.Run("extract_file", () =>

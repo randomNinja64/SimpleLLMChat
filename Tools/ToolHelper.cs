@@ -90,12 +90,17 @@ public static class ToolHelper
         }
         catch (Exception e)
         {
-            result = new ToolResult("error: " + e.Message, 1);
+            result = Fail(e.Message);
             exitCode = 1;
         }
 
         Console.Write(FormatResultJson(result));
         return exitCode;
+    }
+
+    public static ToolResult Fail(string message)
+    {
+        return new ToolResult("error: " + message, 1);
     }
 
     /// <summary>Serialize a tool result as the JSON-first stdout protocol.</summary>

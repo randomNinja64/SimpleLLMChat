@@ -366,7 +366,7 @@ namespace DesktopTools.Tests
                 {
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "navigate",
                         new JObject { ["action"] = "click", ["hwnd"] = "0x0" });
-                    TestAssert.True(r.ExitCode != 0, "invalid HWND rejected");
+                    ToolClient.AssertToolError(r, "hwnd");
                 });
 
                 TestRunner.Run("navigate.unknown_action", () =>

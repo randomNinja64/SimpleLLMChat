@@ -68,6 +68,14 @@ namespace SkillTools.Tests
                         new JObject { ["name"] = "demo" }, config);
                     TestAssert.Equal(0, remove.ExitCode, "remove");
                 });
+
+                TestRunner.Run("view_missing", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "view_skill",
+                        new JObject { ["name"] = "nope" }, config);
+                    ToolClient.AssertToolError(r, "does not exist");
+                    TestAssert.Equal(1, r.ExitCode, "exit 1");
+                });
             }
         }
     }

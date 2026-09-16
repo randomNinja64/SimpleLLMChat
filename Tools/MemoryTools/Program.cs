@@ -42,7 +42,7 @@ namespace MemoryTools
                         return new ToolResult(MemoryHandler.GetContext() ?? "", 0);
 
                     default:
-                        return new ToolResult("error: unknown tool '" + toolName + "'.", 1);
+                        return ToolHelper.Fail("unknown tool '" + toolName + "'.");
                 }
             });
         }

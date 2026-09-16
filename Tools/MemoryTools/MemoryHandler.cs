@@ -79,7 +79,7 @@ namespace MemoryTools
         {
             string path = Path.Combine(GetMemoriesDirectory(), NameToFileName(name));
             if (!File.Exists(path))
-                return "No memory entry found with name: " + name;
+                throw new InvalidOperationException("no memory entry found with name: " + name);
 
             return File.ReadAllText(path, Encoding.UTF8).Trim();
         }
@@ -88,7 +88,7 @@ namespace MemoryTools
         {
             string path = Path.Combine(GetMemoriesDirectory(), NameToFileName(name));
             if (!File.Exists(path))
-                return "No memory entry found with name: " + name;
+                throw new InvalidOperationException("no memory entry found with name: " + name);
 
             File.Delete(path);
             return "Memory deleted: " + name;

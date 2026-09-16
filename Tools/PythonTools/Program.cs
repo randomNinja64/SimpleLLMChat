@@ -19,7 +19,7 @@ namespace PythonTools
                         }
 
                     default:
-                        return new ToolResult("error: unknown tool '" + toolName + "'.", 1);
+                        return ToolHelper.Fail("unknown tool '" + toolName + "'.");
                 }
             });
         }

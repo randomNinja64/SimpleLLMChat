@@ -24,20 +24,20 @@ namespace FileTools
                 if (string.IsNullOrEmpty(expandedPath))
                 {
                     exitCode = 1;
-                    return "File path cannot be empty";
+                    return "error: File path cannot be empty";
                 }
 
                 if (!File.Exists(expandedPath))
                 {
                     exitCode = 1;
-                    return "File does not exist: " + expandedPath;
+                    return "error: File does not exist: " + expandedPath;
                 }
 
                 List<Block> blocks = ParseEdits(edits);
                 if (blocks.Count == 0)
                 {
                     exitCode = 1;
-                    return "No edits provided. Provide at least one edit with old_string and new_string.";
+                    return "error: No edits provided. Provide at least one edit with old_string and new_string.";
                 }
 
                 string original = TextNormalization.NormalizeLineEndings(
@@ -51,7 +51,7 @@ namespace FileTools
                 {
                     exitCode = 1;
                     StringBuilder errSb = new StringBuilder();
-                    errSb.AppendLine("Errors:");
+                    errSb.AppendLine("error: edit failed:");
                     foreach (string err in errors) errSb.AppendLine(err);
                     return errSb.ToString();
                 }
@@ -76,7 +76,7 @@ namespace FileTools
             catch (Exception ex)
             {
                 exitCode = 1;
-                return "Error: " + ex.Message;
+                return "error: " + ex.Message;
             }
         }
 

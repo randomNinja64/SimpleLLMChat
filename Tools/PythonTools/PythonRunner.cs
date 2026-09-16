@@ -38,7 +38,7 @@ namespace PythonTools
                 if (!pythonFound)
                 {
                     exitCode = 1;
-                    return "Error: Python runtime not found in system PATH. Please install Python and ensure it's added to your system PATH environment variable.";
+                    return "error: Python runtime not found in system PATH. Please install Python and ensure it's added to your system PATH environment variable.";
                 }
 
                 // Create a temporary Python script file
@@ -71,8 +71,8 @@ namespace PythonTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error executing Python script: " + ex.Message;
+                exitCode = 1;
+                return "error: executing Python script: " + ex.Message;
             }
         }
     }

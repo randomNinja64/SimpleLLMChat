@@ -35,23 +35,20 @@ namespace DesktopTools
             {
               string action = ToolHelper.GetRequiredArg(argumentsJson, "action");
               string output = ControlActions.Navigate(action, argumentsJson);
-              int exitCode = output.StartsWith("error:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-              return new ToolResult(output, exitCode);
+              return new ToolResult(output, ExitFor(output));
             }
 
           case "set_control_text":
             {
               string output = ControlActions.SetText(argumentsJson);
-              int exitCode = output.StartsWith("error:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-              return new ToolResult(output, exitCode);
+              return new ToolResult(output, ExitFor(output));
             }
 
           case "send_keys":
             {
               string keys = ToolHelper.GetRequiredArg(argumentsJson, "keys");
               string output = SendKeysHelper.Send(keys);
-              int exitCode = output.StartsWith("error:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-              return new ToolResult(output, exitCode);
+              return new ToolResult(output, ExitFor(output));
             }
 
           case "screenshot":
@@ -59,14 +56,19 @@ namespace DesktopTools
               string imageBase64;
               string imageMime;
               string output = ScreenshotCapture.Capture(argumentsJson, out imageBase64, out imageMime);
-              int exitCode = output.StartsWith("error:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-              return new ToolResult(output, exitCode, imageBase64, imageMime);
+              return new ToolResult(output, ExitFor(output), imageBase64, imageMime);
             }
 
           default:
-            return new ToolResult("error: unknown tool '" + toolName + "'.", 1);
+            return ToolHelper.Fail("unknown tool '" + toolName + "'.");
         }
       });
+    }
+
+    static int ExitFor(string output)
+    {
+      return !string.IsNullOrEmpty(output) &&
+          output.StartsWith("error:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
     }
   }
 }

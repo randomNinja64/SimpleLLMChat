@@ -53,18 +53,25 @@ namespace MemoryTools.Tests
 
                 TestRunner.Run("missing_name", () =>
                 {
-                    try
-                    {
-                        ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "save_memory",
-                            new JObject { ["content"] = "x" }, config);
-                        TestAssert.True(r.ExitCode != 0, "missing name should fail");
-                        TestAssert.ContainsIgnoreCase(r.Text ?? r.Stdout, "missing", "error text");
-                    }
-                    catch (Exception)
-                    {
-                        // ToolHelper may return error JSON with exit 1
-                        throw;
-                    }
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "save_memory",
+                        new JObject { ["content"] = "x" }, config);
+                    ToolClient.AssertToolError(r, "missing");
+                });
+
+                TestRunner.Run("recall_missing", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "recall_memory",
+                        new JObject { ["name"] = "does-not-exist" }, config);
+                    ToolClient.AssertToolError(r, "no memory entry");
+                    TestAssert.Equal(1, r.ExitCode, "exit 1");
+                });
+
+                TestRunner.Run("delete_missing", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "delete_memory",
+                        new JObject { ["name"] = "does-not-exist" }, config);
+                    ToolClient.AssertToolError(r, "no memory entry");
+                    TestAssert.Equal(1, r.ExitCode, "exit 1");
                 });
             }
         }

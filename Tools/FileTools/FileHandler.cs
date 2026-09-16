@@ -18,7 +18,7 @@ namespace FileTools
                 if (!File.Exists(filename))
                 {
                     exitCode = 1;
-                    return $"File not found: {filename}";
+                    return $"error: File not found: {filename}";
                 }
 
                 string content = File.ReadAllText(filename, Encoding.UTF8);
@@ -30,7 +30,7 @@ namespace FileTools
                 if (offset >= totalLength)
                 {
                     exitCode = 1;
-                    return $"File length = {totalLength} characters. Offset {offset} exceeds file length.";
+                    return $"error: File length = {totalLength} characters. Offset {offset} exceeds file length.";
                 }
 
                 // Always read up to MAX_CONTENT_LENGTH characters (or until EOF)
@@ -52,8 +52,8 @@ namespace FileTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error reading file: " + ex.Message;
+                exitCode = 1;
+                return "error: reading file: " + ex.Message;
             }
         }
 
@@ -78,8 +78,8 @@ namespace FileTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error writing file: " + ex.Message;
+                exitCode = 1;
+                return "error: writing file: " + ex.Message;
             }
         }
 
@@ -102,8 +102,8 @@ namespace FileTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error moving file: " + ex.Message;
+                exitCode = 1;
+                return "error: moving file: " + ex.Message;
             }
         }
 
@@ -126,8 +126,8 @@ namespace FileTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error copying file: " + ex.Message;
+                exitCode = 1;
+                return "error: copying file: " + ex.Message;
             }
         }
 
@@ -145,7 +145,7 @@ namespace FileTools
             if (!File.Exists(sourcePath))
             {
                 exitCode = 1;
-                errorMessage = $"Source file not found: {sourcePath}";
+                errorMessage = $"error: Source file not found: {sourcePath}";
                 return false;
             }
 
@@ -153,7 +153,7 @@ namespace FileTools
             if (File.Exists(destinationPath))
             {
                 exitCode = 1;
-                errorMessage = $"Destination file already exists: {destinationPath}";
+                errorMessage = $"error: Destination file already exists: {destinationPath}";
                 return false;
             }
 
@@ -180,7 +180,7 @@ namespace FileTools
                 if (!File.Exists(filePath))
                 {
                     exitCode = 1;
-                    return $"File not found: {filePath}";
+                    return $"error: File not found: {filePath}";
                 }
 
                 // Delete the file
@@ -190,8 +190,8 @@ namespace FileTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error deleting file: " + ex.Message;
+                exitCode = 1;
+                return "error: deleting file: " + ex.Message;
             }
         }
 
@@ -208,7 +208,7 @@ namespace FileTools
                 if (!Directory.Exists(directoryPath))
                 {
                     exitCode = 1;
-                    return $"Directory not found: {directoryPath}";
+                    return $"error: Directory not found: {directoryPath}";
                 }
 
                 StringBuilder result = new StringBuilder();
@@ -252,8 +252,8 @@ namespace FileTools
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error listing directory: " + ex.Message;
+                exitCode = 1;
+                return "error: listing directory: " + ex.Message;
             }
         }
 
@@ -271,7 +271,7 @@ namespace FileTools
                 if (!File.Exists(archivePath))
                 {
                     exitCode = 1;
-                    return $"Archive not found: {archivePath}";
+                    return $"error: Archive not found: {archivePath}";
                 }
 
                 // Ensure the destination directory exists
@@ -287,15 +287,15 @@ namespace FileTools
 
                 if (exitCode != 0)
                 {
-                    return $"7za exited with code {exitCode}:\n{output}";
+                    return $"error: 7za exited with code {exitCode}:\n{output}";
                 }
 
                 return $"Archive extracted successfully to: {destinationPath}\n{output}";
             }
             catch (Exception ex)
             {
-                exitCode = -1;
-                return "Error running 7za.exe: " + ex.Message;
+                exitCode = 1;
+                return "error: running 7za.exe: " + ex.Message;
             }
         }
 
@@ -318,7 +318,7 @@ namespace FileTools
             catch (Exception ex)
             {
                 exitCode = 1;
-                errorMessage = $"Failed to create directory '{directoryPath}': {ex.Message}";
+                errorMessage = $"error: Failed to create directory '{directoryPath}': {ex.Message}";
                 return false;
             }
         }

@@ -558,8 +558,19 @@ public static class ToolClient
     public static void AssertUnknownTool(string exeFileName)
     {
         ToolInvokeResult r = InvokeProduct(exeFileName, "not_a_real_tool", new JObject());
+        AssertToolError(r, "unknown tool");
         TestAssert.Equal(1, r.ExitCode, "unknown tool exit code");
-        TestAssert.ContainsIgnoreCase(r.Text ?? r.Stdout, "unknown tool", "unknown tool message");
+    }
+
+    public static void AssertToolError(ToolInvokeResult r, string contains)
+    {
+        TestAssert.True(r.ExitCode != 0, "non-zero exit");
+        string text = r.Text ?? r.Stdout ?? "";
+        TestAssert.True(
+            text.StartsWith("error:", StringComparison.OrdinalIgnoreCase),
+            "error: prefix, got: " + text);
+        if (!string.IsNullOrEmpty(contains))
+            TestAssert.ContainsIgnoreCase(text, contains, "error text");
     }
 
     private static void ParseStdoutJson(ToolInvokeResult result)
