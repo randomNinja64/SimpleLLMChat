@@ -137,7 +137,6 @@
   <ItemGroup>
     <Compile Include="ChatTurn.cs" />
     <Compile Include="ChatTurnView.cs" />
-    <Compile Include="ChatMessageDocumentBehavior.cs" />
     <Compile Include="MarkdownHandler.cs" />
     <Compile Include="ModelsClient.cs" />
     <Compile Include="Options.xaml.cs">
