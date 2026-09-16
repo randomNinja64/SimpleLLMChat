@@ -272,36 +272,16 @@ namespace SimpleLLMChatCLI
         {
             try
             {
-                string stdinData = BuildStdinPayload(null);
+                ToolProcessResult result = RunToolProcess(
+                    executablePath, commandName, BuildStdinPayload(null), 0);
+                if (result.TimedOut)
+                    return null;
 
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = executablePath,
-                    Arguments = commandName,
-                    WorkingDirectory = Path.GetDirectoryName(executablePath),
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-
-                using (Process process = Process.Start(psi))
-                {
-                    process.StandardInput.Write(stdinData);
-                    process.StandardInput.Close();
-
-                    var stdoutTask = Task.Factory.StartNew(() => process.StandardOutput.ReadToEnd());
-                    process.WaitForExit();
-                    string raw = stdoutTask.Result;
-                    string text;
-                    string imageBase64;
-                    string imageMime;
-                    ToolResultParser.Parse(raw, out text, out imageBase64, out imageMime);
-                    return text;
-                }
+                string text;
+                string imageBase64;
+                string imageMime;
+                ToolResultParser.Parse(result.Stdout, out text, out imageBase64, out imageMime);
+                return text;
             }
             catch
             {
@@ -328,6 +308,76 @@ namespace SimpleLLMChatCLI
             stdinPayload["config"] = configObj;
 
             return stdinPayload.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private class ToolProcessResult
+        {
+            public string Stdout;
+            public string Stderr;
+            public int ExitCode;
+            public bool TimedOut;
+        }
+
+        /// <summary>
+        /// Spawns a tool executable with JSON on stdin. Always drains stdout and
+        /// stderr so a chatty tool cannot deadlock the host. timeoutMs of 0 waits
+        /// indefinitely.
+        /// </summary>
+        private static ToolProcessResult RunToolProcess(
+            string executablePath, string arguments, string stdinData, int timeoutMs)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = executablePath,
+                Arguments = arguments ?? "",
+                WorkingDirectory = Path.GetDirectoryName(executablePath),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            using (Process process = Process.Start(psi))
+            {
+                process.StandardInput.Write(stdinData ?? "");
+                process.StandardInput.Close();
+
+                var stdoutTask = Task.Factory.StartNew(() => process.StandardOutput.ReadToEnd());
+                var stderrTask = Task.Factory.StartNew(() => process.StandardError.ReadToEnd());
+
+                bool exited;
+                if (timeoutMs > 0)
+                    exited = process.WaitForExit(timeoutMs);
+                else
+                {
+                    process.WaitForExit();
+                    exited = true;
+                }
+
+                if (!exited)
+                {
+                    try { process.Kill(); } catch { }
+                    try { process.WaitForExit(2000); } catch { }
+                    return new ToolProcessResult
+                    {
+                        TimedOut = true,
+                        ExitCode = -1,
+                        Stdout = "",
+                        Stderr = ""
+                    };
+                }
+
+                return new ToolProcessResult
+                {
+                    Stdout = stdoutTask.Result ?? "",
+                    Stderr = stderrTask.Result ?? "",
+                    ExitCode = process.ExitCode,
+                    TimedOut = false
+                };
+            }
         }
 
         /// <summary>
@@ -359,67 +409,30 @@ namespace SimpleLLMChatCLI
 
             try
             {
-                string stdinData = BuildStdinPayload(arguments);
-
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = def.ExecutablePath,
-                    Arguments = toolName,
-                    WorkingDirectory = Path.GetDirectoryName(def.ExecutablePath),
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-
-                // Determine per-tool timeout from config (key: tooltimeout.<toolname>)
                 string timeoutVal = config.GetConfigValue("tooltimeout." + toolName.ToLowerInvariant());
                 int timeoutSecs = 0;
                 int.TryParse(timeoutVal, out timeoutSecs);
                 int timeoutMs = timeoutSecs > 0 ? timeoutSecs * 1000 : 0;
 
-                using (Process process = Process.Start(psi))
+                ToolProcessResult result = RunToolProcess(
+                    def.ExecutablePath, toolName, BuildStdinPayload(arguments), timeoutMs);
+
+                if (result.TimedOut)
                 {
-                    // Write arguments via stdin
-                    process.StandardInput.Write(stdinData);
-                    process.StandardInput.Close();
-
-                    // Read stdout/stderr asynchronously to avoid deadlock
-                    var stdoutTask = Task.Factory.StartNew(() => process.StandardOutput.ReadToEnd());
-                    var stderrTask = Task.Factory.StartNew(() => process.StandardError.ReadToEnd());
-
-                    bool exited;
-                    if (timeoutMs > 0)
-                        exited = process.WaitForExit(timeoutMs);
-                    else
-                    {
-                        process.WaitForExit();
-                        exited = true;
-                    }
-
-                    if (!exited)
-                    {
-                        try { process.Kill(); } catch { }
-                        toolContent = FormatCommandResult(toolName, "error: tool call timed out after " + timeoutSecs + " second(s).", -1);
-                        exitCode = -1;
-                        return;
-                    }
-
-                    string stdout = stdoutTask.Result;
-                    string stderr = stderrTask.Result;
-                    exitCode = process.ExitCode;
-
-                    string output = stdout ?? "";
-                    if (!string.IsNullOrEmpty(stderr))
-                        output += stderr;
-
-                    string text;
-                    ToolResultParser.Parse(output, out text, out imageBase64, out imageMime);
-                    toolContent = FormatCommandResult(toolName, text, exitCode);
+                    toolContent = FormatCommandResult(toolName,
+                        "error: tool call timed out after " + timeoutSecs + " second(s).", -1);
+                    exitCode = -1;
+                    return;
                 }
+
+                exitCode = result.ExitCode;
+                string output = result.Stdout ?? "";
+                if (!string.IsNullOrEmpty(result.Stderr))
+                    output += result.Stderr;
+
+                string text;
+                ToolResultParser.Parse(output, out text, out imageBase64, out imageMime);
+                toolContent = FormatCommandResult(toolName, text, exitCode);
             }
             catch (Exception ex)
             {
