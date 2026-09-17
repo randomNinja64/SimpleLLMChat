@@ -22,24 +22,12 @@ namespace SkillTools
             public string Description;
         }
 
-        private static string GetSkillsDirectory()
-        {
-            string configured = ToolHelper.GetConfigValue("skillsDirectory").Trim();
-            if (!string.IsNullOrEmpty(configured))
-                return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
-
-            string baseDir = Path.GetDirectoryName(
-                System.Reflection.Assembly.GetEntryAssembly()?.Location
-                ?? typeof(SkillHandler).Assembly.Location);
-            return Path.GetFullPath(Path.Combine(baseDir, "skills"));
-        }
-
         public static string GetContext()
         {
             List<SkillInfo> skills = DiscoverSkills();
             var sb = new StringBuilder();
             sb.AppendLine("Skills:");
-            sb.AppendLine("Skills are located in " + GetSkillsDirectory() + ".");
+            sb.AppendLine("Skills are located in " + ToolHelper.GetConfiguredDirectory("skillsDirectory", "skills") + ".");
             sb.AppendLine("Before replying, scan the skills below. If one clearly matches your task, load it with view_skill and follow its instructions.");
             sb.AppendLine("To run a skill's scripts, run them as shell commands under the skill root returned by view_skill.");
             sb.AppendLine("To author or change skills, use create_skill, edit_skill, edit_skill_file, or remove_skill if available.");
@@ -95,7 +83,7 @@ namespace SkillTools
             if (existing != null)
                 throw new InvalidOperationException("skill already exists: " + name + " (" + existing.DirectoryPath + ")");
 
-            string root = GetSkillsDirectory();
+            string root = ToolHelper.GetConfiguredDirectory("skillsDirectory", "skills");
             if (!Directory.Exists(root))
                 Directory.CreateDirectory(root);
 
@@ -216,7 +204,7 @@ namespace SkillTools
         {
             var results = new List<SkillInfo>();
             var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            string root = GetSkillsDirectory();
+            string root = ToolHelper.GetConfiguredDirectory("skillsDirectory", "skills");
             if (!Directory.Exists(root))
                 return results;
 

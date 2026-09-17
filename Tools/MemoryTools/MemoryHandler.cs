@@ -9,18 +9,6 @@ namespace MemoryTools
     {
         private const int MaxNameLength = 100;
 
-        private static string GetMemoriesDirectory()
-        {
-            string configured = ToolHelper.GetConfigValue("memoriesDirectory").Trim();
-            if (!string.IsNullOrEmpty(configured))
-                return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
-
-            string baseDir = Path.GetDirectoryName(
-                System.Reflection.Assembly.GetEntryAssembly()?.Location
-                ?? typeof(MemoryHandler).Assembly.Location);
-            return Path.GetFullPath(Path.Combine(baseDir, "memories"));
-        }
-
         // Converts a name to a safe filename by replacing any character that
         // isn't alphanumeric, underscore, or hyphen with an underscore.
         private static string NameToFileName(string name)
@@ -41,7 +29,7 @@ namespace MemoryTools
             if (truncated)
                 content = content.Substring(0, maxContentLength);
 
-            string memoryFolder = GetMemoriesDirectory();
+            string memoryFolder = ToolHelper.GetConfiguredDirectory("memoriesDirectory", "memories");
             if (!Directory.Exists(memoryFolder))
                 Directory.CreateDirectory(memoryFolder);
 
@@ -77,7 +65,7 @@ namespace MemoryTools
 
         public static string RecallMemory(string name)
         {
-            string path = Path.Combine(GetMemoriesDirectory(), NameToFileName(name));
+            string path = Path.Combine(ToolHelper.GetConfiguredDirectory("memoriesDirectory", "memories"), NameToFileName(name));
             if (!File.Exists(path))
                 throw new InvalidOperationException("no memory entry found with name: " + name);
 
@@ -86,7 +74,7 @@ namespace MemoryTools
 
         public static string DeleteMemory(string name)
         {
-            string path = Path.Combine(GetMemoriesDirectory(), NameToFileName(name));
+            string path = Path.Combine(ToolHelper.GetConfiguredDirectory("memoriesDirectory", "memories"), NameToFileName(name));
             if (!File.Exists(path))
                 throw new InvalidOperationException("no memory entry found with name: " + name);
 
@@ -96,7 +84,7 @@ namespace MemoryTools
 
         public static string ListMemories()
         {
-            string memoryFolder = GetMemoriesDirectory();
+            string memoryFolder = ToolHelper.GetConfiguredDirectory("memoriesDirectory", "memories");
             if (!Directory.Exists(memoryFolder))
                 return "(no memories saved)";
 
@@ -115,7 +103,7 @@ namespace MemoryTools
 
         public static string GetContext()
         {
-            string memoryFolder = GetMemoriesDirectory();
+            string memoryFolder = ToolHelper.GetConfiguredDirectory("memoriesDirectory", "memories");
             if (!Directory.Exists(memoryFolder))
                 return null;
 
@@ -143,7 +131,7 @@ namespace MemoryTools
 
         public static string SearchMemories(string keyword)
         {
-            string memoryFolder = GetMemoriesDirectory();
+            string memoryFolder = ToolHelper.GetConfiguredDirectory("memoriesDirectory", "memories");
             if (!Directory.Exists(memoryFolder))
                 return "(no memories saved)";
 

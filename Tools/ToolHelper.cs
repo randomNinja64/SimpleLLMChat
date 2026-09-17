@@ -166,6 +166,18 @@ public static class ToolHelper
         return defaultValue;
     }
 
+    /// <summary>
+    /// Resolves a data directory from config, or <paramref name="defaultFolderName"/>
+    /// next to the tool EXE when the key is empty.
+    /// </summary>
+    public static string GetConfiguredDirectory(string configKey, string defaultFolderName)
+    {
+        string configured = GetConfigValue(configKey).Trim();
+        if (!string.IsNullOrEmpty(configured))
+            return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
+        return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, defaultFolderName));
+    }
+
     public static string GetRequiredArg(string arguments, string argName)
     {
         string value = JsonExtractString(arguments, argName)?.Trim() ?? "";
