@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -276,7 +276,9 @@ namespace SimpleLLMChatGUI
 
         private void OnGenerationComplete()
         {
-            Dispatcher.BeginInvoke((Action)(() =>
+            // Background so any already-queued stdout AppendStreamingText
+            // (Normal) runs first — STATUS ready can race the last pipe bytes.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
             {
                 EndStreamingTurn();
                 if (IsMarkdownParsingEnabled())

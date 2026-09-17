@@ -105,6 +105,9 @@
     <Compile Include="..\Shared\StatusPipe\StatusPipe.Indexing.cs">
       <Link>Shared\StatusPipe\StatusPipe.Indexing.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Ready.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Ready.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

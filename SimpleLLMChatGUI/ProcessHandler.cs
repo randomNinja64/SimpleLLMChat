@@ -50,6 +50,7 @@ namespace SimpleLLMChatGUI
                 statusPipeClient = new StatusPipeClient(llmProcess.Id);
                 statusPipeClient.StatusReceived += OnStatusPipeReceived;
                 statusPipeClient.IndexingStatusReceived += OnIndexingStatusPipeReceived;
+                statusPipeClient.ReadyReceived += OnStatusPipeReady;
                 statusPipeClient.Start();
 
                 // 256 byte async buffer
@@ -73,6 +74,13 @@ namespace SimpleLLMChatGUI
                 handler(tokens);
         }
 
+        private void OnStatusPipeReady()
+        {
+            Action handler = GenerationComplete;
+            if (handler != null)
+                handler();
+        }
+
         private void OnIndexingStatusPipeReceived(IndexingStatusEvent status)
         {
             IndexingStatusHub.Publish(status);
@@ -84,6 +92,7 @@ namespace SimpleLLMChatGUI
             {
                 statusPipeClient.StatusReceived -= OnStatusPipeReceived;
                 statusPipeClient.IndexingStatusReceived -= OnIndexingStatusPipeReceived;
+                statusPipeClient.ReadyReceived -= OnStatusPipeReady;
                 statusPipeClient.Dispose();
                 statusPipeClient = null;
             }
@@ -321,88 +330,34 @@ namespace SimpleLLMChatGUI
                 textBuffer.Clear();
             }
 
-            // For streaming, we want to output text immediately
-            // But we need to be careful about "You:" patterns
-
-            // Check if this chunk contains a "You:" pattern
-            int youIndex = textChunk.IndexOf("You:");
-            if (youIndex >= 0)
+            // Hold back a trailing partial "You:" so the CLI prompt is not split
+            // across chunks before OutputText can strip it. Turn-end is STATUS ready.
+            int holdBack = GetPartialSuffixLength(textChunk, "You:");
+            if (holdBack > 0)
             {
-                // Check if this "You:" is complete (followed by whitespace or newline)
-                bool isCompletePattern = false;
-                if (youIndex + 4 < textChunk.Length)
-                {
-                    char nextChar = textChunk[youIndex + 4];
-                    isCompletePattern = char.IsWhiteSpace(nextChar) || nextChar == '\n' || nextChar == '\r';
-                }
-                else
-                {
-                    // "You:" is at the end, so it's incomplete
-                    isCompletePattern = false;
-                }
-
-                if (isCompletePattern)
-                {
-                    // Process everything before "You:" and output it
-                    string textBeforeYou = textChunk.Substring(0, youIndex);
-                    if (!string.IsNullOrEmpty(textBeforeYou))
-                    {
-                        OutputText(textBeforeYou);
-                    }
-
-                    // Signal that generation is complete
-                    GenerationComplete?.Invoke();
-
-                    // Don't output the "You:" pattern itself
-                    // Keep any text after "You:" for next chunk
-                    string textAfterYou = textChunk.Substring(youIndex + 4);
-                    if (!string.IsNullOrEmpty(textAfterYou))
-                    {
-                        // Remove leading whitespace after "You:"
-                        textAfterYou = textAfterYou.TrimStart(' ', '\t');
-                        if (!string.IsNullOrEmpty(textAfterYou))
-                        {
-                            OutputText(textAfterYou);
-                        }
-                    }
-                }
-                else
-                {
-                    // Incomplete "You:" pattern, output everything except the last few characters
-                    int safeEndIndex = Math.Max(0, youIndex - 1);
-                    string safeText = textChunk.Substring(0, safeEndIndex);
-                    if (!string.IsNullOrEmpty(safeText))
-                    {
-                        OutputText(safeText);
-                    }
-
-                    // Keep the incomplete pattern for next chunk
-                    textBuffer.Append(textChunk.Substring(safeEndIndex));
-                }
+                if (holdBack < textChunk.Length)
+                    OutputText(textChunk.Substring(0, textChunk.Length - holdBack));
+                textBuffer.Append(textChunk.Substring(textChunk.Length - holdBack));
+                return;
             }
-            else
-            {
-                // No "You:" pattern in this chunk, output it immediately
-                OutputText(textChunk);
-            }
+
+            OutputText(textChunk);
         }
 
         private void OutputText(string text)
         {
             if (!string.IsNullOrEmpty(text))
             {
-                // Remove any "You:" prompts from the middle of the text
+                // CLI still prints You: for TTY; strip it from the GUI transcript.
                 string filteredText = Regex.Replace(
                     text,
                     @"(^|\r?\n)[ \t]*You:[ \t]*",
-                    match => match.Groups[1].Value, // Keep just the newline part
+                    match => match.Groups[1].Value,
                     RegexOptions.Multiline
                 );
 
-                // Normalize line endings for Windows display
                 filteredText = NormalizeLineEndings(filteredText);
 
-                // Raise event immediately for real-time streaming
                 if (!string.IsNullOrEmpty(filteredText))
                 {
                     OutputReceived?.Invoke(filteredText);

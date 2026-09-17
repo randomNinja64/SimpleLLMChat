@@ -41,6 +41,29 @@ public sealed class StatusPipeServer : IDisposable
         PublishLine(StatusPipe.TokensPrefix + tokens.ToString(CultureInfo.InvariantCulture));
     }
 
+    /// <summary>
+    /// Signals the GUI that the CLI is waiting for input (printed You:).
+    /// Not deduped — consecutive prompts must each fire.
+    /// </summary>
+    public void PublishReady()
+    {
+        lock (_sync)
+        {
+            _lastLine = StatusPipe.ReadyLine;
+            if (_writer == null)
+                return;
+
+            try
+            {
+                _writer.WriteLine(StatusPipe.ReadyLine);
+            }
+            catch
+            {
+                DropConnection();
+            }
+        }
+    }
+
     public void PublishLine(string line)
     {
         if (string.IsNullOrEmpty(line))
