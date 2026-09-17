@@ -289,19 +289,18 @@ public partial class LLMClient
                     if (!outputOnly)
                     {
                         startBlock();
+                        ChatOutput.WriteLine("[tool output]");
                         if (toolOutputDisplay == ChatBlockDisplayMode.Hidden)
                         {
-                            ChatOutput.WriteLine("[tool output]");
                             ChatOutput.WriteLine("Exit Code: " + exitCode);
                         }
                         else
                         {
-                            ChatOutput.WriteLine("[tool output]");
                             ChatOutput.Write(toolContent ?? "");
                             if (string.IsNullOrEmpty(toolContent) || !toolContent.EndsWith("\n"))
                                 ChatOutput.WriteLine();
-                            ChatOutput.WriteLine("[/tool output]");
                         }
+                        ChatOutput.WriteLine("[/tool output]");
                     }
                 }
                 // Mid-turn (after tools): compact context silently, then continue the user request.

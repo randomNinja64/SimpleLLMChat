@@ -6,8 +6,14 @@ using System.Windows.Documents;
 
 namespace SimpleLLMChatGUI
 {
-    public partial class ChatTurn
+    /// <summary>
+    /// A text-backed chat turn with a releasable rendered document.
+    /// </summary>
+    public class ChatTurn
     {
+        /// <summary>
+        /// Classic +/- expander style provided by <c>MainWindow</c>.
+        /// </summary>
         public static Style ThinkingExpanderStyle { get; set; }
 
         private FlowDocument _document;
@@ -133,10 +139,15 @@ namespace SimpleLLMChatGUI
 
             if (!_hasContent)
             {
+                // The CLI's own inter-turn padding newlines land unpredictably
+                // once each turn is its own document — drop them. Turn-to-turn
+                // spacing comes from ListBoxItem Margin.
                 text = text.TrimStart('\r', '\n');
                 if (text.Length == 0)
                     return null;
                 _hasContent = true;
+
+                // Always start real content in a fresh paragraph.
                 Document.Blocks.Add(new Paragraph());
             }
 
@@ -157,6 +168,8 @@ namespace SimpleLLMChatGUI
                     if (openIndex > 0)
                         AppendPlain(remaining.Substring(0, openIndex));
 
+                    // A collapsible block always opens a turn of its own, so
+                    // batched tool calls are spaced by the chat list's item margin.
                     if (HasRenderedContent())
                         return remaining.Substring(openIndex);
 
@@ -169,12 +182,6 @@ namespace SimpleLLMChatGUI
                     }
                     else if (openTag.Equals("[tool output]", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (App.Config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown) == ChatBlockDisplayMode.Hidden)
-                        {
-                            AppendPlain(openTag);
-                            continue;
-                        }
-
                         remaining = remaining.TrimStart('\r', '\n');
                         StartCollapsibleBlock(null, CollapsibleBlockKind.ToolOutput);
                     }
@@ -205,6 +212,10 @@ namespace SimpleLLMChatGUI
             return null;
         }
 
+        /// <summary>
+        /// True once this turn holds something visible — an expander or a
+        /// paragraph with text.
+        /// </summary>
         public bool HasRenderedContent()
         {
             foreach (Block block in Document.Blocks)
@@ -223,6 +234,10 @@ namespace SimpleLLMChatGUI
             return false;
         }
 
+        /// <summary>
+        /// Removes empty paragraphs left at the end of the document by the
+        /// CLI's padding newlines before the next prompt.
+        /// </summary>
         public void TrimTrailingBlankParagraphs()
         {
             if (_activeBlock != null)
@@ -243,6 +258,8 @@ namespace SimpleLLMChatGUI
                 removed = true;
             }
 
+            // Approval prompts can trim padding before streaming resumes. Keep the
+            // source in sync so restoring history cannot reintroduce that padding.
             if (removed && _source != null)
             {
                 string source = _source.ToString();
@@ -259,6 +276,9 @@ namespace SimpleLLMChatGUI
             }
         }
 
+        /// <summary>
+        /// Applies font size to the document, markdown headers, and collapsible expanders.
+        /// </summary>
         public void ApplyFontSize(double fontSize)
         {
             _fontSize = fontSize;
