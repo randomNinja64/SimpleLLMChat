@@ -76,7 +76,9 @@ namespace DesktopTools
     /// </summary>
     private static Bitmap CaptureWindow(IntPtr hwnd, int left, int top, int width, int height)
     {
-      Bitmap printed = TryPrintWindow(hwnd, width, height);
+      string error;
+      Bitmap printed = CaptureSurface(width, height,
+        (screen, surface) => Win32Interop.PrintWindow(hwnd, surface, 0), out error);
       if (printed != null)
         return printed;
 
@@ -86,8 +88,24 @@ namespace DesktopTools
       return CaptureScreenRegion(left, top, width, height);
     }
 
-    private static Bitmap TryPrintWindow(IntPtr hwnd, int width, int height)
+    private static Bitmap CaptureScreenRegion(int left, int top, int width, int height)
     {
+      string error;
+      Bitmap bitmap = CaptureSurface(width, height, (screen, surface) =>
+      {
+        if (!Win32Interop.BitBlt(surface, 0, 0, width, height, screen, left, top, Win32Interop.SrcCopy))
+          throw new InvalidOperationException("BitBlt failed (Win32=" + Marshal.GetLastWin32Error() + ").");
+        return true;
+      }, out error);
+      if (bitmap == null)
+        throw new InvalidOperationException(error);
+      return bitmap;
+    }
+
+    private static Bitmap CaptureSurface(int width, int height,
+      Func<IntPtr, IntPtr, bool> draw, out string error)
+    {
+      error = "GetDC(NULL) failed.";
       IntPtr hdcScreen = Win32Interop.GetDC(IntPtr.Zero);
       if (hdcScreen == IntPtr.Zero)
         return null;
@@ -98,55 +116,20 @@ namespace DesktopTools
 
       try
       {
+        error = "CreateCompatibleDC failed.";
         hdcMem = Win32Interop.CreateCompatibleDC(hdcScreen);
         if (hdcMem == IntPtr.Zero)
           return null;
 
+        error = "CreateCompatibleBitmap failed.";
         hBitmap = Win32Interop.CreateCompatibleBitmap(hdcScreen, width, height);
         if (hBitmap == IntPtr.Zero)
           return null;
 
+        error = null;
         hOld = Win32Interop.SelectObject(hdcMem, hBitmap);
-        if (!Win32Interop.PrintWindow(hwnd, hdcMem, 0))
+        if (!draw(hdcScreen, hdcMem))
           return null;
-
-        return BitmapFromHbitmap(hBitmap, width, height);
-      }
-      finally
-      {
-        if (hOld != IntPtr.Zero)
-          Win32Interop.SelectObject(hdcMem, hOld);
-        if (hBitmap != IntPtr.Zero)
-          Win32Interop.DeleteObject(hBitmap);
-        if (hdcMem != IntPtr.Zero)
-          Win32Interop.DeleteDC(hdcMem);
-        Win32Interop.ReleaseDC(IntPtr.Zero, hdcScreen);
-      }
-    }
-
-    private static Bitmap CaptureScreenRegion(int left, int top, int width, int height)
-    {
-      IntPtr hdcScreen = Win32Interop.GetDC(IntPtr.Zero);
-      if (hdcScreen == IntPtr.Zero)
-        throw new InvalidOperationException("GetDC(NULL) failed.");
-
-      IntPtr hdcMem = IntPtr.Zero;
-      IntPtr hBitmap = IntPtr.Zero;
-      IntPtr hOld = IntPtr.Zero;
-
-      try
-      {
-        hdcMem = Win32Interop.CreateCompatibleDC(hdcScreen);
-        if (hdcMem == IntPtr.Zero)
-          throw new InvalidOperationException("CreateCompatibleDC failed.");
-
-        hBitmap = Win32Interop.CreateCompatibleBitmap(hdcScreen, width, height);
-        if (hBitmap == IntPtr.Zero)
-          throw new InvalidOperationException("CreateCompatibleBitmap failed.");
-
-        hOld = Win32Interop.SelectObject(hdcMem, hBitmap);
-        if (!Win32Interop.BitBlt(hdcMem, 0, 0, width, height, hdcScreen, left, top, Win32Interop.SrcCopy))
-          throw new InvalidOperationException("BitBlt failed (Win32=" + Marshal.GetLastWin32Error() + ").");
 
         return BitmapFromHbitmap(hBitmap, width, height);
       }
