@@ -166,26 +166,16 @@ namespace DesktopTools
       if (root == null)
         return false;
 
-      object[] children = GetChildren(root);
-      if (children == null)
-        return false;
-
       string label = control.Label ?? "";
       string value = control.Value ?? "";
 
-      foreach (object child in children)
+      foreach (AccessibleChild child in EnumerateChildren(root))
       {
-        IAccessible node = child as IAccessible;
-        int id = node == null ? ToChildId(child) : 0;
-        if (node == null && id == 0)
-          continue;
-
-        IAccessible holder = node ?? root;
         string name = "";
         string childValue = "";
-        try { name = holder.get_accName(id) ?? ""; }
+        try { name = child.Owner.get_accName(child.Id) ?? ""; }
         catch { }
-        try { childValue = holder.get_accValue(id) ?? ""; }
+        try { childValue = child.Owner.get_accValue(child.Id) ?? ""; }
         catch { }
 
         bool labelMatch = !string.IsNullOrEmpty(label) &&
@@ -197,8 +187,8 @@ namespace DesktopTools
         if (!labelMatch && !valueMatch)
           continue;
 
-        owner = holder;
-        childId = id;
+        owner = child.Owner;
+        childId = child.Id;
         return true;
       }
 
@@ -279,32 +269,21 @@ namespace DesktopTools
       if (depth > MaxSearchDepth)
         return false;
 
-      object[] children = GetChildren(parent);
-      if (children == null)
-        return false;
-
-      foreach (object child in children)
+      foreach (AccessibleChild child in EnumerateChildren(parent))
       {
-        IAccessible node = child as IAccessible;
-        int id = node == null ? ToChildId(child) : 0;
-        if (node == null && id == 0)
-          continue;
-
-        IAccessible holder = node ?? parent;
-
         Bounds bounds;
-        if (!TryGetBounds(holder, id, out bounds))
+        if (!TryGetBounds(child.Owner, child.Id, out bounds))
           continue;
 
-        if (Matches(bounds, target) && NameMatches(holder, id, name))
+        if (Matches(bounds, target) && NameMatches(child.Owner, child.Id, name))
         {
-          owner = holder;
-          childId = id;
+          owner = child.Owner;
+          childId = child.Id;
           return true;
         }
 
-        if (node != null && Encloses(bounds, target) &&
-            TryFind(node, target, name, depth + 1, out owner, out childId))
+        if (child.Node != null && Encloses(bounds, target) &&
+            TryFind(child.Node, target, name, depth + 1, out owner, out childId))
           return true;
       }
 
@@ -353,33 +332,22 @@ namespace DesktopTools
       if (root == null)
         return 0;
 
-      object[] children = GetChildren(root);
-      if (children == null || children.Length == 0)
-        return 0;
-
       int added = 0;
       int rowIndex = 0;
-      foreach (object child in children)
+      foreach (AccessibleChild child in EnumerateChildren(root))
       {
-        IAccessible node = child as IAccessible;
-        int id = node == null ? ToChildId(child) : 0;
-        if (node == null && id == 0)
-          continue;
-
-        IAccessible holder = node ?? root;
-
         int role = 0;
         string name = "";
         string value = "";
         try
         {
-          object rawRole = holder.get_accRole(id);
+          object rawRole = child.Owner.get_accRole(child.Id);
           role = rawRole is int ? (int)rawRole : Convert.ToInt32(rawRole);
         }
         catch { }
-        try { name = holder.get_accName(id) ?? ""; }
+        try { name = child.Owner.get_accName(child.Id) ?? ""; }
         catch { }
-        try { value = holder.get_accValue(id) ?? ""; }
+        try { value = child.Owner.get_accValue(child.Id) ?? ""; }
         catch { }
 
         if (IsScrollOrChromeRole(role, name))
@@ -421,7 +389,7 @@ namespace DesktopTools
         }
 
         Bounds bounds;
-        if (TryGetBounds(holder, id, out bounds))
+        if (TryGetBounds(child.Owner, child.Id, out bounds))
         {
           info.X = bounds.Left;
           info.Y = bounds.Top;
@@ -453,6 +421,28 @@ namespace DesktopTools
         return false;
       return name.IndexOf("Scroll Bar", StringComparison.OrdinalIgnoreCase) >= 0 ||
              name.IndexOf("Scrollbar", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private struct AccessibleChild
+    {
+      public IAccessible Owner;
+      public IAccessible Node;
+      public int Id;
+    }
+
+    private static IEnumerable<AccessibleChild> EnumerateChildren(IAccessible parent)
+    {
+      object[] children = GetChildren(parent);
+      if (children == null)
+        yield break;
+
+      foreach (object child in children)
+      {
+        IAccessible node = child as IAccessible;
+        int id = node == null ? ToChildId(child) : 0;
+        if (node != null || id != 0)
+          yield return new AccessibleChild { Owner = node ?? parent, Node = node, Id = id };
+      }
     }
 
     private static object[] GetChildren(IAccessible parent)
