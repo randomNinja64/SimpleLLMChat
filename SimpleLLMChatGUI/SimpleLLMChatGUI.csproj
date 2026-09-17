@@ -94,6 +94,9 @@
     <Compile Include="..\Shared\TlsCurlFallback.cs">
       <Link>Shared\TlsCurlFallback.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\CurlHttpsClient.cs">
+      <Link>Shared\CurlHttpsClient.cs</Link>
+    </Compile>
     <Compile Include="..\Shared\ManifestScanner.cs">
       <Link>Shared\ManifestScanner.cs</Link>
     </Compile>

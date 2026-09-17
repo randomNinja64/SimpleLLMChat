@@ -85,7 +85,7 @@ public partial class LLMClient
             }
 
             string serverUrl = config.GetConfigValue("llmserver") ?? "";
-            if (CurlClient.CanFallback(serverUrl, ex))
+            if (TlsCurlFallback.CanAttempt(serverUrl, ex))
                 return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
 
             return new LLMCompletionResponse(reason, null, "request_failed");

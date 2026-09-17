@@ -164,10 +164,11 @@ namespace SimpleLLMChatCLI.RAG
             }
             catch (Exception ex)
             {
-                if (CurlClient.CanFallback(url, ex))
+                if (TlsCurlFallback.CanAttempt(url, ex))
                 {
                     int exitCode;
-                    string body = CurlClient.PostJson(url, _apiKey, payload, out exitCode);
+                    string body = CurlHttpsClient.PostJson(
+                        url, _apiKey, payload.ToString(Formatting.None), out exitCode);
                     if (exitCode == 0 && !string.IsNullOrEmpty(body))
                         return body;
                     error = "Embeddings request failed (curl): " + (body ?? ex.Message);

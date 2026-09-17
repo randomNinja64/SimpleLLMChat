@@ -1,17 +1,15 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Text;
-using System.Threading;
 
 namespace SimpleLLMChatGUI
 {
     /// <summary>
     /// Minimal client for OpenAI-compatible <c>/v1/models</c>. Uses <see cref="TlsConfig"/>
-    /// and an optional curl.exe HTTPS fallback (same pattern as the CLI).
+    /// and an optional curl.exe HTTPS fallback (shared with the CLI).
     /// </summary>
     public static class ModelsClient
     {
@@ -62,7 +60,7 @@ namespace SimpleLLMChatGUI
                 if (TlsCurlFallback.CanAttempt(url, ex))
                 {
                     int exitCode;
-                    string body = CurlGetJson(url, apiKey, out exitCode);
+                    string body = CurlHttpsClient.GetJson(url, apiKey, out exitCode);
                     if (exitCode == 0 && !string.IsNullOrEmpty(body))
                         return body;
                     throw new ModelsException(
@@ -116,55 +114,6 @@ namespace SimpleLLMChatGUI
 
             ids.Sort(StringComparer.OrdinalIgnoreCase);
             return ids;
-        }
-
-        private static string CurlGetJson(string fullUrl, string apiKey, out int exitCode)
-        {
-            exitCode = -1;
-            try
-            {
-                string authHeader = string.IsNullOrEmpty(apiKey)
-                    ? ""
-                    : " -H \"Authorization: Bearer " + apiKey + "\"";
-
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = TlsCurlFallback.DefaultCurlPath,
-                    Arguments = "-s -X GET"
-                        + " -H \"Accept: application/json\""
-                        + authHeader
-                        + " \"" + fullUrl + "\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-
-                using (Process process = Process.Start(psi))
-                {
-                    string output = "";
-                    string error = "";
-                    Thread errThread = new Thread(() => { try { error = process.StandardError.ReadToEnd(); } catch { } });
-                    errThread.IsBackground = true;
-                    errThread.Start();
-
-                    output = process.StandardOutput.ReadToEnd();
-                    errThread.Join(5000);
-                    process.WaitForExit();
-                    exitCode = process.ExitCode;
-
-                    if (exitCode != 0 && string.IsNullOrEmpty(output))
-                        return "cURL failed (exit " + exitCode + "): " + error;
-                    return output;
-                }
-            }
-            catch (Exception ex)
-            {
-                exitCode = -1;
-                return "cURL fallback failed: " + ex.Message;
-            }
         }
 
         private static string TryReadWebExceptionBody(Exception ex)
