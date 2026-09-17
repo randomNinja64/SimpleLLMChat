@@ -9,7 +9,7 @@ namespace SimpleLLMChatGUI
     /// <summary>
     /// A text-backed chat turn with a releasable rendered document.
     /// </summary>
-    public class ChatTurn
+    public partial class ChatTurn
     {
         /// <summary>
         /// Classic +/- expander style provided by <c>MainWindow</c>.
