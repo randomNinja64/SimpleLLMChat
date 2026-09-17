@@ -61,10 +61,10 @@ namespace DesktopTools
       return sb.ToString();
     }
 
-    public static WindowTarget ParseWindowTarget(string argumentsJson)
+    public static WindowTarget ParseWindowTarget(string argumentsJson, string prefix = "")
     {
-      string hwndText = ToolHelper.JsonExtractString(argumentsJson, "hwnd");
-      string windowTitle = ToolHelper.JsonExtractString(argumentsJson, "window_title");
+      string hwndText = ToolHelper.JsonExtractString(argumentsJson, prefix + "hwnd");
+      string windowTitle = ToolHelper.JsonExtractString(argumentsJson, prefix + "window_title");
 
       return new WindowTarget
       {

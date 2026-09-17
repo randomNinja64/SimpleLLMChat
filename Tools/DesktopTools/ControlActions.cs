@@ -316,19 +316,20 @@ namespace DesktopTools
     /// space (outer-window pixels when hwnd/window_title is set; virtual-desktop pixels
     /// otherwise — same as screenshot), then the window itself.
     /// </summary>
-    private static Target Resolve(string argumentsJson)
+    private static Target Resolve(string argumentsJson, string prefix = "",
+      IntPtr windowHwnd = default(IntPtr), List<ControlInfo> controls = null)
     {
-      var target = new Target();
-      WindowTarget window = WindowEnumerator.ParseWindowTarget(argumentsJson);
+      var target = new Target { WindowHwnd = windowHwnd, Controls = controls };
+      WindowTarget window = WindowEnumerator.ParseWindowTarget(argumentsJson, prefix);
 
       int elementIndex;
-      bool hasElement = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "element"), out elementIndex) && elementIndex > 0;
+      bool hasElement = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, prefix + "element"), out elementIndex) && elementIndex > 0;
 
       int x, y = 0;
-      bool hasCoords = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "x"), out x) &&
-                       int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "y"), out y);
+      bool hasCoords = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, prefix + "x"), out x) &&
+                       int.TryParse(ToolHelper.JsonExtractString(argumentsJson, prefix + "y"), out y);
 
-      if (window.IsEmpty && !hasCoords)
+      if (prefix == "" && window.IsEmpty && !hasCoords)
         return Fail("error: provide hwnd, window_title, or x/y.");
 
       if (!window.IsEmpty)
@@ -336,6 +337,8 @@ namespace DesktopTools
         try
         {
           target.WindowHwnd = WindowEnumerator.ResolveWindow(window.HwndText, window.WindowTitle);
+          if (target.WindowHwnd != windowHwnd)
+            target.Controls = null;
         }
         catch (Exception ex)
         {
@@ -343,12 +346,14 @@ namespace DesktopTools
         }
       }
 
+      if (prefix != "" && window.IsEmpty && !hasElement && !hasCoords)
+        return Fail("error: drag requires to_hwnd, to_window_title, to_element or to_x/to_y.");
+
       if (hasElement)
       {
-        TreeScope scope = ControlTree.ParseScope(argumentsJson);
-        target.Controls = ControlTree.Collect(target.WindowHwnd, scope.MaxDepth, scope.MaxControls);
         ControlInfo control;
-        string elementError = TryResolveElement(target.WindowHwnd, elementIndex, argumentsJson, "element", out control, target.Controls);
+        string elementError = TryResolveElement(target.WindowHwnd, elementIndex, argumentsJson,
+          prefix + "element", out control, ref target.Controls);
         if (elementError != null)
           return Fail(elementError);
 
@@ -359,13 +364,10 @@ namespace DesktopTools
 
       if (hasCoords)
       {
-        int screenX, screenY;
         string error;
-        if (!Win32Interop.TryCaptureToScreen(target.WindowHwnd, x, y, out screenX, out screenY, out error))
+        if (!Win32Interop.TryCaptureToScreen(target.WindowHwnd, x, y, out target.X, out target.Y, out error))
           return Fail(error);
 
-        target.X = screenX;
-        target.Y = screenY;
         target.HasPoint = true;
       }
 
@@ -381,50 +383,12 @@ namespace DesktopTools
       toX = 0;
       toY = 0;
 
-      string toHwnd = ToolHelper.JsonExtractString(argumentsJson, "to_hwnd");
-      string toTitle = ToolHelper.JsonExtractString(argumentsJson, "to_window_title");
-      bool hasWindow = !string.IsNullOrWhiteSpace(toHwnd) || !string.IsNullOrWhiteSpace(toTitle);
-      if (hasWindow)
-      {
-        try
-        {
-          IntPtr end = WindowEnumerator.ResolveWindow(toHwnd, toTitle);
-          if (end != windowHwnd) controls = null;
-          windowHwnd = end;
-        }
-        catch (Exception ex) { return "error: " + ex.Message; }
-      }
-
-      int toElement;
-      bool hasToElement = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "to_element"), out toElement) && toElement > 0;
-
-      int x, y = 0;
-      bool hasCoords = int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "to_x"), out x) &&
-                       int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "to_y"), out y);
-
-      if (!hasToElement && !hasCoords)
-        return hasWindow
-          ? (Win32Interop.TryGetWindowCenter(windowHwnd, out toX, out toY) ? null : NoScreenLocationError())
-          : "error: drag requires to_hwnd, to_window_title, to_element or to_x/to_y.";
-
-      if (hasToElement)
-      {
-        ControlInfo control;
-        string elementError = TryResolveElement(windowHwnd, toElement, argumentsJson, "to_element", out control, controls);
-        if (elementError != null)
-          return elementError;
-
-        if (!control.TryGetCenter(out toX, out toY))
-          return NoScreenLocationError();
-
-        return null;
-      }
-
-      string error;
-      if (!Win32Interop.TryCaptureToScreen(windowHwnd, x, y, out toX, out toY, out error))
-        return error;
-
-      return null;
+      Target target = Resolve(argumentsJson, "to_", windowHwnd, controls);
+      if (target.Failed)
+        return target.Error;
+      if (target.Control != null)
+        return target.Control.TryGetCenter(out toX, out toY) ? null : NoScreenLocationError();
+      return TryGetScreenPoint(target, out toX, out toY) ? null : NoScreenLocationError();
     }
 
     /// <summary>
@@ -435,16 +399,18 @@ namespace DesktopTools
       int elementIndex,
       string argumentsJson,
       string paramName,
-      out ControlInfo control, List<ControlInfo> controls = null)
+      out ControlInfo control, ref List<ControlInfo> controls)
     {
       control = null;
 
       if (windowHwnd == IntPtr.Zero)
         return "error: " + paramName + " requires hwnd or window_title to scope the control tree.";
 
-      TreeScope scope = ControlTree.ParseScope(argumentsJson);
       if (controls == null)
+      {
+        TreeScope scope = ControlTree.ParseScope(argumentsJson);
         controls = ControlTree.Collect(windowHwnd, scope.MaxDepth, scope.MaxControls);
+      }
       if (elementIndex > 0 && elementIndex <= controls.Count && controls[elementIndex - 1].Index == elementIndex)
         control = controls[elementIndex - 1];
       if (control == null)
