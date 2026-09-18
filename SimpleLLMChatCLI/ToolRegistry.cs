@@ -79,9 +79,10 @@ namespace SimpleLLMChatCLI
                 {
                     LoadManifest(jsonFile);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Skip malformed manifests
+                    Console.Error.WriteLine(
+                        "Skipping tool manifest '" + jsonFile + "': " + ex.Message);
                 }
             }
         }
@@ -283,8 +284,10 @@ namespace SimpleLLMChatCLI
                 ToolResultParser.Parse(result.Stdout, out text, out imageBase64, out imageMime);
                 return text;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine(
+                    "Context provider '" + commandName + "' failed: " + ex.Message);
                 return null;
             }
         }
