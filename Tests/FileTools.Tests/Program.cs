@@ -91,6 +91,100 @@ namespace FileTools.Tests
                     TestAssert.Equal(1, r.ExitCode, "exit 1");
                 });
 
+                TestRunner.Run("read_file.offset_and_truncate", () =>
+                {
+                    string path = ws.Combine("long.txt");
+                    File.WriteAllText(path, "0123456789ABCDEF", Encoding.UTF8);
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = path, ["offset"] = "0" },
+                        new JObject { ["maxFileContentLength"] = "10" });
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Text, "reading chars 0-9", "header");
+                    TestAssert.Contains(r.Text, "...[truncated]", "trunc");
+                    TestAssert.Contains(r.Text, "0123456789", "body");
+                    TestAssert.True(r.Text.IndexOf("ABCDEF", StringComparison.Ordinal) < 0, "no tail");
+                });
+
+                TestRunner.Run("read_file.offset_past_eof", () =>
+                {
+                    string path = ws.Combine("short.txt");
+                    File.WriteAllText(path, "abc", Encoding.UTF8);
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = path, ["offset"] = "3" });
+                    ToolClient.AssertToolError(r, "exceeds file length");
+                    TestAssert.Equal(1, r.ExitCode, "exit 1");
+                });
+
+                TestRunner.Run("read_file.env_temp", () =>
+                {
+                    string folder = Path.Combine(Path.GetTempPath(), "filetools-env-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(folder);
+                    try
+                    {
+                        string leaf = "env-hello.txt";
+                        File.WriteAllText(Path.Combine(folder, leaf), "from-temp", Encoding.UTF8);
+                        string envPath = "%TEMP%\\" + Path.GetFileName(folder) + "\\" + leaf;
+                        ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                            new JObject { ["filename"] = envPath });
+                        TestAssert.Equal(0, r.ExitCode, "exit");
+                        TestAssert.Contains(r.Text, "from-temp", "content");
+                    }
+                    finally
+                    {
+                        try { Directory.Delete(folder, true); } catch { }
+                    }
+                });
+
+                TestRunner.Run("copy_file.dest_exists", () =>
+                {
+                    string src = ws.Combine("copy-src.txt");
+                    string dest = ws.Combine("copy-dest.txt");
+                    File.WriteAllText(src, "src", Encoding.UTF8);
+                    File.WriteAllText(dest, "dest", Encoding.UTF8);
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "copy_file",
+                        new JObject { ["source_path"] = src, ["destination_path"] = dest });
+                    ToolClient.AssertToolError(r, "already exists");
+                });
+
+                TestRunner.Run("edit_file.old_string_ambiguous", () =>
+                {
+                    string path = ws.Combine("ambig.txt");
+                    File.WriteAllText(path, "xx mid xx", Encoding.UTF8);
+                    JArray edits = new JArray
+                    {
+                        new JObject { ["old_string"] = "xx", ["new_string"] = "YY" }
+                    };
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "edit_file",
+                        new JObject { ["filename"] = path, ["edits"] = edits });
+                    ToolClient.AssertToolError(r, "appears");
+                    TestAssert.Equal("xx mid xx", File.ReadAllText(path, Encoding.UTF8), "unchanged");
+                });
+
+                TestRunner.Run("delete_file.missing", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "delete_file",
+                        new JObject { ["file_path"] = ws.Combine("no-delete.txt") });
+                    ToolClient.AssertToolError(r, "not found");
+                });
+
+                TestRunner.Run("list_directory.missing", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "list_directory",
+                        new JObject { ["directory_path"] = ws.Combine("no-such-dir") });
+                    ToolClient.AssertToolError(r, "Directory not found");
+                });
+
+                TestRunner.Run("extract_file.archive_missing", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "extract_file",
+                        new JObject
+                        {
+                            ["archive_path"] = ws.Combine("missing.zip"),
+                            ["destination_path"] = ws.Combine("extract-out")
+                        });
+                    ToolClient.AssertToolError(r, "Archive not found");
+                });
+
                 TestRunner.Run("extract_file", () =>
                 {
                     if (!ToolClient.ProductExists("7za.exe"))
