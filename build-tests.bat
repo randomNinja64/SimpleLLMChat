@@ -90,6 +90,16 @@ call :CopyTool DesktopTools
 
 call :CopyIfExists "%ROOT%deps\7za.exe" "%TESTBUILD%\FileTools.Tests\7za.exe"
 
+call :CopyIfExists "%ROOT%deps\grep.exe" "%TESTBUILD%\FileTools.Tests\grep.exe"
+
+call :CopyIfExists "%ROOT%deps\libiconv2.dll" "%TESTBUILD%\FileTools.Tests\libiconv2.dll"
+
+call :CopyIfExists "%ROOT%deps\libintl3.dll" "%TESTBUILD%\FileTools.Tests\libintl3.dll"
+
+call :CopyIfExists "%ROOT%deps\pcre3.dll" "%TESTBUILD%\FileTools.Tests\pcre3.dll"
+
+call :CopyIfExists "%ROOT%deps\regex2.dll" "%TESTBUILD%\FileTools.Tests\regex2.dll"
+
 call :CopyIfExists "%ROOT%deps\curl.exe" "%TESTBUILD%\WebTools.Tests\curl.exe"
 
 call :CopyIfExists "%ROOT%deps\curl-ca-bundle.crt" "%TESTBUILD%\WebTools.Tests\curl-ca-bundle.crt"

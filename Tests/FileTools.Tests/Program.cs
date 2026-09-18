@@ -113,6 +113,64 @@ namespace FileTools.Tests
                         new JObject { ["archive_path"] = archive, ["destination_path"] = dest });
                     TestAssert.Equal(0, r.ExitCode, "extract exit");
                 });
+
+                TestRunner.Run("grep_search", () =>
+                {
+                    if (!ToolClient.ProductExists("grep.exe"))
+                        TestRunner.Skip("grep.exe not packaged beside test EXE");
+
+                    string hit = ws.Combine("hit.txt");
+                    string miss = ws.Combine("miss.txt");
+                    File.WriteAllText(hit, "alpha FINDME omega", Encoding.UTF8);
+                    File.WriteAllText(miss, "nothing here", Encoding.UTF8);
+
+                    string noiseDir = Path.Combine(ws.Path, "node_modules");
+                    Directory.CreateDirectory(noiseDir);
+                    File.WriteAllText(Path.Combine(noiseDir, "secret.txt"), "FINDME in node_modules", Encoding.UTF8);
+
+                    string csOnly = ws.Combine("code.cs");
+                    File.WriteAllText(csOnly, "FINDME in csharp", Encoding.UTF8);
+
+                    ToolInvokeResult hitResult = ToolClient.InvokeProduct(Exe, "grep_search",
+                        new JObject
+                        {
+                            ["pattern"] = "FINDME",
+                            ["directory_path"] = ws.Path
+                        });
+                    TestAssert.Equal(0, hitResult.ExitCode, "hit exit");
+                    TestAssert.Contains(hitResult.Text, "FINDME", "hit text");
+                    TestAssert.True(!hitResult.Text.Contains("node_modules"), "excludes node_modules");
+
+                    ToolInvokeResult missResult = ToolClient.InvokeProduct(Exe, "grep_search",
+                        new JObject
+                        {
+                            ["pattern"] = "NO_SUCH_TOKEN_XYZ",
+                            ["directory_path"] = ws.Path
+                        });
+                    TestAssert.Equal(0, missResult.ExitCode, "miss exit");
+                    TestAssert.Contains(missResult.Text, "No matches found", "miss message");
+
+                    ToolInvokeResult caseResult = ToolClient.InvokeProduct(Exe, "grep_search",
+                        new JObject
+                        {
+                            ["pattern"] = "findme",
+                            ["directory_path"] = ws.Path,
+                            ["case_insensitive"] = "true"
+                        });
+                    TestAssert.Equal(0, caseResult.ExitCode, "case exit");
+                    TestAssert.Contains(caseResult.Text, "FINDME", "case text");
+
+                    ToolInvokeResult globResult = ToolClient.InvokeProduct(Exe, "grep_search",
+                        new JObject
+                        {
+                            ["pattern"] = "FINDME",
+                            ["directory_path"] = ws.Path,
+                            ["file_pattern"] = "*.cs"
+                        });
+                    TestAssert.Equal(0, globResult.ExitCode, "glob exit");
+                    TestAssert.Contains(globResult.Text, "code.cs", "glob cs");
+                    TestAssert.True(!globResult.Text.Contains("hit.txt"), "glob skips txt");
+                });
             }
         }
     }

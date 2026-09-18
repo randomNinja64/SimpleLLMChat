@@ -45,8 +45,23 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="GuiDriver.cs" />
-    <Compile Include="..\TestHelper.cs">
-      <Link>TestHelper.cs</Link>
+    <Compile Include="..\TestLog.cs">
+      <Link>TestLog.cs</Link>
+    </Compile>
+    <Compile Include="..\TestAssert.cs">
+      <Link>TestAssert.cs</Link>
+    </Compile>
+    <Compile Include="..\TestRunner.cs">
+      <Link>TestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\ToolClient.cs">
+      <Link>ToolClient.cs</Link>
+    </Compile>
+    <Compile Include="..\ProcessRunner.cs">
+      <Link>ProcessRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\FakeOpenAiServer.cs">
+      <Link>FakeOpenAiServer.cs</Link>
     </Compile>
     <Compile Include="..\..\SimpleLLMChatGUI\SettingsIniWriter.cs">
       <Link>GUI\SettingsIniWriter.cs</Link>

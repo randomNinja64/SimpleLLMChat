@@ -41,7 +41,7 @@ Alternatively, the project can be built using the `SimpleLLMChat.sln` file direc
 
 Both methods require the .NET 4.0 Targeting Pack to be installed.
 
-**Note**: Builds generated using these methods include only the core executables by default. Optional binaries (`7za.exe`, `curl.exe`, `curl-ca-bundle.crt`, `yt-dlp.exe`) are packaged when present under `deps\` or can be manually placed beside the matching tool's executable. Optional binaries are specified in [Tools](#tools).
+**Note**: Builds generated using these methods include only the core executables by default. Optional binaries (`7za.exe`, `grep.exe` and its DLLs, `curl.exe`, `curl-ca-bundle.crt`, `yt-dlp.exe`) are packaged when present under `deps\` or can be manually placed beside the matching tool's executable. Optional binaries are specified in [Tools](#tools). Third-party license texts placed under `THIRD_PARTY_LICENSES\` (gitignored; keep the folder via `.gitkeep`) are copied into the release folder as `THIRD_PARTY_LICENSES\` when present.
 
 ## Tests
 
@@ -54,7 +54,7 @@ run-tests.bat
 
 `build-tests.bat` builds the product and test suites. `run-tests.bat` runs every suite (or one suite when a name is passed, e.g. `run-tests.bat FileTools`) and writes logs under `Tests\logs\`.
 
-**Note**: For cases that need external executables (7za, cURL, YT-DLP), either put them in `deps\` before `build-tests.bat`, or place them beside the matching tool executable before `run-tests.bat`.
+**Note**: For cases that need external executables (7za, grep, cURL, YT-DLP), either put them in `deps\` before `build-tests.bat`, or place them beside the matching tool executable before `run-tests.bat`.
 
 ## Configuration
 
@@ -139,14 +139,16 @@ SimpleLLMChat includes the following 7 tool packages:
     - `delete_file`: Deletes a file from the file system
     - `edit_file`: Replaces exact text in an existing file via one or more old_string/new_string edits
     - `extract_file`: Extracts an archive to a destination directory
+    - `grep_search`: Recursively searches files for a regex pattern
     - `list_directory`: Lists all files and subdirectories in a given directory
     - `move_file`: Moves a file from one location to another
     - `read_file`: Reads the contents of a local file
     - `write_file`: Writes contents to a local file
   - Configuration Options
-    - `maxFileContentLength`: Maximum number of characters to read from a file (default: `8000`)
+    - `maxFileContentLength`: Maximum number of characters to read from a file or return from `grep_search` (default: `8000`)
   - Dependencies
     - `7za.exe`: used to extract archives
+    - `grep.exe` (+ `libiconv2.dll`, `libintl3.dll`, `pcre3.dll`, `regex2.dll`): used by `grep_search` (GnuWin32 GNU grep)
 - Memory Tools
   - Tools
     - `delete_memory`: Deletes a saved memory entry

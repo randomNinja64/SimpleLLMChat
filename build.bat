@@ -30,9 +30,17 @@ for %%T in (FileTools PythonTools ShellTools WebTools MemoryTools SkillTools Des
 :: Optional deps from deps\
 echo Packaging optional dependencies ...
 call :CopyIfExists "%ROOT%deps\7za.exe" "%OUT%\tools\FileTools\7za.exe"
+call :CopyIfExists "%ROOT%deps\grep.exe" "%OUT%\tools\FileTools\grep.exe"
+call :CopyIfExists "%ROOT%deps\libiconv2.dll" "%OUT%\tools\FileTools\libiconv2.dll"
+call :CopyIfExists "%ROOT%deps\libintl3.dll" "%OUT%\tools\FileTools\libintl3.dll"
+call :CopyIfExists "%ROOT%deps\pcre3.dll" "%OUT%\tools\FileTools\pcre3.dll"
+call :CopyIfExists "%ROOT%deps\regex2.dll" "%OUT%\tools\FileTools\regex2.dll"
 call :CopyIfExists "%ROOT%deps\curl.exe" "%OUT%\tools\WebTools\curl.exe"
 call :CopyIfExists "%ROOT%deps\curl-ca-bundle.crt" "%OUT%\tools\WebTools\curl-ca-bundle.crt"
 call :CopyIfExists "%ROOT%deps\yt-dlp.exe" "%OUT%\tools\WebTools\yt-dlp.exe"
+
+:: Optional third-party license texts
+call :CopyLicenses
 
 echo.
 echo Done: %OUT%
@@ -42,5 +50,21 @@ exit /b 0
 if exist "%~1" (
   copy /Y "%~1" "%~2" >nul
   echo   packaged %~nx2
+)
+exit /b 0
+
+:CopyLicenses
+if not exist "%ROOT%THIRD_PARTY_LICENSES" exit /b 0
+set "_any="
+for %%F in ("%ROOT%THIRD_PARTY_LICENSES\*") do (
+  if /I not "%%~nxF"==".gitkeep" set "_any=1"
+)
+if not defined _any exit /b 0
+mkdir "%OUT%\THIRD_PARTY_LICENSES" 2>nul
+for %%F in ("%ROOT%THIRD_PARTY_LICENSES\*") do (
+  if /I not "%%~nxF"==".gitkeep" (
+    copy /Y "%%F" "%OUT%\THIRD_PARTY_LICENSES\" >nul
+    echo   packaged THIRD_PARTY_LICENSES\%%~nxF
+  )
 )
 exit /b 0

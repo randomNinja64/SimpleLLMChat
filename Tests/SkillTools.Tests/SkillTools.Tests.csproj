@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -40,8 +40,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="..\TestHelper.cs">
-      <Link>TestHelper.cs</Link>
+    <Compile Include="..\TestLog.cs">
+      <Link>TestLog.cs</Link>
+    </Compile>
+    <Compile Include="..\TestAssert.cs">
+      <Link>TestAssert.cs</Link>
+    </Compile>
+    <Compile Include="..\TestRunner.cs">
+      <Link>TestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\ToolClient.cs">
+      <Link>ToolClient.cs</Link>
+    </Compile>
+    <Compile Include="..\ProcessRunner.cs">
+      <Link>ProcessRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\FakeOpenAiServer.cs">
+      <Link>FakeOpenAiServer.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

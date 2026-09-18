@@ -85,6 +85,18 @@ namespace FileTools
                             return new ToolResult(output, exitCode);
                         }
 
+                    case "grep_search":
+                        {
+                            string pattern = ToolHelper.GetRequiredArg(argumentsJson, "pattern");
+                            string directoryPath = ToolHelper.JsonExtractString(argumentsJson, "directory_path");
+                            string filePattern = ToolHelper.JsonExtractString(argumentsJson, "file_pattern");
+                            string caseInsensitive = ToolHelper.JsonExtractString(argumentsJson, "case_insensitive");
+                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 8000);
+                            int exitCode;
+                            string output = GrepSearchTool.Search(pattern, directoryPath, filePattern, caseInsensitive, maxContentLength, out exitCode);
+                            return new ToolResult(output, exitCode);
+                        }
+
                     default:
                         return ToolHelper.Fail("unknown tool '" + toolName + "'.");
                 }

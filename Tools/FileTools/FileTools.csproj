@@ -44,6 +44,8 @@
     <Compile Include="..\ToolHelper.cs" />
     <Compile Include="FileHandler.cs" />
     <Compile Include="EditFileTool.cs" />
+    <Compile Include="GrepExcludeLists.cs" />
+    <Compile Include="GrepSearchTool.cs" />
     <Compile Include="TextNormalization.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

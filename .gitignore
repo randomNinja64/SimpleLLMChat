@@ -406,3 +406,7 @@ SimpleLLMChatGUI/Resources/Thumbs.db
 # Optional local tool binaries for build.bat / build-tests.bat (keep folder via .gitkeep)
 /deps/*
 !/deps/.gitkeep
+
+# Optional third-party license texts packaged into the release folder (keep via .gitkeep)
+/THIRD_PARTY_LICENSES/*
+!/THIRD_PARTY_LICENSES/.gitkeep

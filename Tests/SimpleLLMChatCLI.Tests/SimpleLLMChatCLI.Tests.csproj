@@ -40,8 +40,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="..\TestHelper.cs">
-      <Link>TestHelper.cs</Link>
+    <Compile Include="..\TestLog.cs">
+      <Link>TestLog.cs</Link>
+    </Compile>
+    <Compile Include="..\TestAssert.cs">
+      <Link>TestAssert.cs</Link>
+    </Compile>
+    <Compile Include="..\TestRunner.cs">
+      <Link>TestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\ToolClient.cs">
+      <Link>ToolClient.cs</Link>
+    </Compile>
+    <Compile Include="..\ProcessRunner.cs">
+      <Link>ProcessRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\FakeOpenAiServer.cs">
+      <Link>FakeOpenAiServer.cs</Link>
     </Compile>
     <Compile Include="..\..\Shared\TokenEstimator.cs">
       <Link>Shared\TokenEstimator.cs</Link>
