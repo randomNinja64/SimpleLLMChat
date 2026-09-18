@@ -248,6 +248,25 @@ namespace DesktopTools
       return frame.Covers(centerX * frame.Scale, centerY * frame.Scale) ? frame.Scale : 1.0;
     }
 
+    /// <summary>
+    /// Write physical-pixel bounds onto <paramref name="info"/> using the same
+    /// DPI frame as the tree walk. False when the provider rect is empty or
+    /// rounds to nothing.
+    /// </summary>
+    private static bool ApplyBounds(ControlInfo info, System.Windows.Rect rect, Frame frame)
+    {
+      if (info == null || rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0)
+        return false;
+
+      double factor = ScaleFor(rect, info.Hwnd, frame);
+      info.X = (int)Math.Round(rect.X * factor);
+      info.Y = (int)Math.Round(rect.Y * factor);
+      info.Width = (int)Math.Round(rect.Width * factor);
+      info.Height = (int)Math.Round(rect.Height * factor);
+      info.HasLocation = info.Width > 0 && info.Height > 0;
+      return info.HasLocation;
+    }
+
     private static ControlInfo Describe(AutomationElement element, int depth, Frame frame)
     {
       try
@@ -264,18 +283,7 @@ namespace DesktopTools
           Role = RoleOf(current.ControlType)
         };
 
-        System.Windows.Rect rect = current.BoundingRectangle;
-        if (!rect.IsEmpty && rect.Width > 0 && rect.Height > 0)
-        {
-          double factor = ScaleFor(rect, info.Hwnd, frame);
-
-          info.X = (int)Math.Round(rect.X * factor);
-          info.Y = (int)Math.Round(rect.Y * factor);
-          info.Width = (int)Math.Round(rect.Width * factor);
-          info.Height = (int)Math.Round(rect.Height * factor);
-          info.HasLocation = true;
-        }
-
+        ApplyBounds(info, current.BoundingRectangle, frame);
         info.Value = ReadValue(element);
         return info;
       }
@@ -497,19 +505,8 @@ namespace DesktopTools
 
       try
       {
-        System.Windows.Rect rect = info.Element.Current.BoundingRectangle;
-        if (rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0)
-          return false;
-
         Frame frame = Frame.For(windowHwnd, Win32Interop.GetProviderScale(windowHwnd));
-        double factor = ScaleFor(rect, info.Hwnd, frame);
-
-        info.X = (int)Math.Round(rect.X * factor);
-        info.Y = (int)Math.Round(rect.Y * factor);
-        info.Width = (int)Math.Round(rect.Width * factor);
-        info.Height = (int)Math.Round(rect.Height * factor);
-        info.HasLocation = info.Width > 0 && info.Height > 0;
-        return info.HasLocation;
+        return ApplyBounds(info, info.Element.Current.BoundingRectangle, frame);
       }
       catch
       {

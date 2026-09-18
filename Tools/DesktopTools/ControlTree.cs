@@ -100,19 +100,6 @@ namespace DesktopTools
       return controls;
     }
 
-    public static ControlInfo Find(IntPtr windowHwnd, int index, int maxDepth, int maxControls)
-    {
-      if (index < 1)
-        return null;
-
-      List<ControlInfo> controls = Collect(windowHwnd, maxDepth, maxControls);
-      if (index > controls.Count)
-        return null;
-
-      ControlInfo control = controls[index - 1];
-      return control == TruncationMarker.Instance ? null : control;
-    }
-
     public static string Render(IntPtr windowHwnd, int maxDepth, int maxControls)
     {
       int originLeft, originTop, originW, originH;

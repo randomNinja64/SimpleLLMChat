@@ -71,12 +71,8 @@ namespace DesktopTools
           popup != relatedWindow &&
           Win32Interop.IsWindowVisible(popup))
       {
-        long key = popup.ToInt64();
-        string line;
-        if (!after.Windows.TryGetValue(key, out line))
-          line = OutputFormat.FormatTopLevelWindow(popup, Win32Interop.GetWindowTitle(popup), Win32Interop.GetControlClass(popup));
-        notes.Add("dialog " + line);
-        reported.Add(key);
+        notes.Add("dialog " + Describe(popup, after));
+        reported.Add(popup.ToInt64());
       }
 
       int newCount = 0;
@@ -98,20 +94,27 @@ namespace DesktopTools
           after.Foreground != before.Foreground &&
           !reported.Contains(after.Foreground.ToInt64()))
       {
-        long key = after.Foreground.ToInt64();
-        string line;
-        if (!after.Windows.TryGetValue(key, out line))
-          line = OutputFormat.FormatTopLevelWindow(
-            after.Foreground,
-            Win32Interop.GetWindowTitle(after.Foreground),
-            Win32Interop.GetControlClass(after.Foreground));
-        notes.Add("foreground " + line);
+        notes.Add("foreground " + Describe(after.Foreground, after));
       }
 
       if (notes.Count == 0)
         return result;
 
       return result + " | " + string.Join("; ", notes.ToArray());
+    }
+
+    /// <summary>
+    /// Prefer the snapshot line so notes match list_windows; format on the fly
+    /// when the HWND was filtered out of Capture (empty title, non-dialog).
+    /// </summary>
+    private static string Describe(IntPtr hwnd, Snapshot after)
+    {
+      string line;
+      if (after.Windows != null && after.Windows.TryGetValue(hwnd.ToInt64(), out line))
+        return line;
+
+      return OutputFormat.FormatTopLevelWindow(
+        hwnd, Win32Interop.GetWindowTitle(hwnd), Win32Interop.GetControlClass(hwnd));
     }
 
     public static bool IsDialogClass(string className)
