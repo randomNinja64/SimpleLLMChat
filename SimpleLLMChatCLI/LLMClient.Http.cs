@@ -97,6 +97,9 @@ public partial class LLMClient
         ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments));
         Console.Out.Flush();
 
+        if (Program.StatusPipe != null)
+            Program.StatusPipe.PublishDiscrete(StatusPipe.FormatApproval(toolName, arguments));
+
         while (true)
         {
             ChatOutput.Write(ToolApproval.ApprovalPrompt);

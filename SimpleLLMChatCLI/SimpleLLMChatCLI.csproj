@@ -108,6 +108,9 @@
     <Compile Include="..\Shared\StatusPipe\StatusPipe.Ready.cs">
       <Link>Shared\StatusPipe\StatusPipe.Ready.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Approval.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Approval.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

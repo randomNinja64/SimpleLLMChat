@@ -6,6 +6,7 @@ using System.Globalization;
 /// Wire format lines (UTF-8, one per message):
 ///   STATUS tokens=1234
 ///   STATUS ready
+///   STATUS approval name=tool_name args=...
 ///   STATUS indexing=start total=42
 ///   STATUS indexing=progress current=7 total=42 file=notes.md
 ///   STATUS indexing=done files=5
@@ -63,8 +64,9 @@ public static partial class StatusPipe
 
         start += needle.Length;
 
-        // Error messages (and similar free-text) may contain spaces; take the rest of the line.
-        if (string.Equals(key, "message", StringComparison.OrdinalIgnoreCase))
+        // Error messages and approval args may contain spaces; take the rest of the line.
+        if (string.Equals(key, "message", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "args", StringComparison.OrdinalIgnoreCase))
             return args.Substring(start).Trim();
 
         int end = start;

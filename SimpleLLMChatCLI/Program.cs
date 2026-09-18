@@ -227,7 +227,7 @@ namespace SimpleLLMChatCLI
                 // how the previous turn's output ended.
                 ChatOutput.StartBlock();
                 ChatOutput.Write("You: ");
-                StatusPipe.PublishReady();
+                StatusPipe.PublishDiscrete(global::StatusPipe.ReadyLine);
                 string userInput = Console.ReadLine();
                 ChatOutput.EndInputLine();
 

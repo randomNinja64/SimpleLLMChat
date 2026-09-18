@@ -17,6 +17,7 @@ public sealed class StatusPipeClient : IDisposable
     public event Action<int> StatusReceived;
     public event Action<IndexingStatusEvent> IndexingStatusReceived;
     public event Action ReadyReceived;
+    public event Action<string, string> ApprovalReceived;
 
     public StatusPipeClient(int processId)
     {
@@ -64,6 +65,16 @@ public sealed class StatusPipeClient : IDisposable
                             continue;
                         }
 
+                        string approvalTool;
+                        string approvalArgs;
+                        if (StatusPipe.TryParseApprovalLine(line, out approvalTool, out approvalArgs))
+                        {
+                            Action<string, string> handler = ApprovalReceived;
+                            if (handler != null)
+                                handler(approvalTool, approvalArgs);
+                            continue;
+                        }
+
                         int tokens;
                         if (StatusPipe.TryParseStatusLine(line, out tokens))
                         {
@@ -107,6 +118,7 @@ public sealed class StatusPipeClient : IDisposable
         StatusReceived = null;
         IndexingStatusReceived = null;
         ReadyReceived = null;
+        ApprovalReceived = null;
 
         NamedPipeClientStream pipe = _pipe;
         _pipe = null;

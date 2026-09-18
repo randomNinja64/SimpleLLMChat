@@ -42,20 +42,23 @@ public sealed class StatusPipeServer : IDisposable
     }
 
     /// <summary>
-    /// Signals the GUI that the CLI is waiting for input (printed You:).
-    /// Not deduped — consecutive prompts must each fire.
+    /// Publishes a one-shot control event (ready, approval, …). Not deduped —
+    /// consecutive identical lines must each fire.
     /// </summary>
-    public void PublishReady()
+    public void PublishDiscrete(string line)
     {
+        if (string.IsNullOrEmpty(line))
+            return;
+
         lock (_sync)
         {
-            _lastLine = StatusPipe.ReadyLine;
+            _lastLine = line;
             if (_writer == null)
                 return;
 
             try
             {
-                _writer.WriteLine(StatusPipe.ReadyLine);
+                _writer.WriteLine(line);
             }
             catch
             {

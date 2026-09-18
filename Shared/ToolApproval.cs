@@ -1,7 +1,8 @@
 using System;
 
 /// <summary>
-/// Shared tool-approval prompt text used by CLI output and GUI parsing.
+/// Shared tool-approval prompt text for TTY stdout and GUI MessageBox formatting.
+/// GUI turn/approval control uses StatusPipe (STATUS approval), not stdout scraping.
 /// </summary>
 public static class ToolApproval
 {

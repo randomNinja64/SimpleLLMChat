@@ -115,6 +115,9 @@
     <Compile Include="..\Shared\StatusPipe\StatusPipe.Ready.cs">
       <Link>Shared\StatusPipe\StatusPipe.Ready.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Approval.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Approval.cs</Link>
+    </Compile>
     <Compile Include="StatusPipeClient.cs" />
     <Compile Include="IndexingStatusHub.cs" />
     <Compile Include="ToolOptionsRegistry.cs" />

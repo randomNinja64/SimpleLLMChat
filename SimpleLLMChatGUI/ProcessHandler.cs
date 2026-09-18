@@ -10,7 +10,7 @@ namespace SimpleLLMChatGUI
     {
         private Process llmProcess;
         private bool disposed;
-        private StringBuilder textBuffer = new StringBuilder(); // Buffer for incomplete text
+        private StringBuilder textBuffer = new StringBuilder(); // Buffer for incomplete You: strip
 
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
@@ -18,7 +18,6 @@ namespace SimpleLLMChatGUI
         public event Func<string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
 
-        private readonly StringBuilder streamBuffer = new StringBuilder();
         private StatusPipeClient statusPipeClient;
 
         public bool IsProcessRunning
@@ -44,13 +43,13 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.CreateNoWindow = true;
                 llmProcess.StartInfo.Arguments = "--no-banners";
                 textBuffer.Clear();
-                streamBuffer.Clear();
                 llmProcess.Start();
 
                 statusPipeClient = new StatusPipeClient(llmProcess.Id);
                 statusPipeClient.StatusReceived += OnStatusPipeReceived;
                 statusPipeClient.IndexingStatusReceived += OnIndexingStatusPipeReceived;
                 statusPipeClient.ReadyReceived += OnStatusPipeReady;
+                statusPipeClient.ApprovalReceived += OnStatusPipeApproval;
                 statusPipeClient.Start();
 
                 // 256 byte async buffer
@@ -81,6 +80,15 @@ namespace SimpleLLMChatGUI
                 handler();
         }
 
+        private void OnStatusPipeApproval(string toolName, string arguments)
+        {
+            bool approved = false;
+            if (ApprovalRequested != null)
+                approved = ApprovalRequested(toolName, arguments);
+
+            SendApprovalResponse(approved);
+        }
+
         private void OnIndexingStatusPipeReceived(IndexingStatusEvent status)
         {
             IndexingStatusHub.Publish(status);
@@ -93,6 +101,7 @@ namespace SimpleLLMChatGUI
                 statusPipeClient.StatusReceived -= OnStatusPipeReceived;
                 statusPipeClient.IndexingStatusReceived -= OnIndexingStatusPipeReceived;
                 statusPipeClient.ReadyReceived -= OnStatusPipeReady;
+                statusPipeClient.ApprovalReceived -= OnStatusPipeApproval;
                 statusPipeClient.Dispose();
                 statusPipeClient = null;
             }
@@ -182,10 +191,7 @@ namespace SimpleLLMChatGUI
                     string newText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
                     if (!string.IsNullOrEmpty(newText))
-                    {
-                        // Process text immediately for streaming
-                        ProcessStreamingText(newText);
-                    }
+                        ProcessTextChunk(newText);
                 }
                 catch
                 {
@@ -217,77 +223,6 @@ namespace SimpleLLMChatGUI
             return false;
         }
 
-        private void ProcessStreamingText(string newText)
-        {
-            if (string.IsNullOrEmpty(newText))
-                return;
-
-            streamBuffer.Append(newText);
-
-            while (true)
-            {
-                string buffered = streamBuffer.ToString();
-                int promptIndex = buffered.IndexOf(ToolApproval.ApprovalPrompt, StringComparison.Ordinal);
-                if (promptIndex < 0)
-                {
-                    FlushBufferedTextWithoutApprovalPrompt(buffered);
-                    return;
-                }
-
-                int blockStart = buffered.LastIndexOf(ToolApproval.RunToolPrefix, promptIndex, StringComparison.Ordinal);
-                if (blockStart < 0)
-                {
-                    ProcessTextChunk(buffered.Substring(0, promptIndex + ToolApproval.ApprovalPrompt.Length));
-                    streamBuffer.Clear();
-                    streamBuffer.Append(buffered.Substring(promptIndex + ToolApproval.ApprovalPrompt.Length));
-                    continue;
-                }
-
-                if (blockStart > 0)
-                    ProcessTextChunk(buffered.Substring(0, blockStart));
-
-                string approvalBlock = buffered.Substring(blockStart, promptIndex + ToolApproval.ApprovalPrompt.Length - blockStart);
-                HandleApprovalBlock(approvalBlock);
-
-                string remaining = buffered.Substring(promptIndex + ToolApproval.ApprovalPrompt.Length);
-                streamBuffer.Clear();
-                if (string.IsNullOrEmpty(remaining))
-                    return;
-
-                streamBuffer.Append(remaining);
-            }
-        }
-
-        private void FlushBufferedTextWithoutApprovalPrompt(string buffered)
-        {
-            int runIndex = buffered.LastIndexOf(ToolApproval.RunToolPrefix, StringComparison.Ordinal);
-            if (runIndex >= 0)
-            {
-                if (runIndex > 0)
-                    ProcessTextChunk(buffered.Substring(0, runIndex));
-
-                streamBuffer.Clear();
-                streamBuffer.Append(buffered.Substring(runIndex));
-                return;
-            }
-
-            int holdBack = Math.Max(
-                GetPartialSuffixLength(buffered, ToolApproval.ApprovalPrompt),
-                GetPartialSuffixLength(buffered, ToolApproval.RunToolPrefix));
-
-            if (holdBack > 0)
-            {
-                ProcessTextChunk(buffered.Substring(0, buffered.Length - holdBack));
-                streamBuffer.Clear();
-                streamBuffer.Append(buffered.Substring(buffered.Length - holdBack));
-            }
-            else
-            {
-                ProcessTextChunk(buffered);
-                streamBuffer.Clear();
-            }
-        }
-
         private static int GetPartialSuffixLength(string text, string marker)
         {
             int maxLength = Math.Min(marker.Length - 1, text.Length);
@@ -298,24 +233,6 @@ namespace SimpleLLMChatGUI
             }
 
             return 0;
-        }
-
-        private void HandleApprovalBlock(string approvalBlock)
-        {
-            string toolName;
-            string arguments;
-            if (!ToolApproval.TryParseApprovalPrompt(approvalBlock, out toolName, out arguments))
-            {
-                ErrorOccurred?.Invoke("Failed to parse tool approval prompt.");
-                SendApprovalResponse(false);
-                return;
-            }
-
-            bool approved = false;
-            if (ApprovalRequested != null)
-                approved = ApprovalRequested(toolName, arguments);
-
-            SendApprovalResponse(approved);
         }
 
         private void ProcessTextChunk(string textChunk)
@@ -348,10 +265,17 @@ namespace SimpleLLMChatGUI
         {
             if (!string.IsNullOrEmpty(text))
             {
-                // CLI still prints You: for TTY; strip it from the GUI transcript.
+                // CLI still prints You: / Approve? for TTY; strip from the GUI transcript.
+                // Approval interaction is STATUS approval on the control pipe.
                 string filteredText = Regex.Replace(
                     text,
                     @"(^|\r?\n)[ \t]*You:[ \t]*",
+                    match => match.Groups[1].Value,
+                    RegexOptions.Multiline
+                );
+                filteredText = Regex.Replace(
+                    filteredText,
+                    @"(^|\r?\n)[ \t]*" + Regex.Escape(ToolApproval.ApprovalPrompt),
                     match => match.Groups[1].Value,
                     RegexOptions.Multiline
                 );
