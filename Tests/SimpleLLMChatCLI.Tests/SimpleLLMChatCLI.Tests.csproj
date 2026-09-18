@@ -55,6 +55,12 @@
     <Compile Include="..\ProcessRunner.cs">
       <Link>ProcessRunner.cs</Link>
     </Compile>
+    <Compile Include="..\CliProcess.cs">
+      <Link>CliProcess.cs</Link>
+    </Compile>
+    <Compile Include="..\StatusPipeProbe.cs">
+      <Link>StatusPipeProbe.cs</Link>
+    </Compile>
     <Compile Include="..\FakeOpenAiServer.cs">
       <Link>FakeOpenAiServer.cs</Link>
     </Compile>
@@ -78,6 +84,21 @@
     </Compile>
     <Compile Include="..\..\Shared\RagExtensionList.cs">
       <Link>Shared\RagExtensionList.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\StatusPipe\StatusPipe.cs">
+      <Link>Shared\StatusPipe\StatusPipe.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\StatusPipe\StatusPipe.Tokens.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Tokens.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\StatusPipe\StatusPipe.Indexing.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Indexing.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\StatusPipe\StatusPipe.Ready.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Ready.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\StatusPipe\StatusPipe.Approval.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Approval.cs</Link>
     </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ImageEncoder.cs">
       <Link>CLI\ImageEncoder.cs</Link>

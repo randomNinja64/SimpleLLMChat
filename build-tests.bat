@@ -116,6 +116,22 @@ copy /Y "%ROOT%SimpleLLMChatCLI\bin\Release\SimpleLLMChatCLI.exe" "%TESTBUILD%\S
 
 copy /Y "%ROOT%SimpleLLMChatCLI\bin\Release\Newtonsoft.Json.dll" "%TESTBUILD%\SimpleLLMChatCLI.Tests\" >nul
 
+:: Production-like tools/ tree beside the CLI test host (Skip in tests if missing)
+
+call :CopyToolToCliHost FileTools
+
+call :CopyToolToCliHost MemoryTools
+
+call :CopyToolToCliHost SkillTools
+
+call :CopyToolToCliHost ShellTools
+
+call :CopyToolToCliHost PythonTools
+
+call :CopyToolToCliHost WebTools
+
+call :CopyToolToCliHost DesktopTools
+
 
 
 copy /Y "%ROOT%SimpleLLMChatGUI\bin\Release\SimpleLLMChatGUI.exe" "%TESTBUILD%\SimpleLLMChatGUI.Tests\" >nul
@@ -162,6 +178,30 @@ copy /Y "%SRC%\%T%.exe" "%DST%\" >nul
 copy /Y "%SRC%\%T%.json" "%DST%\" >nul
 
 copy /Y "%SRC%\Newtonsoft.Json.dll" "%DST%\" >nul
+
+exit /b 0
+
+
+
+:CopyToolToCliHost
+
+set T=%~1
+
+set SRC=%ROOT%Tools\%T%\bin\Release
+
+set DST=%TESTBUILD%\SimpleLLMChatCLI.Tests\tools\%T%
+
+if not exist "%SRC%\%T%.exe" exit /b 0
+
+if not exist "%DST%" mkdir "%DST%"
+
+copy /Y "%SRC%\%T%.exe" "%DST%\" >nul
+
+copy /Y "%SRC%\%T%.json" "%DST%\" >nul
+
+if exist "%SRC%\Newtonsoft.Json.dll" copy /Y "%SRC%\Newtonsoft.Json.dll" "%DST%\" >nul
+
+echo   CLI tools\%T%
 
 exit /b 0
 

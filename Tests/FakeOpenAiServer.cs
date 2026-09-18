@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -55,8 +56,19 @@ public static class TestHttpListener
 
 public sealed class FakeOpenAiServer : IDisposable
 {
+    private sealed class ScriptedReply
+    {
+        public bool IsToolCall;
+        public string Content;
+        public string ToolName;
+        public string ToolId;
+        public string ToolArguments;
+    }
+
     private readonly HttpListener _listener;
     private readonly Thread _thread;
+    private readonly object _scriptGate = new object();
+    private readonly Queue<ScriptedReply> _script = new Queue<ScriptedReply>();
     private volatile bool _running;
     private int _turn;
 
@@ -91,6 +103,38 @@ public sealed class FakeOpenAiServer : IDisposable
         _thread = new Thread(ListenLoop) { IsBackground = true };
         _thread.Start();
         TestLog.Detail("FakeOpenAiServer listening at " + BaseUrl);
+    }
+
+    public void ClearScript()
+    {
+        lock (_scriptGate)
+            _script.Clear();
+    }
+
+    public void EnqueueContent(string content)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                IsToolCall = false,
+                Content = content ?? ""
+            });
+        }
+    }
+
+    public void EnqueueToolCall(string name, string id, string argumentsJson)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                IsToolCall = true,
+                ToolName = name ?? "",
+                ToolId = string.IsNullOrEmpty(id) ? "call_1" : id,
+                ToolArguments = argumentsJson ?? "{}"
+            });
+        }
     }
 
     private void ListenLoop()
@@ -160,7 +204,32 @@ public sealed class FakeOpenAiServer : IDisposable
     private void WriteSseChat(HttpListenerContext ctx)
     {
         _turn++;
-        string content;
+        ScriptedReply scripted = null;
+        lock (_scriptGate)
+        {
+            if (_script.Count > 0)
+                scripted = _script.Dequeue();
+        }
+
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentType = "text/event-stream";
+        ctx.Response.SendChunked = true;
+
+        using (Stream output = ctx.Response.OutputStream)
+        {
+            if (scripted != null && scripted.IsToolCall)
+                WriteToolCallSse(output, scripted);
+            else
+                WriteContentSse(output, ResolveContent(scripted));
+        }
+        ctx.Response.Close();
+    }
+
+    private string ResolveContent(ScriptedReply scripted)
+    {
+        if (scripted != null)
+            return scripted.Content ?? "";
+
         if (LongMarkdownReplies)
         {
             StringBuilder sb = new StringBuilder();
@@ -178,47 +247,72 @@ public sealed class FakeOpenAiServer : IDisposable
             sb.AppendLine("```");
             sb.AppendLine();
             sb.AppendLine("End of turn " + _turn + ".");
-            content = sb.ToString();
-        }
-        else
-        {
-            content = FixedReply ?? "ok";
+            return sb.ToString();
         }
 
+        return FixedReply ?? "ok";
+    }
+
+    private void WriteContentSse(Stream output, string content)
+    {
         int delayMs = StreamDelayMs;
         int chunkChars = StreamChunkChars > 0 ? StreamChunkChars : 16;
+        if (content == null)
+            content = "";
 
-        // Always stream + flush each SSE event so CLI and GUI exercise the same
-        // token path (~LLM cadence when delayMs is 20–40).
-        ctx.Response.StatusCode = 200;
-        ctx.Response.ContentType = "text/event-stream";
-        ctx.Response.SendChunked = true;
-
-        using (Stream output = ctx.Response.OutputStream)
+        for (int i = 0; i < content.Length; i += chunkChars)
         {
-            for (int i = 0; i < content.Length; i += chunkChars)
-            {
-                if (!_running)
-                    break;
+            if (!_running)
+                break;
 
-                int len = Math.Min(chunkChars, content.Length - i);
-                string piece = content.Substring(i, len);
-                string evt = "data: {\"choices\":[{\"delta\":{\"content\":\"" +
-                    EscapeJson(piece) + "\"}}]}\n\n";
-                byte[] bytes = Encoding.UTF8.GetBytes(evt);
-                output.Write(bytes, 0, bytes.Length);
-                output.Flush();
-                if (delayMs > 0)
-                    Thread.Sleep(delayMs);
-            }
+            int len = Math.Min(chunkChars, content.Length - i);
+            string piece = content.Substring(i, len);
+            string evt = "data: {\"choices\":[{\"delta\":{\"content\":\"" +
+                EscapeJson(piece) + "\"}}]}\n\n";
+            byte[] bytes = Encoding.UTF8.GetBytes(evt);
+            output.Write(bytes, 0, bytes.Length);
+            output.Flush();
+            if (delayMs > 0)
+                Thread.Sleep(delayMs);
+        }
 
-            byte[] trail = Encoding.UTF8.GetBytes(
-                "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
-                "data: [DONE]\n\n");
-            output.Write(trail, 0, trail.Length);
+        byte[] trail = Encoding.UTF8.GetBytes(
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
+            "data: [DONE]\n\n");
+        output.Write(trail, 0, trail.Length);
+        output.Flush();
+    }
+
+    private void WriteToolCallSse(Stream output, ScriptedReply call)
+    {
+        // Name announcement (matches SseStreamParser: name with empty args first).
+        string nameEvt = "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"" +
+            EscapeJson(call.ToolId) + "\",\"function\":{\"name\":\"" +
+            EscapeJson(call.ToolName) + "\",\"arguments\":\"\"}}]}}]}\n\n";
+        byte[] nameBytes = Encoding.UTF8.GetBytes(nameEvt);
+        output.Write(nameBytes, 0, nameBytes.Length);
+        output.Flush();
+
+        string args = call.ToolArguments ?? "{}";
+        int chunkChars = StreamChunkChars > 0 ? StreamChunkChars : 16;
+        for (int i = 0; i < args.Length; i += chunkChars)
+        {
+            if (!_running)
+                break;
+            int len = Math.Min(chunkChars, args.Length - i);
+            string piece = args.Substring(i, len);
+            string argsEvt = "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"" +
+                EscapeJson(piece) + "\"}}]}}]}\n\n";
+            byte[] argsBytes = Encoding.UTF8.GetBytes(argsEvt);
+            output.Write(argsBytes, 0, argsBytes.Length);
             output.Flush();
         }
-        ctx.Response.Close();
+
+        byte[] trail = Encoding.UTF8.GetBytes(
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n" +
+            "data: [DONE]\n\n");
+        output.Write(trail, 0, trail.Length);
+        output.Flush();
     }
 
     private static string EscapeJson(string s)
