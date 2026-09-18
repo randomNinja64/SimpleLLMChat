@@ -131,7 +131,7 @@ CLI mode provides the following additional flags:
 
 ## Tools
 
-SimpleLLMChat includes the following 6 tool packages:
+SimpleLLMChat includes the following 7 tool packages:
 
 - File Tools
   - Tools
