@@ -27,6 +27,11 @@ for %%T in (FileTools PythonTools ShellTools WebTools MemoryTools SkillTools Des
     copy /Y "%ROOT%Tools\%%T\bin\Release\Newtonsoft.Json.dll" "%OUT%\tools\%%T\" >nul
 )
 
+:: Default data folders (knowledge next to EXE; skills/memories next to their tools)
+mkdir "%OUT%\knowledge"
+mkdir "%OUT%\tools\SkillTools\skills"
+mkdir "%OUT%\tools\MemoryTools\memories"
+
 :: Optional deps from deps\
 echo Packaging optional dependencies ...
 call :CopyIfExists "%ROOT%deps\7za.exe" "%OUT%\tools\FileTools\7za.exe"
