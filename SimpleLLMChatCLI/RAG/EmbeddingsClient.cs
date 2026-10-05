@@ -14,7 +14,7 @@ namespace SimpleLLMChatCLI.RAG
     }
 
     /// <summary>
-    /// OpenAI-compatible /v1/embeddings client with optional curl HTTPS fallback.
+    /// OpenAI-compatible embeddings client with optional curl HTTPS fallback.
     /// </summary>
     public class EmbeddingsClient
     {
@@ -140,7 +140,7 @@ namespace SimpleLLMChatCLI.RAG
         private string PostEmbeddings(JObject payload, out string error)
         {
             error = null;
-            string url = _endpoint.TrimEnd('/') + "/v1/embeddings";
+            string url = _endpoint.TrimEnd('/') + "/embeddings";
 
             try
             {

@@ -45,7 +45,7 @@
                 <Label Content="API Key:"/>
                 <PasswordBox x:Name="ApiKeyPasswordBox" Height="23"/>
 
-                <Label Content="LLM Server URL (http://ip:port):"/>
+                <Label Content="LLM Server URL (http://ip:port/v1):"/>
                 <TextBox x:Name="ServerTextBox" Height="23"/>
 
                 <Label Content="Model:"/>

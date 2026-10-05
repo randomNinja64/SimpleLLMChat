@@ -20,7 +20,7 @@ namespace SimpleLLMChatCLI
             Action onContentStart = null,
             Action startBlock = null)
         {
-            string url = serverUrl.TrimEnd('/') + "/v1/chat/completions";
+            string url = serverUrl.TrimEnd('/') + "/chat/completions";
             try
             {
                 LLMClient.LLMCompletionResponse result = new LLMClient.LLMCompletionResponse(

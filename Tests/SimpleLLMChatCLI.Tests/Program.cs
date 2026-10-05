@@ -121,7 +121,7 @@ namespace SimpleLLMChatCLI.Tests
                 using (TempWorkspace ws = PackageCliWorkspace())
                 {
                     server.FixedReply = "canned-reply-ok";
-                    WriteCliIni(ws.Path, server.BaseUrl, "", "");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
                     ProcessResult r = ProcessRunner.Run(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "-o --no-banners ping",
@@ -157,7 +157,7 @@ namespace SimpleLLMChatCLI.Tests
                         "run_shell_command",
                         "call_deny_o",
                         "{\"command\":\"echo SHOULD_NOT_RUN\"}");
-                    WriteCliIni(ws.Path, server.BaseUrl, "", "run_shell_command");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "run_shell_command");
                     ProcessResult r = ProcessRunner.Run(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "-o --no-banners please run a command",
@@ -178,7 +178,7 @@ namespace SimpleLLMChatCLI.Tests
                         "call_disabled",
                         "{\"command\":\"echo DISABLED_PATH\"}");
                     server.EnqueueContent("disabled-path-final");
-                    WriteCliIni(ws.Path, server.BaseUrl, "", "");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
                     ProcessResult r = ProcessRunner.Run(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners call a tool",
@@ -194,7 +194,7 @@ namespace SimpleLLMChatCLI.Tests
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
                 using (TempWorkspace ws = PackageCliWorkspace())
                 {
-                    WriteCliIni(ws.Path, server.BaseUrl, "", "");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
@@ -220,7 +220,7 @@ namespace SimpleLLMChatCLI.Tests
                         "call_deny",
                         "{\"command\":\"echo APPROVAL_DENY_MARKER\"}");
                     server.EnqueueContent("deny-final-ok");
-                    WriteCliIni(ws.Path, server.BaseUrl, "run_shell_command", "run_shell_command");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
@@ -258,7 +258,7 @@ namespace SimpleLLMChatCLI.Tests
                         "call_echo",
                         "{\"command\":\"echo TOOL_LOOP_OK\"}");
                     server.EnqueueContent("tool-loop-final");
-                    WriteCliIni(ws.Path, server.BaseUrl, "run_shell_command", "");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "");
                     ProcessResult r = ProcessRunner.Run(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners run echo",
@@ -285,7 +285,7 @@ namespace SimpleLLMChatCLI.Tests
                         "call_allow",
                         "{\"command\":\"echo APPROVAL_ALLOW_OK\"}");
                     server.EnqueueContent("allow-final-ok");
-                    WriteCliIni(ws.Path, server.BaseUrl, "run_shell_command", "run_shell_command");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),

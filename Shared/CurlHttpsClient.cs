@@ -10,7 +10,7 @@ using System.Threading;
 /// </summary>
 public static class CurlHttpsClient
 {
-    /// <summary>Buffered GET (e.g. /v1/models).</summary>
+    /// <summary>Buffered GET (e.g. /models).</summary>
     public static string GetJson(string url, string apiKey, out int exitCode)
     {
         exitCode = -1;

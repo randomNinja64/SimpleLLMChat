@@ -6,7 +6,7 @@ using System.Windows.Input;
 namespace SimpleLLMChatGUI
 {
     /// <summary>
-    /// Dialog that fetches models from an OpenAI-compatible <c>/v1/models</c> endpoint
+    /// Dialog that fetches models from an OpenAI-compatible <c>/models</c> endpoint
     /// and lets the user pick one.
     /// </summary>
     public partial class ModelChooserDialog : Window

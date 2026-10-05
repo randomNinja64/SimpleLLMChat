@@ -119,7 +119,7 @@
                     <PasswordBox x:Name="ApiKeyPasswordBox" Height="23"/>
 
                     <!-- Host -->
-                    <Label Content="LLM Server URL (http://ip:port):"/>
+                    <Label Content="LLM Server URL (http://ip:port/v1):"/>
                     <TextBox x:Name="ServerTextBox"
                              Text="{Binding ServerURL, UpdateSourceTrigger=PropertyChanged}"
                              Height="23"/>

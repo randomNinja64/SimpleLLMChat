@@ -52,7 +52,7 @@ namespace SimpleLLMChatGUI.Tests
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
                 {
-                    IList<string> models = ModelsClient.ListModels(server.BaseUrl, "test-key");
+                    IList<string> models = ModelsClient.ListModels(server.BaseUrl + "/v1", "test-key");
                     TestAssert.True(models.Count >= 1, "count");
                     TestAssert.Equal("test-model", models[0], "id");
                 }
@@ -72,7 +72,7 @@ namespace SimpleLLMChatGUI.Tests
                 using (TempWorkspace ws = PackageGuiWorkspace())
                 {
                     server.LongMarkdownReplies = true;
-                    WriteGuiIni(ws.Path, server.BaseUrl);
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
 
                     string sessionPerf = Path.Combine(
                         Path.GetDirectoryName(TestLog.LogPath) ?? ".",

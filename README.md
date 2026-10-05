@@ -86,7 +86,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 
 **System**
 - `apikey`: API key (if required by model provider)
-- `llmserver`: Base URL of the OpenAI-compatible endpoint
+- `llmserver`: Base URL of the OpenAI-compatible endpoint (e.g `http://127.0.0.1:8080/v1`)
 - `model`: Model name to use for text generation (if supported by the endpoint)
 - `sysprompt`: System prompt for the LLM
 - `contextWindowSize`: If known, can be set here to enable automatic context summarization when context fills

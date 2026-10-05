@@ -8,7 +8,7 @@ using System.Text;
 namespace SimpleLLMChatGUI
 {
     /// <summary>
-    /// Minimal client for OpenAI-compatible <c>/v1/models</c>. Uses <see cref="TlsConfig"/>
+    /// Minimal client for OpenAI-compatible <c>/models</c>. Uses <see cref="TlsConfig"/>
     /// and an optional curl.exe HTTPS fallback (shared with the CLI).
     /// </summary>
     public static class ModelsClient
@@ -20,7 +20,7 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
-        /// Fetches model ids from <c>{baseUrl}/v1/models</c>.
+        /// Fetches model ids from <c>{baseUrl}/models</c>.
         /// Throws if the server is unreachable or the response is invalid.
         /// </summary>
         public static IList<string> ListModels(string baseUrl, string apiKey)
@@ -30,7 +30,7 @@ namespace SimpleLLMChatGUI
 
             TlsConfig.EnsureModernProtocols();
 
-            string url = baseUrl.Trim().TrimEnd('/') + "/v1/models";
+            string url = baseUrl.Trim().TrimEnd('/') + "/models";
             string key = apiKey ?? string.Empty;
             string body = GetModelsJson(url, key);
             return ParseModelIds(body);
@@ -64,13 +64,13 @@ namespace SimpleLLMChatGUI
                     if (exitCode == 0 && !string.IsNullOrEmpty(body))
                         return body;
                     throw new ModelsException(
-                        "Unable to reach /v1/models (curl): " + (body ?? httpBody ?? ex.Message),
+                        "Unable to reach /models (curl): " + (body ?? httpBody ?? ex.Message),
                         ex);
                 }
 
                 if (!string.IsNullOrEmpty(httpBody))
-                    throw new ModelsException("Unable to reach /v1/models: " + ex.Message + " — " + httpBody, ex);
-                throw new ModelsException("Unable to reach /v1/models: " + ex.Message, ex);
+                    throw new ModelsException("Unable to reach /models: " + ex.Message + " — " + httpBody, ex);
+                throw new ModelsException("Unable to reach /models: " + ex.Message, ex);
             }
         }
 
