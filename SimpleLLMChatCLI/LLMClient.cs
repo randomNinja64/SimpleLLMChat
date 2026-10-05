@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using SimpleLLMChatCLI.RAG;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -13,7 +14,7 @@ public partial class LLMClient
 {
     private readonly ConfigHandler config;
     private readonly ToolRegistry registry;
-    private readonly Func<string, string, bool> requestToolApproval;
+    private readonly Func<string, string, double?, bool> requestToolApproval;
 
     // Cached sysprompt + tools schema length (NyoCoder-style base overhead).
     // Cleared (set null) on /reload so the next request recomputes it.
@@ -21,7 +22,7 @@ public partial class LLMClient
 
     public string ReasoningEffort { get; set; }
 
-    public LLMClient(ConfigHandler config, ToolRegistry registry, Func<string, string, bool> requestToolApproval = null)
+    public LLMClient(ConfigHandler config, ToolRegistry registry, Func<string, string, double?, bool> requestToolApproval = null)
     {
         this.registry = registry;
         this.config = config;
@@ -174,7 +175,7 @@ public partial class LLMClient
                             ChatOutput.WriteLine("[/tool call]");
                         }
 
-                        currentToolCallSuppressed = approvalSet.Contains(toolCall.Name);
+                        currentToolCallSuppressed = !IsAutoToolApproval() && approvalSet.Contains(toolCall.Name);
 
                         if (!currentToolCallSuppressed)
                         {
@@ -228,24 +229,22 @@ public partial class LLMClient
                 for (int i = 0; i < response.ToolCalls.Count; i++)
                 {
                     ToolRegistry.ToolCall call = response.ToolCalls[i];
-                    bool needsApproval = approvalSet.Contains(call.Name);
 
-                    if (needsApproval && outputOnly)
+                    // Manual output-only cannot ask, including when the tool is also disabled.
+                    if (!IsAutoToolApproval() && outputOnly && approvalSet.Contains(call.Name))
                     {
                         ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
                         return;
                     }
 
-                    // The tool call block itself was already streamed above (if not suppressed
-                    // for approval); only pad a blank line before the approval prompt here.
-                    if (!outputOnly && needsApproval)
-                        startBlock();
-
                     int exitCode = 0;
-                    string toolContent;
-
+                    string toolContent = string.Empty;
                     string toolImage = null;
                     string toolImageMime = null;
+                    bool runTool = false;
+                    bool askUser = false;
+                    double? jevConfidence = null;
+
                     if (!enabledSet.Contains(call.Name))
                     {
                         exitCode = -1;
@@ -255,12 +254,56 @@ public partial class LLMClient
                             exitCode
                         );
                     }
-                    else if (needsApproval)
+                    else if (IsAutoToolApproval())
                     {
-                        if (requestToolApproval(call.Name, call.Arguments))
+                        JevGateDecision decision = JevDecisionClient.Decide(
+                            config,
+                            call.Name,
+                            call.Arguments,
+                            registry.GetToolDescription(call.Name),
+                            RecentMessagesForDecision(conversation));
+                        if (decision.Choice == JevGateChoice.Allow)
                         {
-                            registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
+                            if (!outputOnly)
+                            {
+                                if (startBlock != null)
+                                    startBlock();
+                                string approved = decision.Confidence.HasValue
+                                    ? "[" + call.Name + " auto allowed, confidence " + decision.Confidence.Value.ToString("0.00", CultureInfo.InvariantCulture) + "]"
+                                    : "[" + call.Name + " auto allowed]";
+                                ChatOutput.WriteLine(approved);
+                            }
+                            runTool = true;
                         }
+                        else
+                        {
+                            askUser = true;
+                            jevConfidence = decision.Confidence;
+                        }
+                    }
+                    else if (approvalSet.Contains(call.Name))
+                    {
+                        askUser = true;
+                    }
+                    else
+                    {
+                        runTool = true;
+                    }
+
+                    if (askUser && outputOnly)
+                    {
+                        ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
+                        return;
+                    }
+
+                    // The tool call block itself was already streamed above (if not suppressed
+                    // for approval); only pad a blank line before the approval prompt here.
+                    if (askUser)
+                    {
+                        if (!outputOnly && startBlock != null)
+                            startBlock();
+                        if (requestToolApproval(call.Name, call.Arguments, jevConfidence))
+                            runTool = true;
                         else
                         {
                             exitCode = -1;
@@ -271,7 +314,8 @@ public partial class LLMClient
                             );
                         }
                     }
-                    else
+
+                    if (runTool)
                     {
                         registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
                     }
@@ -359,6 +403,52 @@ public partial class LLMClient
             ChatOutput.WriteLine("[Conversation summarized - continuing...]");
 
         PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+    }
+
+    private bool IsAutoToolApproval()
+    {
+        return string.Equals(
+            config.GetConfigValue("toolapprovalmode"),
+            "auto",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static List<JevContextMessage> RecentMessagesForDecision(List<ChatMessage> conversation)
+    {
+        var selected = new List<JevContextMessage>();
+        if (conversation == null || conversation.Count == 0)
+            return selected;
+
+        int start = conversation.Count - JevDecisionClient.RecentMessageCount;
+        if (start < 0)
+            start = 0;
+        for (int i = start; i < conversation.Count; i++)
+            selected.Add(ToJevContextMessage(conversation[i]));
+        return selected;
+    }
+
+    private static JevContextMessage ToJevContextMessage(ChatMessage message)
+    {
+        var text = new StringBuilder();
+        if (!string.IsNullOrEmpty(message.Content))
+            text.Append(message.Content);
+        if (message.ToolCalls != null)
+        {
+            for (int i = 0; i < message.ToolCalls.Count; i++)
+            {
+                if (text.Length > 0)
+                    text.Append('\n');
+                text.Append(message.ToolCalls[i].Name ?? string.Empty);
+                text.Append(' ');
+                text.Append(message.ToolCalls[i].Arguments ?? string.Empty);
+            }
+        }
+
+        return new JevContextMessage
+        {
+            Role = message.Role ?? string.Empty,
+            Text = text.ToString()
+        };
     }
 
     public void PublishStatusTokens(int characterCount)

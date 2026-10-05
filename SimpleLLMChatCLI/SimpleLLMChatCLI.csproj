@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="ChatOutput.cs" />
     <Compile Include="ImageEncoder.cs" />
+    <Compile Include="JevDecisionClient.cs" />
     <Compile Include="CurlClient.cs" />
     <Compile Include="LLMClient.cs" />
     <Compile Include="LLMClient.Request.cs" />
@@ -95,6 +96,9 @@
     </Compile>
     <Compile Include="..\Shared\CurlHttpsClient.cs">
       <Link>Shared\CurlHttpsClient.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\JsonHttpClient.cs">
+      <Link>Shared\JsonHttpClient.cs</Link>
     </Compile>
     <Compile Include="..\Shared\StatusPipe\StatusPipe.cs">
       <Link>Shared\StatusPipe\StatusPipe.cs</Link>

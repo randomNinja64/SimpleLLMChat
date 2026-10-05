@@ -15,7 +15,7 @@ namespace SimpleLLMChatGUI
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
         public event Action GenerationComplete;
-        public event Func<string, string, bool> ApprovalRequested;
+        public event Func<string, string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
 
         private StatusPipeClient statusPipeClient;
@@ -80,11 +80,11 @@ namespace SimpleLLMChatGUI
                 handler();
         }
 
-        private void OnStatusPipeApproval(string toolName, string arguments)
+        private void OnStatusPipeApproval(string toolName, string arguments, string confidence)
         {
             bool approved = false;
             if (ApprovalRequested != null)
-                approved = ApprovalRequested(toolName, arguments);
+                approved = ApprovalRequested(toolName, arguments, confidence);
 
             SendApprovalResponse(approved);
         }

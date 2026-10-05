@@ -9,6 +9,7 @@ public static class ToolApproval
     public const string RunToolPrefix = "Run tool: ";
     public const string ArgumentsPrefix = "With arguments:";
     public const string ApprovalPrompt = "Approve? (Y/N): ";
+    public const string ConfidencePrefix = "Jev confidence: ";
 
     public static string UnescapeArguments(string arguments)
     {
@@ -27,10 +28,14 @@ public static class ToolApproval
             .Replace("\u0000", "\\");
     }
 
-    public static string FormatApprovalMessage(string toolName, string arguments)
+    public static string FormatApprovalMessage(string toolName, string arguments, string confidenceText = null)
     {
         string formattedArguments = UnescapeArguments(arguments);
-        return RunToolPrefix + toolName + "\n" + formattedArguments;
+        string message = RunToolPrefix + toolName + "\n";
+        if (!string.IsNullOrEmpty(confidenceText))
+            message += ConfidencePrefix + confidenceText + "\n";
+        message += formattedArguments;
+        return message;
     }
 
     public static bool TryParseApprovalPrompt(string text, out string toolName, out string arguments)
@@ -58,6 +63,12 @@ public static class ToolApproval
         toolName = block.Substring(nameStart, nameEnd - nameStart).Trim();
 
         string rest = block.Substring(nameEnd + 1);
+
+        if (rest.StartsWith(ConfidencePrefix, StringComparison.Ordinal))
+        {
+            int confidenceLineEnd = rest.IndexOf('\n');
+            rest = confidenceLineEnd >= 0 ? rest.Substring(confidenceLineEnd + 1) : string.Empty;
+        }
 
         // Older format inserted a "With arguments:" label before the payload.
         if (rest.StartsWith(ArgumentsPrefix, StringComparison.Ordinal))

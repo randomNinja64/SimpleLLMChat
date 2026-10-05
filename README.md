@@ -15,7 +15,7 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 - **Markdown Rendering** - The GUI can render Markdown formatting for easier reading.
 - **OpenAI-Compatible Endpoint Support** - In addition to OpenAI, any service/server offering the OpenAI v1 chat endpoint can be used, including [llama.cpp](https://github.com/ggerganov/llama.cpp) and [LM Studio](https://lmstudio.ai/).
 - **Retrieval Augmented Generation (RAG)** - Retrieve information from documents via a local knowledge folder (see [RAG](#rag)).
-- **Script-Friendly** - Output without tool calls, tool outputs, and reasoning can be piped out of the CLI using the `-o` or `--output-only` flag. **Note**: Tool calls requiring approval will automatically be denied.
+- **Script-Friendly** - Output without tool calls, tool outputs, and reasoning can be piped out of the CLI using the `-o` or `--output-only` flag. **Note**: Tool calls requiring manual approval will automatically be denied.
 - **Streaming Responses** - Responses are streamed from the LLM server in real-time.
 - **Tools** - A modular, extensible tool system is available. For information about the included tools, see [Tools](#tools).
 
@@ -93,8 +93,16 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 
 **Tools**
 - `tools`: Comma-separated list of tools the AI is allowed to use
-- `toolsrequiringapproval`: Comma-separated list of tools that require manual approval for the AI to use
-- `tooltimeout.<toolname>`: Timeout for tool-call in seconds
+
+**Tool Approvals**
+- `toolapprovalmode`: `manual` (default) or `auto`. Manual mode prompts for approval for tools set to require it. Auto mode uses a Jev-compatible endpoint to determine whether or not a tool should run.
+- `jevbaseurl`: Full URL for a Jev-compatible server (e.g. `http://127.0.0.1:8080/v1/systemone` if you're using llama.cpp)
+- `jevapikey`: API key if required for your Jev-compatible server
+- `jevmodel`: Model to use (if supported by your endpoint)
+- `toolsrequiringapproval`: Comma-separated list of tools that require approval for the AI to use in manual mode.
+
+**Tool Timeouts**
+- `tooltimeout.<toolname>`: Timeout for that tool call, in seconds; `0` means no timeout.
 
 Tool-specific configuration options for the included tools are available in the [Tools](#tools) section.
 

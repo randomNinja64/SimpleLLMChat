@@ -92,7 +92,7 @@ public sealed class StatusPipeProbe : IDisposable
         bool ok = WaitFor(line =>
         {
             string n, a;
-            if (!StatusPipe.TryParseApprovalLine(line, out n, out a))
+            if (!StatusPipe.TryParseApprovalLine(line, out n, out a, out _))
                 return false;
             name = n;
             args = a;

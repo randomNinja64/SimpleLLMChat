@@ -17,7 +17,7 @@ public sealed class StatusPipeClient : IDisposable
     public event Action<int> StatusReceived;
     public event Action<IndexingStatusEvent> IndexingStatusReceived;
     public event Action ReadyReceived;
-    public event Action<string, string> ApprovalReceived;
+    public event Action<string, string, string> ApprovalReceived;
 
     public StatusPipeClient(int processId)
     {
@@ -67,11 +67,12 @@ public sealed class StatusPipeClient : IDisposable
 
                         string approvalTool;
                         string approvalArgs;
-                        if (StatusPipe.TryParseApprovalLine(line, out approvalTool, out approvalArgs))
+                        string approvalConfidence;
+                        if (StatusPipe.TryParseApprovalLine(line, out approvalTool, out approvalArgs, out approvalConfidence))
                         {
-                            Action<string, string> handler = ApprovalReceived;
+                            Action<string, string, string> handler = ApprovalReceived;
                             if (handler != null)
-                                handler(approvalTool, approvalArgs);
+                                handler(approvalTool, approvalArgs, approvalConfidence);
                             continue;
                         }
 

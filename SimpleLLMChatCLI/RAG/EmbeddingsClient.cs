@@ -2,9 +2,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Text;
 
 namespace SimpleLLMChatCLI.RAG
 {
@@ -139,45 +136,20 @@ namespace SimpleLLMChatCLI.RAG
 
         private string PostEmbeddings(JObject payload, out string error)
         {
-            error = null;
             string url = _endpoint.TrimEnd('/') + "/embeddings";
-
-            try
+            string detail;
+            string body = JsonHttpClient.Post(url, _apiKey, payload.ToString(Formatting.None), 120000, out detail);
+            if (body != null)
             {
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                request.Method = "POST";
-                request.ContentType = "application/json";
-                if (!string.IsNullOrEmpty(_apiKey))
-                    request.Headers.Add("Authorization", "Bearer " + _apiKey);
-                request.Timeout = 120000;
-                request.ReadWriteTimeout = 120000;
-
-                byte[] bytes = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
-                request.ContentLength = bytes.Length;
-                using (Stream stream = request.GetRequestStream())
-                    stream.Write(bytes, 0, bytes.Length);
-
-                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
-                using (Stream responseStream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(responseStream, Encoding.UTF8))
-                    return reader.ReadToEnd();
+                error = null;
+                return body;
             }
-            catch (Exception ex)
-            {
-                if (TlsCurlFallback.CanAttempt(url, ex))
-                {
-                    int exitCode;
-                    string body = CurlHttpsClient.PostJson(
-                        url, _apiKey, payload.ToString(Formatting.None), out exitCode);
-                    if (exitCode == 0 && !string.IsNullOrEmpty(body))
-                        return body;
-                    error = "Embeddings request failed (curl): " + (body ?? ex.Message);
-                    return null;
-                }
 
-                error = "Embeddings request failed: " + ex.Message;
-                return null;
-            }
+            if (detail != null && detail.StartsWith("curl: "))
+                error = "Embeddings request failed (curl): " + detail.Substring("curl: ".Length);
+            else
+                error = "Embeddings request failed: " + detail;
+            return null;
         }
 
     }

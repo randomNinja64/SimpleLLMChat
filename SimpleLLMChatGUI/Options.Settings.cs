@@ -30,6 +30,9 @@ namespace SimpleLLMChatGUI
         private string _embeddingsEndpoint;
         private string _embeddingsModel;
         private string _embeddingsApiKey;
+        private string _jevBaseUrl;
+        private string _jevApiKey;
+        private string _jevModel;
 
         private static readonly List<string> DisplayModeOptionList =
             new List<string> { "Shown", "Collapsed", "Hidden" };
@@ -193,6 +196,24 @@ namespace SimpleLLMChatGUI
             set { _embeddingsApiKey = value; OnPropertyChanged(nameof(EmbeddingsApiKey)); }
         }
 
+        public string JevBaseUrl
+        {
+            get { return _jevBaseUrl; }
+            set { _jevBaseUrl = value; OnPropertyChanged(nameof(JevBaseUrl)); }
+        }
+
+        public string JevApiKey
+        {
+            get { return _jevApiKey; }
+            set { _jevApiKey = value; OnPropertyChanged(nameof(JevApiKey)); }
+        }
+
+        public string JevModel
+        {
+            get { return _jevModel; }
+            set { _jevModel = value; OnPropertyChanged(nameof(JevModel)); }
+        }
+
         private void InitializeDefaults()
         {
             ServerURL = "";
@@ -219,6 +240,9 @@ namespace SimpleLLMChatGUI
             EmbeddingsEndpoint = "";
             EmbeddingsModel = "";
             EmbeddingsApiKey = "";
+            JevBaseUrl = "";
+            JevApiKey = "";
+            JevModel = "";
         }
 
         private void SaveIni(string path)

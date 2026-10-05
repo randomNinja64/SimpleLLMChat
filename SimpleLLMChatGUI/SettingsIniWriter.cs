@@ -124,6 +124,10 @@ namespace SimpleLLMChatGUI
             {
                 "tools=",
                 "toolsrequiringapproval=",
+                "toolapprovalmode=manual",
+                "jevbaseurl=",
+                "jevapikey=",
+                "jevmodel=",
             };
         }
     }

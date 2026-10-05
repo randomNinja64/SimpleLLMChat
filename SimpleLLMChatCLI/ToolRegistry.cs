@@ -179,6 +179,13 @@ namespace SimpleLLMChatCLI
             }
         }
 
+        public string GetToolDescription(string toolName)
+        {
+            ToolDefinition def;
+            Tools.TryGetValue(toolName ?? string.Empty, out def);
+            return def.Description ?? string.Empty;
+        }
+
         /// <summary>
         /// Builds the OpenAI-compatible tools JSON array for the given enabled tool names.
         /// </summary>

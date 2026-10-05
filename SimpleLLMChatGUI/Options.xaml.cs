@@ -75,6 +75,19 @@ namespace SimpleLLMChatGUI
                 Model = picked;
         }
 
+        private void JevModelListButton_Click(object sender, RoutedEventArgs e)
+        {
+            string baseUrl = JevModelsBaseUrl(JevBaseUrl);
+            string picked = ModelChooserDialog.Pick(
+                this,
+                baseUrl,
+                JevApiKeyPasswordBox.Password,
+                JevModel,
+                "Enter a Jev-compatible URL before listing models.");
+            if (picked != null)
+                JevModel = picked;
+        }
+
         private void EmbeddingsModelListButton_Click(object sender, RoutedEventArgs e)
         {
             string baseUrl = EmbeddingsEndpoint;
@@ -104,11 +117,15 @@ namespace SimpleLLMChatGUI
             AppearancePage.Visibility = Visibility.Collapsed;
             SystemPage.Visibility = Visibility.Collapsed;
             ToolsPage.Visibility = Visibility.Collapsed;
+            ToolApprovalsPage.Visibility = Visibility.Collapsed;
+            ToolTimeoutsPage.Visibility = Visibility.Collapsed;
             if (RagPage != null)
                 RagPage.Visibility = Visibility.Collapsed;
             foreach (var page in _toolGroupPages)
                 page.Visibility = Visibility.Collapsed;
 
+            // Static pages occupy 0–5. Per-tool option pages are appended after them.
+            const int toolGroupStart = 6;
             switch (CategoryListBox.SelectedIndex)
             {
                 case 0: AppearancePage.Visibility = Visibility.Visible; break;
@@ -118,8 +135,10 @@ namespace SimpleLLMChatGUI
                     break;
                 case 2: SystemPage.Visibility = Visibility.Visible; break;
                 case 3: ToolsPage.Visibility = Visibility.Visible; break;
+                case 4: ToolApprovalsPage.Visibility = Visibility.Visible; break;
+                case 5: ToolTimeoutsPage.Visibility = Visibility.Visible; break;
                 default:
-                    int toolIdx = CategoryListBox.SelectedIndex - 4;
+                    int toolIdx = CategoryListBox.SelectedIndex - toolGroupStart;
                     if (toolIdx >= 0 && toolIdx < _toolGroupPages.Count)
                         _toolGroupPages[toolIdx].Visibility = Visibility.Visible;
                     break;
@@ -173,9 +192,13 @@ namespace SimpleLLMChatGUI
             EmbeddingsEndpoint = config.GetConfigValue("embeddingsEndpoint");
             EmbeddingsModel = config.GetConfigValue("embeddingsModel");
             EmbeddingsApiKey = config.GetConfigValue("embeddingsApiKey");
+            JevBaseUrl = config.GetConfigValue("jevbaseurl");
+            JevApiKey = config.GetConfigValue("jevapikey");
+            JevModel = config.GetConfigValue("jevmodel");
 
             ApiKeyPasswordBox.Password = ApiKey;
             EmbeddingsApiKeyPasswordBox.Password = EmbeddingsApiKey;
+            JevApiKeyPasswordBox.Password = JevApiKey;
             ApplyRetrieveModeToCombo();
         }
 
@@ -232,6 +255,7 @@ namespace SimpleLLMChatGUI
         {
             ApiKey = ApiKeyPasswordBox.Password;
             EmbeddingsApiKey = EmbeddingsApiKeyPasswordBox.Password;
+            JevApiKey = JevApiKeyPasswordBox.Password;
             SyncRetrieveModeFromCombo();
             SaveIni(App.ConfigFilePath);
         }
@@ -242,6 +266,15 @@ namespace SimpleLLMChatGUI
                 _processHandler.SendInput("/clearindex");
             else
                 MessageBox.Show(this, "Start a chat session first so the CLI can clear the index.", "RAG", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private static string JevModelsBaseUrl(string decisionUrl)
+        {
+            string url = decisionUrl != null ? decisionUrl.Trim().TrimEnd('/') : string.Empty;
+            const string suffix = "/systemone";
+            if (url.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                url = url.Substring(0, url.Length - suffix.Length).TrimEnd('/');
+            return url;
         }
 
         protected virtual void OnPropertyChanged(string propertyName)

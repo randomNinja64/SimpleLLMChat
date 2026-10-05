@@ -6,7 +6,7 @@ using System.Globalization;
 /// Wire format lines (UTF-8, one per message):
 ///   STATUS tokens=1234
 ///   STATUS ready
-///   STATUS approval name=tool_name args=...
+///   STATUS approval name=tool_name [confidence=0.91] args=...
 ///   STATUS indexing=start total=42
 ///   STATUS indexing=progress current=7 total=42 file=notes.md
 ///   STATUS indexing=done files=5

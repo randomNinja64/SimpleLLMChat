@@ -3,6 +3,7 @@ using SimpleLLMChatCLI;
 using SimpleLLMChatCLI.RAG;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -32,6 +33,56 @@ namespace SimpleLLMChatCLI.Tests
                 TestAssert.True(ToolApproval.TryParseApprovalPrompt(
                     msg + "\n" + ToolApproval.ApprovalPrompt, out tool, out arguments), "parse");
                 TestAssert.Equal("read_file", tool, "tool");
+            });
+
+            TestRunner.Run("ToolApproval.confidence_line_skipped", () =>
+            {
+                string args = "{\"command\":\"echo hi\"}";
+                string msg = ToolApproval.FormatApprovalMessage("run_shell_command", args, "0.91");
+                string tool, parsed;
+                TestAssert.True(ToolApproval.TryParseApprovalPrompt(
+                    msg + "\n" + ToolApproval.ApprovalPrompt, out tool, out parsed), "parse");
+                TestAssert.Equal("run_shell_command", tool, "tool");
+                TestAssert.Equal(args, parsed, "args");
+                TestAssert.Contains(msg, "Jev confidence: 0.91", "confidence");
+            });
+
+            TestRunner.Run("JevDecisionClient.parse", () =>
+            {
+                JevGateDecision allow = JevDecisionClient.ParseResponse(
+                    "{\"answers\":{\"gate\":{\"type\":\"choice\",\"choice\":\"allow\",\"confidence\":0.91}}}");
+                TestAssert.Equal("Allow", allow.Choice.ToString(), "allow");
+                TestAssert.True(allow.Confidence.HasValue, "allow confidence present");
+                TestAssert.Equal("0.91", allow.Confidence.Value.ToString("0.00", CultureInfo.InvariantCulture), "allow confidence");
+
+                JevGateDecision confirm = JevDecisionClient.ParseResponse(
+                    "{\"answers\":{\"gate\":{\"choice\":\"confirm\",\"confidence\":0.42}}}");
+                TestAssert.Equal("Confirm", confirm.Choice.ToString(), "confirm");
+                TestAssert.Equal("0.42", confirm.Confidence.Value.ToString("0.00", CultureInfo.InvariantCulture), "confirm confidence");
+
+                JevGateDecision missing = JevDecisionClient.ParseResponse("{\"model\":\"jev-latest\"}");
+                TestAssert.Equal("Confirm", missing.Choice.ToString(), "missing");
+                TestAssert.True(!missing.Confidence.HasValue, "missing confidence");
+
+                JevGateDecision error = JevDecisionClient.ParseResponse("{\"error\":{\"message\":\"nope\"}}");
+                TestAssert.Equal("Confirm", error.Choice.ToString(), "error body");
+                TestAssert.True(!error.Confidence.HasValue, "error confidence");
+
+                var messages = new List<JevContextMessage>();
+                messages.Add(new JevContextMessage { Role = "user", Text = "too old" });
+                messages.Add(new JevContextMessage { Role = "user", Text = "please read" });
+                messages.Add(new JevContextMessage { Role = "assistant", Text = "reading" });
+                messages.Add(new JevContextMessage { Role = "tool", Text = new string('x', 600) + "TAIL" });
+                string request = JevDecisionClient.BuildRequestJson(
+                    "", "read_file", "{}", "Read a file from disk", messages);
+                TestAssert.True(request.IndexOf("\"model\"", StringComparison.Ordinal) < 0, "model omitted");
+                TestAssert.Contains(request, "\"allow\"", "allow criterion");
+                TestAssert.Contains(request, "\"confirm\"", "confirm criterion");
+                TestAssert.Contains(request, "Read a file from disk", "description");
+                TestAssert.Contains(request, "please read", "recent user");
+                TestAssert.True(request.IndexOf("too old", StringComparison.Ordinal) < 0, "older than 3 dropped");
+                TestAssert.True(request.IndexOf("TAIL", StringComparison.Ordinal) < 0, "long message truncated");
+                TestAssert.Contains(request, "...", "truncation mark");
             });
 
             TestRunner.Run("ToolResultParser.json", () =>
@@ -141,10 +192,16 @@ namespace SimpleLLMChatCLI.Tests
             {
                 string args = "{\"command\":\"echo hi\\nnext\"}";
                 string line = StatusPipe.FormatApproval("run_shell_command", args);
-                string name, parsed;
-                TestAssert.True(StatusPipe.TryParseApprovalLine(line, out name, out parsed), "parse");
+                string name, parsed, confidence;
+                TestAssert.True(StatusPipe.TryParseApprovalLine(line, out name, out parsed, out confidence), "parse");
                 TestAssert.Equal("run_shell_command", name, "name");
                 TestAssert.Equal(args, parsed, "args");
+                TestAssert.True(string.IsNullOrEmpty(confidence), "no confidence");
+
+                string withConfidence = StatusPipe.FormatApproval("run_shell_command", args, 0.91);
+                TestAssert.True(StatusPipe.TryParseApprovalLine(withConfidence, out name, out parsed, out confidence), "parse confidence");
+                TestAssert.Equal("0.91", confidence, "confidence");
+                TestAssert.Equal(args, parsed, "args with confidence");
             });
 
             TestRunner.Run("cli.approval_denied_output_only", () =>
@@ -268,6 +325,7 @@ namespace SimpleLLMChatCLI.Tests
                     TestAssert.Contains(r.Stdout, "[tool output]", "tool output");
                     TestAssert.ContainsIgnoreCase(r.Stdout, "TOOL_LOOP_OK", "echo");
                     TestAssert.Contains(r.Stdout, "tool-loop-final", "final");
+                    TestAssert.Equal(0, server.SystemOneRequestCount, "no systemone");
                 }
             });
 
@@ -312,6 +370,139 @@ namespace SimpleLLMChatCLI.Tests
                     }
                 }
             });
+
+            TestRunner.Run("cli.auto_approval_allow", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    if (!ShellToolsPackaged(ws))
+                        TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
+
+                    server.StreamDelayMs = 0;
+                    server.SystemOneChoice = "allow";
+                    server.SystemOneConfidence = 0.91;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_auto_allow",
+                        "{\"command\":\"echo AUTO_ALLOW_OK\"}");
+                    server.EnqueueContent("auto-allow-final");
+                    WriteCliIni(
+                        ws.Path,
+                        server.BaseUrl + "/v1",
+                        "run_shell_command",
+                        "",
+                        "auto",
+                        server.BaseUrl + "/v1/systemone",
+                        "jev-secret",
+                        "");
+
+                    ProcessResult r = ProcessRunner.Run(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners please run the command",
+                        ws.Path, null, 30000);
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Stdout, "[run_shell_command auto allowed, confidence 0.91]", "auto line");
+                    TestAssert.ContainsIgnoreCase(r.Stdout, "AUTO_ALLOW_OK", "echo");
+                    TestAssert.True(r.Stdout.IndexOf("Approve? (Y/N):", StringComparison.Ordinal) < 0, "no prompt");
+                    TestAssert.True(server.SystemOneRequestCount >= 1, "systemone called");
+                    TestAssert.Equal("Bearer jev-secret", server.SystemOneAuthorization, "bearer");
+                    TestAssert.True(
+                        server.SystemOneBody != null && server.SystemOneBody.IndexOf("\"model\"", StringComparison.Ordinal) < 0,
+                        "model omitted");
+                    TestAssert.Contains(server.SystemOneBody, "run_shell_command", "tool in state");
+                }
+            });
+
+            TestRunner.Run("cli.auto_approval_confirm", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.SystemOneChoice = "confirm";
+                    server.SystemOneConfidence = 0.42;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_auto_confirm",
+                        "{\"command\":\"echo AUTO_CONFIRM_SKIP\"}");
+                    server.EnqueueContent("auto-confirm-final");
+                    WriteCliIni(
+                        ws.Path,
+                        server.BaseUrl + "/v1",
+                        "run_shell_command",
+                        "",
+                        "auto",
+                        server.BaseUrl + "/v1/systemone",
+                        "jev-secret",
+                        "jev-latest");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("please run the command");
+                        string tool, args;
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args), "approval");
+                        TestAssert.Equal("run_shell_command", tool, "tool");
+                        TestAssert.True(WaitStdoutContains(cli, "Jev confidence: 0.42", 5000), "confidence");
+                        cli.WriteLine("N");
+                        TestAssert.True(WaitStdoutContains(cli, "auto-confirm-final", 20000), "final");
+                        TestAssert.ContainsIgnoreCase(cli.Stdout, "cancelled by the user", "cancelled");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.auto_approval_http_error", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.SystemOneStatusCode = 500;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_auto_error",
+                        "{\"command\":\"echo AUTO_ERROR_SKIP\"}");
+                    server.EnqueueContent("auto-error-final");
+                    WriteCliIni(
+                        ws.Path,
+                        server.BaseUrl + "/v1",
+                        "run_shell_command",
+                        "",
+                        "auto",
+                        server.BaseUrl + "/v1/systemone",
+                        "jev-secret",
+                        "");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("please run the command");
+                        string tool, args;
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args), "approval");
+                        TestAssert.True(WaitStdoutContains(cli, "Approve? (Y/N):", 5000), "prompt");
+                        TestAssert.True(
+                            cli.Stdout.IndexOf("Jev confidence:", StringComparison.Ordinal) < 0,
+                            "no confidence");
+                        cli.WriteLine("N");
+                        TestAssert.True(WaitStdoutContains(cli, "auto-error-final", 20000), "final");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
         }
 
         static TempWorkspace PackageCliWorkspace()
@@ -348,6 +539,19 @@ namespace SimpleLLMChatCLI.Tests
 
         static void WriteCliIni(string dir, string llmServer, string tools, string toolsRequiringApproval)
         {
+            WriteCliIni(dir, llmServer, tools, toolsRequiringApproval, null, null, null, null);
+        }
+
+        static void WriteCliIni(
+            string dir,
+            string llmServer,
+            string tools,
+            string toolsRequiringApproval,
+            string toolApprovalMode,
+            string jevBaseUrl,
+            string jevApiKey,
+            string jevModel)
+        {
             string path = Path.Combine(dir, "LLMSettings.ini");
             File.WriteAllText(path,
                 "[System]\r\n" +
@@ -359,6 +563,10 @@ namespace SimpleLLMChatCLI.Tests
                 "[Tools]\r\n" +
                 "tools=" + (tools ?? "") + "\r\n" +
                 "toolsrequiringapproval=" + (toolsRequiringApproval ?? "") + "\r\n" +
+                "toolapprovalmode=" + (toolApprovalMode ?? "manual") + "\r\n" +
+                "jevbaseurl=" + (jevBaseUrl ?? "") + "\r\n" +
+                "jevapikey=" + (jevApiKey ?? "") + "\r\n" +
+                "jevmodel=" + (jevModel ?? "") + "\r\n" +
                 "[Appearance]\r\n" +
                 "assistantname=LLM\r\n" +
                 "markdownparsing=0\r\n" +

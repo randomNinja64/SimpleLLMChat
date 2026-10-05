@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -92,13 +93,22 @@ public partial class LLMClient
         }
     }
 
-    private static bool CliRequestApproval(string toolName, string arguments)
+    private static bool CliRequestApproval(string toolName, string arguments, double? confidence)
     {
-        ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments));
+        if (confidence.HasValue)
+        {
+            string confidenceText = confidence.Value.ToString("0.00", CultureInfo.InvariantCulture);
+            ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments, confidenceText));
+            if (Program.StatusPipe != null)
+                Program.StatusPipe.PublishDiscrete(StatusPipe.FormatApproval(toolName, arguments, confidence.Value));
+        }
+        else
+        {
+            ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments));
+            if (Program.StatusPipe != null)
+                Program.StatusPipe.PublishDiscrete(StatusPipe.FormatApproval(toolName, arguments));
+        }
         Console.Out.Flush();
-
-        if (Program.StatusPipe != null)
-            Program.StatusPipe.PublishDiscrete(StatusPipe.FormatApproval(toolName, arguments));
 
         while (true)
         {

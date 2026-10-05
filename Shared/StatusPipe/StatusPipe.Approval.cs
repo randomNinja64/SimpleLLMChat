@@ -1,20 +1,24 @@
 using System;
+using System.Globalization;
 
 public static partial class StatusPipe
 {
     public const string ApprovalPrefix = "STATUS approval ";
 
-    public static string FormatApproval(string toolName, string arguments)
+    public static string FormatApproval(string toolName, string arguments, double? confidence = null)
     {
-        return ApprovalPrefix
-            + "name=" + SanitizeToken(toolName)
-            + " args=" + EncodePipeArg(arguments);
+        string line = ApprovalPrefix + "name=" + SanitizeToken(toolName);
+        if (confidence.HasValue)
+            line += " confidence=" + confidence.Value.ToString("0.00", CultureInfo.InvariantCulture);
+        line += " args=" + EncodePipeArg(arguments);
+        return line;
     }
 
-    public static bool TryParseApprovalLine(string line, out string toolName, out string arguments)
+    public static bool TryParseApprovalLine(string line, out string toolName, out string arguments, out string confidence)
     {
         toolName = null;
         arguments = null;
+        confidence = null;
 
         string rest;
         if (!TryStripPrefix(line, ApprovalPrefix, out rest))
@@ -24,6 +28,7 @@ public static partial class StatusPipe
         if (string.IsNullOrEmpty(toolName))
             return false;
 
+        confidence = ParseStringArg(rest, "confidence");
         arguments = DecodePipeArg(ParseStringArg(rest, "args"));
         return true;
     }

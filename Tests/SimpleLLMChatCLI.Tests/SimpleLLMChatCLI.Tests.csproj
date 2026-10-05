@@ -73,6 +73,15 @@
     <Compile Include="..\..\Shared\ConfigHandler.cs">
       <Link>Shared\ConfigHandler.cs</Link>
     </Compile>
+    <Compile Include="..\..\Shared\TlsCurlFallback.cs">
+      <Link>Shared\TlsCurlFallback.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\CurlHttpsClient.cs">
+      <Link>Shared\CurlHttpsClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\JsonHttpClient.cs">
+      <Link>Shared\JsonHttpClient.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>
@@ -105,6 +114,9 @@
     </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ToolResultParser.cs">
       <Link>CLI\ToolResultParser.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\JevDecisionClient.cs">
+      <Link>CLI\JevDecisionClient.cs</Link>
     </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\RAG\VectorStore.cs">
       <Link>CLI\VectorStore.cs</Link>

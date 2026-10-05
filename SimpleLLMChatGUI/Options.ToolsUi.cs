@@ -38,6 +38,10 @@ namespace SimpleLLMChatGUI
             {
                 "tools=" + string.Join(",", GetSelectedToolsFromListBox(ToolsListBox)),
                 "toolsrequiringapproval=" + string.Join(",", GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox)),
+                "toolapprovalmode=" + (ApprovalAutoRadio.IsChecked == true ? "auto" : "manual"),
+                "jevbaseurl=" + (JevBaseUrl ?? string.Empty),
+                "jevapikey=" + (JevApiKey ?? string.Empty),
+                "jevmodel=" + (JevModel ?? string.Empty),
             };
 
             foreach (var kvp in _toolTimeoutControls)
@@ -152,15 +156,9 @@ namespace SimpleLLMChatGUI
             if (_availableTools.Count == 0)
                 return;
 
-            var stack = ToolsPage.Content as StackPanel;
+            var stack = ToolTimeoutsStack;
             if (stack == null)
                 return;
-
-            stack.Children.Add(new Label
-            {
-                Content = "Tool Timeouts (seconds, 0 or blank = no timeout):",
-                Margin = new Thickness(0, 8, 0, 0)
-            });
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -226,6 +224,17 @@ namespace SimpleLLMChatGUI
             ApplyToolSelectionToListBox(
                 ToolsRequiringApprovalListBox,
                 config.GetConfigList("toolsrequiringapproval"));
+            ApplyApprovalMode(config);
+        }
+
+        private void ApplyApprovalMode(ConfigHandler config)
+        {
+            bool auto = string.Equals(
+                config.GetConfigValue("toolapprovalmode"),
+                "auto",
+                StringComparison.OrdinalIgnoreCase);
+            ApprovalAutoRadio.IsChecked = auto;
+            ApprovalManualRadio.IsChecked = !auto;
         }
 
         private void ApplyToolSelectionToListBox(ListBox listBox, List<string> tools)

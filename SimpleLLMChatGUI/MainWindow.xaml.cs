@@ -247,7 +247,7 @@ namespace SimpleLLMChatGUI
             }));
         }
 
-        private bool OnApprovalRequested(string toolName, string arguments)
+        private bool OnApprovalRequested(string toolName, string arguments, string confidence)
         {
             bool approved = false;
             // Run after queued stdout updates so the approval block's leading
@@ -262,7 +262,9 @@ namespace SimpleLLMChatGUI
                     _streamingTurn.AppendText("\r\n");
                 }
 
-                string message = ToolApproval.FormatApprovalMessage(toolName, arguments);
+                string message = string.IsNullOrEmpty(confidence)
+                    ? ToolApproval.FormatApprovalMessage(toolName, arguments)
+                    : ToolApproval.FormatApprovalMessage(toolName, arguments, confidence);
                 MessageBoxResult result = MessageBox.Show(
                     message,
                     "Tool Call",

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -77,6 +78,13 @@ public sealed class FakeOpenAiServer : IDisposable
     public string LastBody { get; private set; }
     public string LastAuthorization { get; private set; }
 
+    public int SystemOneRequestCount { get; private set; }
+    public string SystemOneAuthorization { get; private set; }
+    public string SystemOneBody { get; private set; }
+    public string SystemOneChoice { get; set; }
+    public double? SystemOneConfidence { get; set; }
+    public int SystemOneStatusCode { get; set; }
+
     /// <summary>When true, chat replies include ~2KB markdown with a turn index.</summary>
     public bool LongMarkdownReplies { get; set; }
 
@@ -96,6 +104,7 @@ public sealed class FakeOpenAiServer : IDisposable
         FixedReply = "Hello from FakeOpenAiServer.";
         StreamDelayMs = 30;
         StreamChunkChars = 16;
+        SystemOneStatusCode = 200;
         string baseUrl;
         _listener = TestHttpListener.StartLoopback(out baseUrl);
         BaseUrl = baseUrl;
@@ -188,6 +197,31 @@ public sealed class FakeOpenAiServer : IDisposable
             path.Equals("/v1/models", StringComparison.OrdinalIgnoreCase))
         {
             string json = "{\"object\":\"list\",\"data\":[{\"id\":\"test-model\",\"object\":\"model\"}]}";
+            WriteJson(ctx, 200, json);
+            return;
+        }
+
+        if (path.IndexOf("/v1/systemone", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            SystemOneRequestCount++;
+            SystemOneAuthorization = LastAuthorization;
+            SystemOneBody = body;
+            if (SystemOneStatusCode != 200)
+            {
+                WriteJson(ctx, SystemOneStatusCode, "{\"error\":{\"message\":\"forced\"}}");
+                return;
+            }
+
+            string choice = string.IsNullOrEmpty(SystemOneChoice) ? "confirm" : SystemOneChoice;
+            string confidenceField = "";
+            if (SystemOneConfidence.HasValue)
+            {
+                confidenceField = ",\"confidence\":" + SystemOneConfidence.Value.ToString(
+                    "0.00", CultureInfo.InvariantCulture);
+            }
+            string json = "{\"model\":\"jev-latest\",\"answers\":{\"gate\":{\"type\":\"choice\",\"choice\":\""
+                + choice + "\"" + confidenceField
+                + "}},\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}";
             WriteJson(ctx, 200, json);
             return;
         }
