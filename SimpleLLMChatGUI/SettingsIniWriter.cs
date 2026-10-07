@@ -128,6 +128,7 @@ namespace SimpleLLMChatGUI
                 "jevbaseurl=",
                 "jevapikey=",
                 "jevmodel=",
+                "showjevconfidence=1",
             };
         }
     }

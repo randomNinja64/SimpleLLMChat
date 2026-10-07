@@ -264,7 +264,7 @@ public partial class LLMClient
                             RecentMessagesForDecision(conversation));
                         if (decision.Choice == JevGateChoice.Allow)
                         {
-                            if (!outputOnly)
+                            if (!outputOnly && config.GetConfigBool("showjevconfidence", true))
                             {
                                 if (startBlock != null)
                                     startBlock();
@@ -278,7 +278,7 @@ public partial class LLMClient
                         else
                         {
                             askUser = true;
-                            jevConfidence = decision.Confidence;
+                            jevConfidence = ConfidenceForDisplay(decision.Confidence);
                         }
                     }
                     else if (approvalSet.Contains(call.Name))
@@ -411,6 +411,13 @@ public partial class LLMClient
             config.GetConfigValue("toolapprovalmode"),
             "auto",
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    private double? ConfidenceForDisplay(double? confidence)
+    {
+        if (!confidence.HasValue || !config.GetConfigBool("showjevconfidence", true))
+            return null;
+        return confidence;
     }
 
     private static List<JevContextMessage> RecentMessagesForDecision(List<ChatMessage> conversation)

@@ -33,6 +33,7 @@ namespace SimpleLLMChatGUI
         private string _jevBaseUrl;
         private string _jevApiKey;
         private string _jevModel;
+        private bool _showJevConfidence = true;
 
         private static readonly List<string> DisplayModeOptionList =
             new List<string> { "Shown", "Collapsed", "Hidden" };
@@ -214,6 +215,12 @@ namespace SimpleLLMChatGUI
             set { _jevModel = value; OnPropertyChanged(nameof(JevModel)); }
         }
 
+        public bool ShowJevConfidence
+        {
+            get { return _showJevConfidence; }
+            set { _showJevConfidence = value; OnPropertyChanged(nameof(ShowJevConfidence)); }
+        }
+
         private void InitializeDefaults()
         {
             ServerURL = "";
@@ -243,6 +250,7 @@ namespace SimpleLLMChatGUI
             JevBaseUrl = "";
             JevApiKey = "";
             JevModel = "";
+            ShowJevConfidence = true;
         }
 
         private void SaveIni(string path)

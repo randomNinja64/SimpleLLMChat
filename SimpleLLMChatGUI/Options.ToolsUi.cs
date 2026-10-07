@@ -42,6 +42,7 @@ namespace SimpleLLMChatGUI
                 "jevbaseurl=" + (JevBaseUrl ?? string.Empty),
                 "jevapikey=" + (JevApiKey ?? string.Empty),
                 "jevmodel=" + (JevModel ?? string.Empty),
+                "showjevconfidence=" + (ShowJevConfidence ? "1" : "0"),
             };
 
             foreach (var kvp in _toolTimeoutControls)

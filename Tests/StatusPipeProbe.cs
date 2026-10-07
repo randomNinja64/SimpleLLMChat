@@ -85,21 +85,24 @@ public sealed class StatusPipeProbe : IDisposable
         return WaitFor(line => StatusPipe.TryParseReadyLine(line), timeoutMs);
     }
 
-    public bool WaitForApproval(int timeoutMs, out string toolName, out string arguments)
+    public bool WaitForApproval(int timeoutMs, out string toolName, out string arguments, out string confidence)
     {
         string name = null;
         string args = null;
+        string conf = null;
         bool ok = WaitFor(line =>
         {
-            string n, a;
-            if (!StatusPipe.TryParseApprovalLine(line, out n, out a, out _))
+            string n, a, c;
+            if (!StatusPipe.TryParseApprovalLine(line, out n, out a, out c))
                 return false;
             name = n;
             args = a;
+            conf = c;
             return true;
         }, timeoutMs);
         toolName = name;
         arguments = args;
+        confidence = conf;
         return ok;
     }
 

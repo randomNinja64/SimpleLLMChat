@@ -289,7 +289,7 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(probe.WaitForReady(15000), "ready");
                         cli.WriteLine("please run the command");
                         string tool, args;
-                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args), "approval");
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out _), "approval");
                         TestAssert.Equal("run_shell_command", tool, "tool");
                         cli.WriteLine("N");
                         TestAssert.True(WaitStdoutContains(cli, "deny-final-ok", 20000), "final");
@@ -355,7 +355,7 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(probe.WaitForReady(15000), "ready");
                         cli.WriteLine("please run the command");
                         string tool, args;
-                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args), "approval");
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out _), "approval");
                         TestAssert.Equal("run_shell_command", tool, "tool");
                         cli.WriteLine("Y");
                         TestAssert.True(WaitStdoutContains(cli, "allow-final-ok", 25000), "final");
@@ -414,6 +414,45 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.auto_approval_allow_hides_confidence", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    if (!ShellToolsPackaged(ws))
+                        TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
+
+                    server.StreamDelayMs = 0;
+                    server.SystemOneChoice = "allow";
+                    server.SystemOneConfidence = 0.91;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_auto_allow_hide",
+                        "{\"command\":\"echo AUTO_ALLOW_HIDE\"}");
+                    server.EnqueueContent("auto-allow-hide-final");
+                    WriteCliIni(
+                        ws.Path,
+                        server.BaseUrl + "/v1",
+                        "run_shell_command",
+                        "",
+                        "auto",
+                        server.BaseUrl + "/v1/systemone",
+                        "jev-secret",
+                        "",
+                        false);
+
+                    ProcessResult r = ProcessRunner.Run(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners please run the command",
+                        ws.Path, null, 30000);
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.True(
+                        r.Stdout.IndexOf("auto allowed", StringComparison.Ordinal) < 0,
+                        "no auto line");
+                    TestAssert.ContainsIgnoreCase(r.Stdout, "AUTO_ALLOW_HIDE", "echo");
+                }
+            });
+
             TestRunner.Run("cli.auto_approval_confirm", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
@@ -446,13 +485,63 @@ namespace SimpleLLMChatCLI.Tests
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
                         cli.WriteLine("please run the command");
-                        string tool, args;
-                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args), "approval");
+                        string tool, args, pipeConfidence;
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out pipeConfidence), "approval");
                         TestAssert.Equal("run_shell_command", tool, "tool");
+                        TestAssert.Equal("0.42", pipeConfidence, "pipe confidence");
                         TestAssert.True(WaitStdoutContains(cli, "Jev confidence: 0.42", 5000), "confidence");
                         cli.WriteLine("N");
                         TestAssert.True(WaitStdoutContains(cli, "auto-confirm-final", 20000), "final");
                         TestAssert.ContainsIgnoreCase(cli.Stdout, "cancelled by the user", "cancelled");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.auto_approval_confirm_hides_confidence", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.SystemOneChoice = "confirm";
+                    server.SystemOneConfidence = 0.42;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_auto_confirm_hide",
+                        "{\"command\":\"echo AUTO_CONFIRM_HIDE\"}");
+                    server.EnqueueContent("auto-confirm-hide-final");
+                    WriteCliIni(
+                        ws.Path,
+                        server.BaseUrl + "/v1",
+                        "run_shell_command",
+                        "",
+                        "auto",
+                        server.BaseUrl + "/v1/systemone",
+                        "jev-secret",
+                        "jev-latest",
+                        false);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("please run the command");
+                        string tool, args, pipeConfidence;
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out pipeConfidence), "approval");
+                        TestAssert.Equal("run_shell_command", tool, "tool");
+                        TestAssert.True(string.IsNullOrEmpty(pipeConfidence), "pipe confidence hidden");
+                        TestAssert.True(WaitStdoutContains(cli, "Approve? (Y/N):", 5000), "prompt");
+                        TestAssert.True(
+                            cli.Stdout.IndexOf("Jev confidence:", StringComparison.Ordinal) < 0,
+                            "no confidence");
+                        cli.WriteLine("N");
+                        TestAssert.True(WaitStdoutContains(cli, "auto-confirm-hide-final", 20000), "final");
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }
@@ -491,7 +580,7 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(probe.WaitForReady(15000), "ready");
                         cli.WriteLine("please run the command");
                         string tool, args;
-                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args), "approval");
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out _), "approval");
                         TestAssert.True(WaitStdoutContains(cli, "Approve? (Y/N):", 5000), "prompt");
                         TestAssert.True(
                             cli.Stdout.IndexOf("Jev confidence:", StringComparison.Ordinal) < 0,
@@ -539,7 +628,7 @@ namespace SimpleLLMChatCLI.Tests
 
         static void WriteCliIni(string dir, string llmServer, string tools, string toolsRequiringApproval)
         {
-            WriteCliIni(dir, llmServer, tools, toolsRequiringApproval, null, null, null, null);
+            WriteCliIni(dir, llmServer, tools, toolsRequiringApproval, null, null, null, null, null);
         }
 
         static void WriteCliIni(
@@ -550,8 +639,12 @@ namespace SimpleLLMChatCLI.Tests
             string toolApprovalMode,
             string jevBaseUrl,
             string jevApiKey,
-            string jevModel)
+            string jevModel,
+            bool? showJevConfidence = null)
         {
+            string confidenceLine = showJevConfidence.HasValue
+                ? "showjevconfidence=" + (showJevConfidence.Value ? "1" : "0") + "\r\n"
+                : "";
             string path = Path.Combine(dir, "LLMSettings.ini");
             File.WriteAllText(path,
                 "[System]\r\n" +
@@ -567,6 +660,7 @@ namespace SimpleLLMChatCLI.Tests
                 "jevbaseurl=" + (jevBaseUrl ?? "") + "\r\n" +
                 "jevapikey=" + (jevApiKey ?? "") + "\r\n" +
                 "jevmodel=" + (jevModel ?? "") + "\r\n" +
+                confidenceLine +
                 "[Appearance]\r\n" +
                 "assistantname=LLM\r\n" +
                 "markdownparsing=0\r\n" +

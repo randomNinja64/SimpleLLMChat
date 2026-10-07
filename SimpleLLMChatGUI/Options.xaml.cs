@@ -195,6 +195,7 @@ namespace SimpleLLMChatGUI
             JevBaseUrl = config.GetConfigValue("jevbaseurl");
             JevApiKey = config.GetConfigValue("jevapikey");
             JevModel = config.GetConfigValue("jevmodel");
+            ShowJevConfidence = config.GetConfigBool("showjevconfidence", true);
 
             ApiKeyPasswordBox.Password = ApiKey;
             EmbeddingsApiKeyPasswordBox.Password = EmbeddingsApiKey;

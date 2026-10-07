@@ -99,6 +99,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `jevbaseurl`: Full URL for a Jev-compatible server (e.g. `http://127.0.0.1:8080/v1/systemone` if you're using llama.cpp)
 - `jevapikey`: API key if required for your Jev-compatible server
 - `jevmodel`: Model to use (if supported by your endpoint)
+- `showjevconfidence`: Show/Hide automatic tool approval confidence level (`1` or `0`, default `1`)
 - `toolsrequiringapproval`: Comma-separated list of tools that require approval for the AI to use in manual mode.
 
 **Tool Timeouts**
