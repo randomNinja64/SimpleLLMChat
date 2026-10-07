@@ -80,22 +80,19 @@ public static class ToolHelper
             }
         }
 
-        int exitCode = 0;
-        ToolResult result = new ToolResult("", 0);
+        ToolResult result;
 
         try
         {
             result = dispatch(toolName, argumentsJson);
-            exitCode = result.ExitCode;
         }
         catch (Exception e)
         {
             result = Fail(e.Message);
-            exitCode = 1;
         }
 
         Console.Write(FormatResultJson(result));
-        return exitCode;
+        return result.ExitCode;
     }
 
     public static ToolResult Fail(string message)
@@ -274,18 +271,7 @@ public static class ToolHelper
             if (root.Type == JTokenType.Object)
             {
                 JObject obj = (JObject)root;
-                JToken token;
-                if (!obj.TryGetValue(key, out token))
-                {
-                    foreach (JProperty property in obj.Properties())
-                    {
-                        if (string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
-                        {
-                            token = property.Value;
-                            break;
-                        }
-                    }
-                }
+                JToken token = FindPropertyValue(obj, key);
 
                 if (token != null && token.Type != JTokenType.Null)
                 {
@@ -312,18 +298,7 @@ public static class ToolHelper
                 return null;
 
             JObject obj = (JObject)root;
-            JToken token;
-            if (!obj.TryGetValue(key, out token))
-            {
-                foreach (JProperty property in obj.Properties())
-                {
-                    if (string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
-                    {
-                        token = property.Value;
-                        break;
-                    }
-                }
-            }
+            JToken token = FindPropertyValue(obj, key);
 
             return token as JArray;
         }
@@ -331,5 +306,20 @@ public static class ToolHelper
         {
             return null;
         }
+    }
+
+    private static JToken FindPropertyValue(JObject obj, string key)
+    {
+        JToken token;
+        if (obj.TryGetValue(key, out token))
+            return token;
+
+        foreach (JProperty property in obj.Properties())
+        {
+            if (string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
+                return property.Value;
+        }
+
+        return null;
     }
 }

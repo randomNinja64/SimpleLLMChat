@@ -204,10 +204,7 @@ namespace SimpleLLMChatCLI.RAG
             try
             {
                 string json = File.ReadAllText(path, Encoding.UTF8);
-                IndexManifest manifest = JsonConvert.DeserializeObject<IndexManifest>(json);
-                if (manifest != null && manifest.Files == null)
-                    manifest.Files = new Dictionary<string, IndexFileEntry>(StringComparer.OrdinalIgnoreCase);
-                return manifest;
+                return JsonConvert.DeserializeObject<IndexManifest>(json);
             }
             catch
             {
