@@ -436,12 +436,8 @@ namespace SimpleLLMChatCLI
                 }
 
                 exitCode = result.ExitCode;
-                string output = result.Stdout ?? "";
-                if (!string.IsNullOrEmpty(result.Stderr))
-                    output += result.Stderr;
-
                 string text;
-                ToolResultParser.Parse(output, out text, out imageBase64, out imageMime);
+                ToolResultParser.Parse(result.Stdout, result.Stderr, out text, out imageBase64, out imageMime);
                 toolContent = FormatCommandResult(toolName, text, exitCode);
             }
             catch (Exception ex)

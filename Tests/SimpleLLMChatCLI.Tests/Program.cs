@@ -93,6 +93,14 @@ namespace SimpleLLMChatCLI.Tests
                 TestAssert.Equal("hi", text, "text");
                 TestAssert.Equal("QQ==", image, "image");
                 TestAssert.Equal("image/png", mime, "mime");
+
+                ToolResultParser.Parse(
+                    "{\"text\":\"captured\",\"image\":{\"data\":\"QQ==\",\"mime\":\"image/jpeg\"}}",
+                    "curl: (23) Failed writing body\n",
+                    out text, out image, out mime);
+                TestAssert.Equal("captured\ncurl: (23) Failed writing body\n", text, "stderr kept as text");
+                TestAssert.Equal("QQ==", image, "image kept");
+                TestAssert.Equal("image/jpeg", mime, "mime kept");
             });
 
             TestRunner.Run("VectorStore.search", () =>
