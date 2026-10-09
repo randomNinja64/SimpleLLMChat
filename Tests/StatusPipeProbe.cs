@@ -80,6 +80,21 @@ public sealed class StatusPipeProbe : IDisposable
         }
     }
 
+    public int LastTokens()
+    {
+        int tokens = 0;
+        lock (_gate)
+        {
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                int parsed;
+                if (StatusPipe.TryParseStatusLine(_lines[i], out parsed))
+                    tokens = parsed;
+            }
+        }
+        return tokens;
+    }
+
     public bool WaitForReady(int timeoutMs)
     {
         return WaitFor(line => StatusPipe.TryParseReadyLine(line), timeoutMs);

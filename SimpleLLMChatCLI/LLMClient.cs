@@ -373,8 +373,8 @@ public partial class LLMClient
     }
 
     /// <summary>
-    /// If context usage is high, summarize silently (summary text is not shown) and replace
-    /// the conversation with a compact summary message.
+    /// If context usage is high, summarize on this thread and replace the conversation
+    /// with a compact summary message. The summary text itself is not shown.
     /// </summary>
     private void MaybeSummarizeInBackground(List<ChatMessage> conversation, bool outputOnly, string continueHint)
     {
@@ -392,7 +392,20 @@ public partial class LLMClient
 
         string summary = SummarizeConversation(conversation);
         if (string.IsNullOrEmpty(summary))
+        {
+            int contextWindow = config.GetConfigInt("contextWindowSize", 0);
+            int dropped = DropOldestMessagesUntilFit(conversation, contextWindow);
+            int chars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
+            PublishStatusTokens(chars);
+            if (!outputOnly)
+            {
+                if (dropped > 0)
+                    ChatOutput.WriteLine("[Summarization failed - dropped older messages]");
+                if (TokenEstimator.ShouldSummarize(chars, contextWindow))
+                    ChatOutput.WriteLine("[Summarization failed - current turn still exceeds the context window]");
+            }
             return;
+        }
 
         conversation.Clear();
         conversation.Add(new ChatMessage(
@@ -403,6 +416,34 @@ public partial class LLMClient
             ChatOutput.WriteLine("[Conversation summarized - continuing...]");
 
         PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+    }
+
+    /// <summary>
+    /// Drops messages older than the latest user turn until usage is under the
+    /// summarize threshold. The latest user message and everything after it stay.
+    /// </summary>
+    private int DropOldestMessagesUntilFit(List<ChatMessage> conversation, int contextWindowSize)
+    {
+        int keepFrom = 0;
+        for (int i = conversation.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(conversation[i].Role, "user", StringComparison.OrdinalIgnoreCase))
+            {
+                keepFrom = i;
+                break;
+            }
+        }
+
+        int dropped = 0;
+        while (keepFrom > 0 && TokenEstimator.ShouldSummarize(
+            GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead(),
+            contextWindowSize))
+        {
+            conversation.RemoveAt(0);
+            keepFrom--;
+            dropped++;
+        }
+        return dropped;
     }
 
     private bool IsAutoToolApproval()
@@ -467,7 +508,7 @@ public partial class LLMClient
     }
 
     /// <summary>
-    /// Sum of message content and tool-call name/arguments (excludes base overhead).
+    /// Sum of message content, image data URLs, and tool-call name/arguments (excludes base overhead).
     /// </summary>
     public static int GetConversationCharacterCount(List<ChatMessage> conversation)
     {
@@ -479,6 +520,12 @@ public partial class LLMClient
         {
             if (!string.IsNullOrEmpty(msg.Content))
                 count += msg.Content.Length;
+
+            if (!string.IsNullOrEmpty(msg.Image))
+            {
+                string mime = string.IsNullOrEmpty(msg.ImageMime) ? ImageEncoder.DefaultMime : msg.ImageMime;
+                count += ("data:" + mime + ";base64," + msg.Image).Length;
+            }
 
             if (msg.ToolCalls != null)
             {

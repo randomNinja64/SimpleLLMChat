@@ -225,6 +225,103 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.summary_failure_drops_old_messages", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply");
+                    server.EnqueueContent("second-reply");
+                    server.EnqueueApiError("summary-down");
+                    server.EnqueueContent("after-trim");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 200);
+                    string oldMarker = new string('A', 400);
+                    string keptMarker = new string('B', 200);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+                        cli.WriteLine(oldMarker);
+                        TestAssert.True(WaitStdoutContains(cli, "first-reply", 20000), "first reply");
+
+                        cli.WriteLine(keptMarker);
+                        TestAssert.True(WaitStdoutContains(cli, "second-reply", 20000), "second reply");
+
+                        cli.WriteLine("please trim");
+                        TestAssert.True(WaitStdoutContains(cli, "after-trim", 20000), "follow-up");
+                        TestAssert.True(WaitStdoutContains(cli, "[Summarization failed - dropped older messages]", 5000), "dropped note");
+                        TestAssert.True(
+                            cli.Stdout.IndexOf("current turn still exceeds", StringComparison.Ordinal) < 0,
+                            "current turn fits");
+
+                        int tokens = 0;
+                        DateTime deadline = DateTime.UtcNow.AddMilliseconds(5000);
+                        while (DateTime.UtcNow < deadline)
+                        {
+                            tokens = probe.LastTokens();
+                            if (tokens > 0 && tokens < 180)
+                                break;
+                            System.Threading.Thread.Sleep(25);
+                        }
+                        TestAssert.True(tokens > 0 && tokens < 180, "tokens under window tokens=" + tokens);
+                        TestAssert.True(server.LastBody.IndexOf(oldMarker, StringComparison.Ordinal) < 0, "old history omitted");
+                        TestAssert.Contains(server.LastBody, keptMarker, "previous turn kept");
+                        TestAssert.Contains(server.LastBody, "please trim", "new message kept");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.image_counts_toward_tokens", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("seen");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+
+                    byte[] blob = new byte[600];
+                    for (int i = 0; i < blob.Length; i++)
+                        blob[i] = (byte)(i % 256);
+                    string imagePath = Path.Combine(ws.Path, "shot.png");
+                    File.WriteAllBytes(imagePath, blob);
+                    int minTokens = TokenEstimator.ApproximateTokens(Convert.ToBase64String(blob).Length);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("/image \"" + imagePath + "\" see");
+                        TestAssert.True(WaitStdoutContains(cli, "seen", 20000), "reply");
+
+                        int tokens = 0;
+                        DateTime deadline = DateTime.UtcNow.AddMilliseconds(5000);
+                        while (DateTime.UtcNow < deadline)
+                        {
+                            tokens = probe.LastTokens();
+                            if (tokens >= minTokens)
+                                break;
+                            System.Threading.Thread.Sleep(25);
+                        }
+                        TestAssert.True(tokens >= minTokens, "image counted tokens=" + tokens + " min=" + minTokens);
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("StatusPipe.ready_parse", () =>
             {
                 TestAssert.True(StatusPipe.TryParseReadyLine(StatusPipe.ReadyLine), "ready");
@@ -683,7 +780,8 @@ namespace SimpleLLMChatCLI.Tests
             string jevBaseUrl,
             string jevApiKey,
             string jevModel,
-            bool? showJevConfidence = null)
+            bool? showJevConfidence = null,
+            int contextWindowSize = 0)
         {
             string confidenceLine = showJevConfidence.HasValue
                 ? "showjevconfidence=" + (showJevConfidence.Value ? "1" : "0") + "\r\n"
@@ -695,7 +793,7 @@ namespace SimpleLLMChatCLI.Tests
                 "llmserver=" + llmServer + "\r\n" +
                 "model=test-model\r\n" +
                 "sysprompt=\"You are a test assistant.\"\r\n" +
-                "contextWindowSize=0\r\n" +
+                "contextWindowSize=" + contextWindowSize.ToString(CultureInfo.InvariantCulture) + "\r\n" +
                 "[Tools]\r\n" +
                 "tools=" + (tools ?? "") + "\r\n" +
                 "toolsrequiringapproval=" + (toolsRequiringApproval ?? "") + "\r\n" +
