@@ -167,6 +167,7 @@ namespace SimpleLLMChatGUI
 
             processHandler.OutputReceived += OnOutputReceived;
             processHandler.ErrorOccurred += OnErrorOccurred;
+            processHandler.CliErrorReceived += OnCliErrorReceived;
             processHandler.GenerationComplete += OnGenerationComplete;
             processHandler.ApprovalRequested += OnApprovalRequested;
             processHandler.StatusReceived += OnStatusReceived;
@@ -237,6 +238,17 @@ namespace SimpleLLMChatGUI
             if (!_streamingTurn.HasRenderedContent())
                 _chatTurns.Remove(_streamingTurn);
             _streamingTurn = null;
+        }
+
+        private void OnCliErrorReceived(string line)
+        {
+            Dispatcher.BeginInvoke((Action)(() =>
+            {
+                ChatTurn errorTurn = AddTurn();
+                errorTurn.AppendText(line);
+                errorTurn.Complete();
+                ScrollChatToEnd();
+            }));
         }
 
         private void OnErrorOccurred(string errorMessage)

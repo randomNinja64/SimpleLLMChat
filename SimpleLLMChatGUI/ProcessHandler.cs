@@ -14,6 +14,7 @@ namespace SimpleLLMChatGUI
 
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
+        public event Action<string> CliErrorReceived;
         public event Action GenerationComplete;
         public event Func<string, string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
@@ -39,11 +40,15 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.FileName = executablePath;
                 llmProcess.StartInfo.UseShellExecute = false;
                 llmProcess.StartInfo.RedirectStandardOutput = true;
+                llmProcess.StartInfo.RedirectStandardError = true;
                 llmProcess.StartInfo.RedirectStandardInput = true;
+                llmProcess.StartInfo.StandardErrorEncoding = Encoding.UTF8;
                 llmProcess.StartInfo.CreateNoWindow = true;
                 llmProcess.StartInfo.Arguments = "--no-banners";
+                llmProcess.ErrorDataReceived += OnErrorDataReceived;
                 textBuffer.Clear();
                 llmProcess.Start();
+                llmProcess.BeginErrorReadLine();
 
                 statusPipeClient = new StatusPipeClient(llmProcess.Id);
                 statusPipeClient.StatusReceived += OnStatusPipeReceived;
@@ -64,6 +69,16 @@ namespace SimpleLLMChatGUI
                 ErrorOccurred?.Invoke("Failed to start process: " + ex.Message);
                 return false;
             }
+        }
+
+        private void OnErrorDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            if (disposed || string.IsNullOrEmpty(e.Data))
+                return;
+
+            Action<string> handler = CliErrorReceived;
+            if (handler != null)
+                handler(e.Data);
         }
 
         private void OnStatusPipeReceived(int tokens)
@@ -306,6 +321,7 @@ namespace SimpleLLMChatGUI
             DisposeStatusPipeClient();
             OutputReceived = null;
             ErrorOccurred = null;
+            CliErrorReceived = null;
             GenerationComplete = null;
             ApprovalRequested = null;
             StatusReceived = null;
