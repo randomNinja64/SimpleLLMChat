@@ -11,6 +11,9 @@ namespace SimpleLLMChatGUI
         private Process llmProcess;
         private bool disposed;
         private StringBuilder textBuffer = new StringBuilder(); // Buffer for incomplete You: strip
+        private readonly Decoder utf8Decoder = Encoding.UTF8.GetDecoder();
+        // 256-byte read plus a 3-byte character carried from the previous read.
+        private readonly char[] charBuffer = new char[260];
 
         public event Action<string> OutputReceived;
         public event Action<string> ErrorOccurred;
@@ -203,14 +206,13 @@ namespace SimpleLLMChatGUI
             {
                 try
                 {
-                    string newText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-
-                    if (!string.IsNullOrEmpty(newText))
-                        ProcessTextChunk(newText);
+                    int written = utf8Decoder.GetChars(buffer, 0, bytesRead, charBuffer, 0);
+                    if (written > 0)
+                        ProcessTextChunk(new string(charBuffer, 0, written));
                 }
                 catch
                 {
-                    // If UTF-8 decoding fails, skip this chunk
+                    // Skip this chunk if decoding fails. The read loop keeps going.
                 }
 
                 // Continue reading
