@@ -190,6 +190,41 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.sse_error_field", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.StreamChunkChars = 16;
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string exe = Path.Combine(ws.Path, "SimpleLLMChatCLI.exe");
+
+                    server.EnqueueContent("error");
+                    ProcessResult word = ProcessRunner.Run(exe, "-o --no-banners ping", ws.Path, null, 20000);
+                    TestAssert.Equal(0, word.ExitCode, "word exit");
+                    TestAssert.Contains(word.Stdout, "error", "word kept");
+                    TestAssert.True(word.Stdout.IndexOf("[API Error]", StringComparison.Ordinal) < 0, "word not an api error");
+
+                    server.EnqueueContent("an error occurred");
+                    ProcessResult phrase = ProcessRunner.Run(exe, "-o --no-banners ping", ws.Path, null, 20000);
+                    TestAssert.Equal(0, phrase.ExitCode, "phrase exit");
+                    TestAssert.Contains(phrase.Stdout, "an error occurred", "phrase kept");
+                    TestAssert.True(phrase.Stdout.IndexOf("[API Error]", StringComparison.Ordinal) < 0, "phrase not an api error");
+
+                    server.EnqueueContentWithNullError("beside-null");
+                    ProcessResult nulled = ProcessRunner.Run(exe, "-o --no-banners ping", ws.Path, null, 20000);
+                    TestAssert.Equal(0, nulled.ExitCode, "null error exit");
+                    TestAssert.Contains(nulled.Stdout, "beside-null", "null error still streams");
+                    TestAssert.True(nulled.Stdout.IndexOf("[API Error]", StringComparison.Ordinal) < 0, "null error not an api error");
+
+                    server.EnqueueApiError("nope");
+                    ProcessResult failed = ProcessRunner.Run(exe, "-o --no-banners ping", ws.Path, null, 20000);
+                    TestAssert.Contains(failed.Stdout, "[API Error]", "api error shown");
+                    TestAssert.Contains(failed.Stdout, "nope", "api error body");
+                }
+            });
+
             TestRunner.Run("StatusPipe.ready_parse", () =>
             {
                 TestAssert.True(StatusPipe.TryParseReadyLine(StatusPipe.ReadyLine), "ready");

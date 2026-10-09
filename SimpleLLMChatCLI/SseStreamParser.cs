@@ -40,7 +40,20 @@ namespace SimpleLLMChatCLI
                 string jsonPart = line.Substring(6);
                 if (jsonPart == "[DONE]") break;
 
-                if (jsonPart.Contains("\"error\""))
+                JObject obj;
+                try
+                {
+                    obj = JObject.Parse(jsonPart);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                // A content delta whose text is "error" also contains that substring.
+                // Only a real error property is an API failure.
+                JToken errorToken = obj["error"];
+                if (errorToken != null && errorToken.Type != JTokenType.Null)
                 {
                     if (onContentChunk != null)
                     {
@@ -52,7 +65,6 @@ namespace SimpleLLMChatCLI
 
                 try
                 {
-                    JObject obj = JObject.Parse(jsonPart);
                     JArray choices = (JArray)obj["choices"];
                     if (choices == null) continue;
 

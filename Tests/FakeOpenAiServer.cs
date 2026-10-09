@@ -60,6 +60,8 @@ public sealed class FakeOpenAiServer : IDisposable
     private sealed class ScriptedReply
     {
         public bool IsToolCall;
+        public bool IsApiError;
+        public bool IncludeNullError;
         public string Content;
         public string ToolName;
         public string ToolId;
@@ -128,6 +130,30 @@ public sealed class FakeOpenAiServer : IDisposable
             {
                 IsToolCall = false,
                 Content = content ?? ""
+            });
+        }
+    }
+
+    public void EnqueueContentWithNullError(string content)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                Content = content ?? "",
+                IncludeNullError = true
+            });
+        }
+    }
+
+    public void EnqueueApiError(string message)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                IsApiError = true,
+                Content = message ?? ""
             });
         }
     }
@@ -251,10 +277,12 @@ public sealed class FakeOpenAiServer : IDisposable
 
         using (Stream output = ctx.Response.OutputStream)
         {
-            if (scripted != null && scripted.IsToolCall)
+            if (scripted != null && scripted.IsApiError)
+                WriteApiErrorSse(output, scripted.Content);
+            else if (scripted != null && scripted.IsToolCall)
                 WriteToolCallSse(output, scripted);
             else
-                WriteContentSse(output, ResolveContent(scripted));
+                WriteContentSse(output, ResolveContent(scripted), scripted != null && scripted.IncludeNullError);
         }
         ctx.Response.Close();
     }
@@ -287,7 +315,21 @@ public sealed class FakeOpenAiServer : IDisposable
         return FixedReply ?? "ok";
     }
 
+    private void WriteApiErrorSse(Stream output, string message)
+    {
+        string evt = "data: {\"error\":{\"message\":\"" + EscapeJson(message) + "\"}}\n\n" +
+            "data: [DONE]\n\n";
+        byte[] bytes = Encoding.UTF8.GetBytes(evt);
+        output.Write(bytes, 0, bytes.Length);
+        output.Flush();
+    }
+
     private void WriteContentSse(Stream output, string content)
+    {
+        WriteContentSse(output, content, false);
+    }
+
+    private void WriteContentSse(Stream output, string content, bool includeNullError)
     {
         int delayMs = StreamDelayMs;
         int chunkChars = StreamChunkChars > 0 ? StreamChunkChars : 16;
@@ -301,7 +343,8 @@ public sealed class FakeOpenAiServer : IDisposable
 
             int len = Math.Min(chunkChars, content.Length - i);
             string piece = content.Substring(i, len);
-            string evt = "data: {\"choices\":[{\"delta\":{\"content\":\"" +
+            string errorField = includeNullError ? "\"error\":null," : "";
+            string evt = "data: {" + errorField + "\"choices\":[{\"delta\":{\"content\":\"" +
                 EscapeJson(piece) + "\"}}]}\n\n";
             byte[] bytes = Encoding.UTF8.GetBytes(evt);
             output.Write(bytes, 0, bytes.Length);

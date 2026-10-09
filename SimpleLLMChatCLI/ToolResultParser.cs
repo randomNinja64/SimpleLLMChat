@@ -10,6 +10,19 @@ public static class ToolResultParser
     /// <summary>
     /// Parse tool stdout JSON { "text"?, "image"? }. On failure, treats the entire stdout as plain text.
     /// </summary>
+    public static void Parse(string stdout, string stderr, out string text, out string imageBase64, out string imageMime)
+    {
+        Parse(stdout, out text, out imageBase64, out imageMime);
+        if (string.IsNullOrEmpty(stderr))
+            return;
+        if (string.IsNullOrEmpty(text))
+            text = stderr;
+        else if (text.EndsWith("\n"))
+            text += stderr;
+        else
+            text += "\n" + stderr;
+    }
+
     public static void Parse(string stdout, out string text, out string imageBase64, out string imageMime)
     {
         text = stdout ?? "";
