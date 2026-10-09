@@ -154,59 +154,9 @@ public partial class LLMClient
         {
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
-            // Stream tool calls with explicit open/close markers as they arrive, rather than
-            // waiting for the full response before printing them. A tool that requires approval
-            // is suppressed here since the approval prompt below shows its name + args instead.
-            // Hidden: name only (no args). outputOnly: no tool-call UI at all.
-            bool toolCallUiOpen = false;
-            bool toolCallArgsEndedWithNewline = true;
-            bool currentToolCallSuppressed = false;
-            Action<ToolRegistry.ToolCall> toolCallStreamCallback = null;
-            if (!outputOnly)
-            {
-                toolCallStreamCallback = (toolCall) =>
-                {
-                    if (!string.IsNullOrEmpty(toolCall.Name) && string.IsNullOrEmpty(toolCall.Arguments))
-                    {
-                        if (toolCallUiOpen)
-                        {
-                            if (!toolCallArgsEndedWithNewline)
-                                ChatOutput.WriteLine();
-                            ChatOutput.WriteLine("[/tool call]");
-                        }
-
-                        currentToolCallSuppressed = !IsAutoToolApproval() && approvalSet.Contains(toolCall.Name);
-
-                        if (!currentToolCallSuppressed)
-                        {
-                            startBlock();
-                            ChatOutput.WriteLine("[tool call] " + toolCall.Name);
-                            toolCallUiOpen = true;
-                            toolCallArgsEndedWithNewline = true;
-                        }
-                        else
-                        {
-                            toolCallUiOpen = false;
-                        }
-                    }
-                    else if (!string.IsNullOrEmpty(toolCall.Arguments)
-                        && !currentToolCallSuppressed
-                        && toolCallDisplay != ChatBlockDisplayMode.Hidden)
-                    {
-                        ChatOutput.Write(toolCall.Arguments);
-                        toolCallArgsEndedWithNewline = toolCall.Arguments.EndsWith("\n");
-                    }
-                };
-            }
-
-            LLMCompletionResponse response = sendMessages(conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback, onContentStart, startBlock, outputOnly, contextInjections);
-
-            if (toolCallUiOpen)
-            {
-                if (!toolCallArgsEndedWithNewline)
-                    ChatOutput.WriteLine();
-                ChatOutput.WriteLine("[/tool call]");
-            }
+            LLMCompletionResponse response = StreamModelCall(
+                conversation, enabledTools, approvalSet, toolCallDisplay,
+                outputOnly, contextInjections, startBlock, onContentStart);
 
             if (response.FinishReason == "request_failed")
             {
@@ -218,136 +168,9 @@ public partial class LLMClient
 
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
-                ChatMessage assistantCall = new ChatMessage
-                {
-                    Role = "assistant",
-                    Content = string.Empty,
-                    ToolCalls = response.ToolCalls
-                };
-                conversation.Add(assistantCall);
+                if (!RunToolCalls(conversation, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock))
+                    return;
 
-                for (int i = 0; i < response.ToolCalls.Count; i++)
-                {
-                    ToolRegistry.ToolCall call = response.ToolCalls[i];
-
-                    // Manual output-only cannot ask, including when the tool is also disabled.
-                    if (!IsAutoToolApproval() && outputOnly && approvalSet.Contains(call.Name))
-                    {
-                        ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
-                        return;
-                    }
-
-                    int exitCode = 0;
-                    string toolContent = string.Empty;
-                    string toolImage = null;
-                    string toolImageMime = null;
-                    bool runTool = false;
-                    bool askUser = false;
-                    double? jevConfidence = null;
-
-                    if (!enabledSet.Contains(call.Name))
-                    {
-                        exitCode = -1;
-                        toolContent = ToolRegistry.FormatCommandResult(
-                            call.Name,
-                            "error: tool '" + call.Name + "' is disabled by configuration.",
-                            exitCode
-                        );
-                    }
-                    else if (IsAutoToolApproval())
-                    {
-                        JevGateDecision decision = JevDecisionClient.Decide(
-                            config,
-                            call.Name,
-                            call.Arguments,
-                            registry.GetToolDescription(call.Name),
-                            RecentMessagesForDecision(conversation));
-                        if (decision.Choice == JevGateChoice.Allow)
-                        {
-                            if (!outputOnly && config.GetConfigBool("showjevconfidence", true))
-                            {
-                                if (startBlock != null)
-                                    startBlock();
-                                string approved = decision.Confidence.HasValue
-                                    ? "[" + call.Name + " auto allowed, confidence " + decision.Confidence.Value.ToString("0.00", CultureInfo.InvariantCulture) + "]"
-                                    : "[" + call.Name + " auto allowed]";
-                                ChatOutput.WriteLine(approved);
-                            }
-                            runTool = true;
-                        }
-                        else
-                        {
-                            askUser = true;
-                            jevConfidence = ConfidenceForDisplay(decision.Confidence);
-                        }
-                    }
-                    else if (approvalSet.Contains(call.Name))
-                    {
-                        askUser = true;
-                    }
-                    else
-                    {
-                        runTool = true;
-                    }
-
-                    if (askUser && outputOnly)
-                    {
-                        ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
-                        return;
-                    }
-
-                    // The tool call block itself was already streamed above (if not suppressed
-                    // for approval); only pad a blank line before the approval prompt here.
-                    if (askUser)
-                    {
-                        if (!outputOnly && startBlock != null)
-                            startBlock();
-                        if (requestToolApproval(call.Name, call.Arguments, jevConfidence))
-                            runTool = true;
-                        else
-                        {
-                            exitCode = -1;
-                            toolContent = ToolRegistry.FormatCommandResult(
-                                call.Name,
-                                "Tool execution was cancelled by the user.",
-                                exitCode
-                            );
-                        }
-                    }
-
-                    if (runTool)
-                    {
-                        registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
-                    }
-
-                    ChatMessage toolMsg = new ChatMessage
-                    {
-                        Role = "tool",
-                        Content = toolContent,
-                        ToolCallId = call.Id,
-                        Image = toolImage,
-                        ImageMime = toolImageMime
-                    };
-                    conversation.Add(toolMsg);
-
-                    if (!outputOnly)
-                    {
-                        startBlock();
-                        ChatOutput.WriteLine("[tool output]");
-                        if (toolOutputDisplay == ChatBlockDisplayMode.Hidden)
-                        {
-                            ChatOutput.WriteLine("Exit Code: " + exitCode);
-                        }
-                        else
-                        {
-                            ChatOutput.Write(toolContent ?? "");
-                            if (string.IsNullOrEmpty(toolContent) || !toolContent.EndsWith("\n"))
-                                ChatOutput.WriteLine();
-                        }
-                        ChatOutput.WriteLine("[/tool output]");
-                    }
-                }
-                // Mid-turn (after tools): compact context silently, then continue the user request.
                 MaybeSummarizeInBackground(
                     conversation,
                     outputOnly,
@@ -355,21 +178,230 @@ public partial class LLMClient
                 continue;
             }
 
-            // Add assistant message
-            ChatMessage assistantMsg = new ChatMessage
+            conversation.Add(new ChatMessage
             {
                 Role = "assistant",
                 Content = response.Content
-            };
-            conversation.Add(assistantMsg);
+            });
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
             if (!outputOnly)
-            {
                 ChatOutput.EndLine();
-            }
             break;
         }
+    }
+
+    /// <summary>
+    /// One model call. Streams [tool call] tags as arguments arrive. A call that
+    /// still needs approval is not tagged here; the approval prompt shows it.
+    /// </summary>
+    private LLMCompletionResponse StreamModelCall(
+        List<ChatMessage> conversation,
+        List<string> enabledTools,
+        HashSet<string> approvalSet,
+        ChatBlockDisplayMode toolCallDisplay,
+        bool outputOnly,
+        List<string> contextInjections,
+        Action startBlock,
+        Action onContentStart)
+    {
+        bool toolCallUiOpen = false;
+        bool toolCallArgsEndedWithNewline = true;
+        bool currentToolCallSuppressed = false;
+        Action<ToolRegistry.ToolCall> toolCallStreamCallback = null;
+        if (!outputOnly)
+        {
+            toolCallStreamCallback = (toolCall) =>
+            {
+                if (!string.IsNullOrEmpty(toolCall.Name) && string.IsNullOrEmpty(toolCall.Arguments))
+                {
+                    if (toolCallUiOpen)
+                    {
+                        if (!toolCallArgsEndedWithNewline)
+                            ChatOutput.WriteLine();
+                        ChatOutput.WriteLine("[/tool call]");
+                    }
+
+                    currentToolCallSuppressed = !IsAutoToolApproval() && approvalSet.Contains(toolCall.Name);
+
+                    if (!currentToolCallSuppressed)
+                    {
+                        startBlock();
+                        ChatOutput.WriteLine("[tool call] " + toolCall.Name);
+                        toolCallUiOpen = true;
+                        toolCallArgsEndedWithNewline = true;
+                    }
+                    else
+                    {
+                        toolCallUiOpen = false;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(toolCall.Arguments)
+                    && !currentToolCallSuppressed
+                    && toolCallDisplay != ChatBlockDisplayMode.Hidden)
+                {
+                    ChatOutput.Write(toolCall.Arguments);
+                    toolCallArgsEndedWithNewline = toolCall.Arguments.EndsWith("\n");
+                }
+            };
+        }
+
+        LLMCompletionResponse response = sendMessages(
+            conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback,
+            onContentStart, startBlock, outputOnly, contextInjections);
+
+        if (toolCallUiOpen)
+        {
+            if (!toolCallArgsEndedWithNewline)
+                ChatOutput.WriteLine();
+            ChatOutput.WriteLine("[/tool call]");
+        }
+
+        return response;
+    }
+
+    /// <summary>
+    /// Records the assistant tool call, then approves and runs each call.
+    /// Returns false when output-only mode must stop because a call needs approval.
+    /// </summary>
+    private bool RunToolCalls(
+        List<ChatMessage> conversation,
+        List<ToolRegistry.ToolCall> toolCalls,
+        HashSet<string> enabledSet,
+        HashSet<string> approvalSet,
+        ChatBlockDisplayMode toolOutputDisplay,
+        bool outputOnly,
+        Action startBlock)
+    {
+        conversation.Add(new ChatMessage
+        {
+            Role = "assistant",
+            Content = string.Empty,
+            ToolCalls = toolCalls
+        });
+
+        for (int i = 0; i < toolCalls.Count; i++)
+        {
+            ToolRegistry.ToolCall call = toolCalls[i];
+
+            // Manual output-only cannot ask, including when the tool is also disabled.
+            if (!IsAutoToolApproval() && outputOnly && approvalSet.Contains(call.Name))
+            {
+                ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
+                return false;
+            }
+
+            int exitCode = 0;
+            string toolContent = string.Empty;
+            string toolImage = null;
+            string toolImageMime = null;
+            bool runTool = false;
+            bool askUser = false;
+            double? jevConfidence = null;
+
+            if (!enabledSet.Contains(call.Name))
+            {
+                exitCode = -1;
+                toolContent = ToolRegistry.FormatCommandResult(
+                    call.Name,
+                    "error: tool '" + call.Name + "' is disabled by configuration.",
+                    exitCode
+                );
+            }
+            else if (IsAutoToolApproval())
+            {
+                JevGateDecision decision = JevDecisionClient.Decide(
+                    config,
+                    call.Name,
+                    call.Arguments,
+                    registry.GetToolDescription(call.Name),
+                    RecentMessagesForDecision(conversation));
+                if (decision.Choice == JevGateChoice.Allow)
+                {
+                    if (!outputOnly && config.GetConfigBool("showjevconfidence", true))
+                    {
+                        if (startBlock != null)
+                            startBlock();
+                        string approved = decision.Confidence.HasValue
+                            ? "[" + call.Name + " auto allowed, confidence " + decision.Confidence.Value.ToString("0.00", CultureInfo.InvariantCulture) + "]"
+                            : "[" + call.Name + " auto allowed]";
+                        ChatOutput.WriteLine(approved);
+                    }
+                    runTool = true;
+                }
+                else
+                {
+                    askUser = true;
+                    jevConfidence = ConfidenceForDisplay(decision.Confidence);
+                }
+            }
+            else if (approvalSet.Contains(call.Name))
+            {
+                askUser = true;
+            }
+            else
+            {
+                runTool = true;
+            }
+
+            if (askUser && outputOnly)
+            {
+                ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
+                return false;
+            }
+
+            // The tool call block itself was already streamed above (if not suppressed
+            // for approval); only pad a blank line before the approval prompt here.
+            if (askUser)
+            {
+                if (!outputOnly && startBlock != null)
+                    startBlock();
+                if (requestToolApproval(call.Name, call.Arguments, jevConfidence))
+                    runTool = true;
+                else
+                {
+                    exitCode = -1;
+                    toolContent = ToolRegistry.FormatCommandResult(
+                        call.Name,
+                        "Tool execution was cancelled by the user.",
+                        exitCode
+                    );
+                }
+            }
+
+            if (runTool)
+            {
+                registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
+            }
+
+            conversation.Add(new ChatMessage
+            {
+                Role = "tool",
+                Content = toolContent,
+                ToolCallId = call.Id,
+                Image = toolImage,
+                ImageMime = toolImageMime
+            });
+
+            if (!outputOnly)
+            {
+                startBlock();
+                ChatOutput.WriteLine("[tool output]");
+                if (toolOutputDisplay == ChatBlockDisplayMode.Hidden)
+                {
+                    ChatOutput.WriteLine("Exit Code: " + exitCode);
+                }
+                else
+                {
+                    ChatOutput.Write(toolContent ?? "");
+                    if (string.IsNullOrEmpty(toolContent) || !toolContent.EndsWith("\n"))
+                        ChatOutput.WriteLine();
+                }
+                ChatOutput.WriteLine("[/tool output]");
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
