@@ -102,15 +102,22 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Button Name="clearButton"
-                    Content="Clear Chat"
-                    MinWidth="80"
-                    MinHeight="25"
-                    Margin="0,0,5,0"
-                    VerticalAlignment="Center"
-                    HorizontalAlignment="Left"
-                    Grid.Column="0"
-                    Click="clearButton_Click" />
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button Name="clearButton"
+                        Content="Clear Chat"
+                        MinWidth="80"
+                        MinHeight="25"
+                        Margin="0,0,5,0"
+                        VerticalAlignment="Center"
+                        Click="clearButton_Click" />
+                <Button Name="saveButton"
+                        Content="Save Chat"
+                        MinWidth="80"
+                        MinHeight="25"
+                        Margin="0,0,5,0"
+                        VerticalAlignment="Center"
+                        Click="saveButton_Click" />
+            </StackPanel>
 
             <Button Name="optionsButton"
                     Content="Options"

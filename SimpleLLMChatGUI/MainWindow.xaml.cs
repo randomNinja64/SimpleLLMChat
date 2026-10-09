@@ -542,6 +542,24 @@ namespace SimpleLLMChatGUI
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
+        private void saveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (processHandler == null || !processHandler.IsProcessRunning)
+            {
+                MessageBox.Show("Error: CLI is not running!");
+                return;
+            }
+
+            Microsoft.Win32.SaveFileDialog dialog = new Microsoft.Win32.SaveFileDialog();
+            dialog.Filter = "Markdown (*.md)|*.md";
+            dialog.FileName = "chat.md";
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            if (!processHandler.SendInput("/save \"" + dialog.FileName + "\""))
+                MessageBox.Show("Failed to save chat.");
+        }
+
         private void clearButton_Click(object sender, RoutedEventArgs e)
         {
             // Kill running process first to stop any new output

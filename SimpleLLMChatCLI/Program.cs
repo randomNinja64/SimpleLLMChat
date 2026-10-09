@@ -28,6 +28,7 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
             ChatOutput.WriteLine("| /reload: Reload configuration                   |");
+            ChatOutput.WriteLine("| /save <path>: Save chat markdown                |");
             ChatOutput.WriteLine("===================================================");
         }
 
@@ -288,6 +289,41 @@ namespace SimpleLLMChatCLI
                 if (userInput == "/clearindex")
                 {
                     RagHost.ClearIndex();
+                    ChatOutput.MarkSeparated();
+                    continue;
+                }
+
+                if (userInput.StartsWith("/save "))
+                {
+                    try
+                    {
+                        StringBuilder markdown = new StringBuilder();
+                        for (int i = 0; i < conversation.Count; i++)
+                        {
+                            string content = conversation[i].Content;
+                            if (string.IsNullOrEmpty(content))
+                                continue;
+                            string label = conversation[i].Role;
+                            if (string.Equals(label, "user", StringComparison.OrdinalIgnoreCase))
+                                label = "You";
+                            else if (string.Equals(label, "assistant", StringComparison.OrdinalIgnoreCase))
+                                label = assistantName;
+                            else if (string.Equals(label, "tool", StringComparison.OrdinalIgnoreCase))
+                                label = "Tool";
+                            if (markdown.Length > 0)
+                                markdown.Append("\n\n");
+                            markdown.Append(label);
+                            markdown.Append(": ");
+                            markdown.Append(content.Replace("\r\n", "\n").Replace("\r", "\n").TrimEnd('\n'));
+                        }
+                        if (markdown.Length > 0)
+                            markdown.Append('\n');
+                        File.WriteAllText(userInput.Substring(6).Trim().Trim('"'), markdown.ToString());
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine("Error saving chat: " + ex.Message);
+                    }
                     ChatOutput.MarkSeparated();
                     continue;
                 }

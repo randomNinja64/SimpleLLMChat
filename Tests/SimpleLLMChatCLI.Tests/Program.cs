@@ -386,6 +386,52 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.save_markdown", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_save",
+                        "{\"command\":\"echo hi\"}");
+                    server.EnqueueContent("save-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string mdPath = Path.Combine(ws.Path, "my chat.md");
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("hello save");
+                        TestAssert.True(WaitStdoutContains(cli, "save-reply-ok", 20000), "reply");
+                        cli.WriteLine("/save \"" + mdPath + "\"");
+                        string md = "";
+                        DateTime deadline = DateTime.UtcNow.AddMilliseconds(10000);
+                        while (DateTime.UtcNow < deadline)
+                        {
+                            if (File.Exists(mdPath))
+                            {
+                                md = File.ReadAllText(mdPath, Encoding.UTF8);
+                                if (md.IndexOf("save-reply-ok", StringComparison.Ordinal) >= 0)
+                                    break;
+                            }
+                            System.Threading.Thread.Sleep(50);
+                        }
+                        TestAssert.Contains(md, "You: hello save", "user text");
+                        TestAssert.Contains(md, "LLM: save-reply-ok", "reply");
+                        TestAssert.True(md.IndexOf("\"Role\"", StringComparison.Ordinal) < 0, "no json wrapper");
+                        TestAssert.True(md.IndexOf("call_save", StringComparison.Ordinal) < 0, "no tool-call json");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.status_ready", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
