@@ -354,7 +354,7 @@ namespace SimpleLLMChatCLI.Tests
                         "run_shell_command",
                         "call_deny_o",
                         "{\"command\":\"echo SHOULD_NOT_RUN\"}");
-                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "run_shell_command");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
                     ProcessResult r = ProcessRunner.Run(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "-o --no-banners please run a command",

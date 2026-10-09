@@ -284,13 +284,6 @@ public partial class LLMClient
         {
             ToolRegistry.ToolCall call = toolCalls[i];
 
-            // Manual output-only cannot ask, including when the tool is also disabled.
-            if (!IsAutoToolApproval() && outputOnly && approvalSet.Contains(call.Name))
-            {
-                ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
-                return false;
-            }
-
             int exitCode = 0;
             string toolContent = string.Empty;
             string toolImage = null;
