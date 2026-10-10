@@ -154,6 +154,7 @@ namespace SimpleLLMChatGUI
             LoadToolSelections(config);
             BuildToolOptionsUI(config);
             BuildToolTimeoutsUI(config);
+            RestrictToDigits(MaxConsecutiveFailedToolCallsTextBox);
 
             IndexingStatusHub.Updated += OnIndexingStatusUpdated;
             RefreshIndexingStatusUi();
@@ -196,6 +197,7 @@ namespace SimpleLLMChatGUI
             JevApiKey = config.GetConfigValue("jevapikey");
             JevModel = config.GetConfigValue("jevmodel");
             ShowJevConfidence = config.GetConfigBool("showjevconfidence", true);
+            MaxConsecutiveFailedToolCalls = config.GetConfigInt("maxconsecutivefailedtoolcalls", 10);
 
             ApiKeyPasswordBox.Password = ApiKey;
             EmbeddingsApiKeyPasswordBox.Password = EmbeddingsApiKey;

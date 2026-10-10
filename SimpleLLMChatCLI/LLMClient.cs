@@ -75,6 +75,8 @@ public partial class LLMClient
     {
         ChatBlockDisplayMode toolCallDisplay = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed);
         ChatBlockDisplayMode toolOutputDisplay = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown);
+        int maxConsecutiveFailedToolCalls = Math.Max(0, config.GetConfigInt("maxconsecutivefailedtoolcalls", 10));
+        int consecutiveFailedToolCalls = 0;
 
         HashSet<string> enabledSet = new HashSet<string>(
             enabledTools ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
@@ -168,8 +170,19 @@ public partial class LLMClient
 
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
-                if (!RunToolCalls(conversation, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock))
+                if (!RunToolCalls(
+                    conversation, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock,
+                    ref consecutiveFailedToolCalls, maxConsecutiveFailedToolCalls))
                     return;
+
+                if (maxConsecutiveFailedToolCalls > 0
+                    && consecutiveFailedToolCalls >= maxConsecutiveFailedToolCalls)
+                {
+                    if (!outputOnly && startBlock != null)
+                        startBlock();
+                    ChatOutput.WriteLine("[Stopped: " + consecutiveFailedToolCalls + " consecutive tool calls failed]");
+                    break;
+                }
 
                 MaybeSummarizeInBackground(
                     conversation,
@@ -271,7 +284,9 @@ public partial class LLMClient
         HashSet<string> approvalSet,
         ChatBlockDisplayMode toolOutputDisplay,
         bool outputOnly,
-        Action startBlock)
+        Action startBlock,
+        ref int consecutiveFailedToolCalls,
+        int maxConsecutiveFailedToolCalls)
     {
         conversation.Add(new ChatMessage
         {
@@ -366,6 +381,9 @@ public partial class LLMClient
             {
                 registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
             }
+
+            ConsecutiveToolFailures.Record(
+                ref consecutiveFailedToolCalls, maxConsecutiveFailedToolCalls, runTool, exitCode);
 
             conversation.Add(new ChatMessage
             {

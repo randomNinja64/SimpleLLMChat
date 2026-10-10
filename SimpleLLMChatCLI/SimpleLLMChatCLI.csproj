@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChatOutput.cs" />
+    <Compile Include="ConsecutiveToolFailures.cs" />
     <Compile Include="ImageEncoder.cs" />
     <Compile Include="JevDecisionClient.cs" />
     <Compile Include="CurlClient.cs" />

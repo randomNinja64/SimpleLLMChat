@@ -93,6 +93,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 
 **Tools**
 - `tools`: Comma-separated list of tools the AI is allowed to use
+- `maxconsecutivefailedtoolcalls`: Maximum number of tool calls that can fail in a row before a session is halted (default `10`; `0` = off)
 
 **Tool Approvals**
 - `toolapprovalmode`: `manual` (default) or `auto`. Manual mode prompts for approval for tools set to require it. Auto mode uses a Jev-compatible endpoint to determine whether or not a tool should run.

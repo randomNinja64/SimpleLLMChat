@@ -109,6 +109,9 @@
     <Compile Include="..\..\Shared\StatusPipe\StatusPipe.Approval.cs">
       <Link>Shared\StatusPipe\StatusPipe.Approval.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ConsecutiveToolFailures.cs">
+      <Link>CLI\ConsecutiveToolFailures.cs</Link>
+    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ImageEncoder.cs">
       <Link>CLI\ImageEncoder.cs</Link>
     </Compile>

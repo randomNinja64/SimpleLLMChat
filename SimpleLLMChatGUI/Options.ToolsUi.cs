@@ -43,6 +43,7 @@ namespace SimpleLLMChatGUI
                 "jevapikey=" + (JevApiKey ?? string.Empty),
                 "jevmodel=" + (JevModel ?? string.Empty),
                 "showjevconfidence=" + (ShowJevConfidence ? "1" : "0"),
+                "maxconsecutivefailedtoolcalls=" + MaxConsecutiveFailedToolCalls,
             };
 
             foreach (var kvp in _toolTimeoutControls)
@@ -191,16 +192,7 @@ namespace SimpleLLMChatGUI
                     Margin = new Thickness(0, 2, 0, 2),
                     VerticalAlignment = VerticalAlignment.Center
                 };
-                textBox.PreviewTextInput += (s, e) => { e.Handled = !e.Text.All(char.IsDigit); };
-                DataObject.AddPastingHandler(textBox, (s, e) =>
-                {
-                    if (e.DataObject.GetDataPresent(DataFormats.Text))
-                    {
-                        string text = (string)e.DataObject.GetData(DataFormats.Text);
-                        if (!text.All(char.IsDigit)) e.CancelCommand();
-                    }
-                    else e.CancelCommand();
-                });
+                RestrictToDigits(textBox);
                 Grid.SetRow(textBox, rowIdx);
                 Grid.SetColumn(textBox, 1);
 
@@ -210,6 +202,20 @@ namespace SimpleLLMChatGUI
             }
 
             stack.Children.Add(grid);
+        }
+
+        private static void RestrictToDigits(TextBox textBox)
+        {
+            textBox.PreviewTextInput += (s, e) => { e.Handled = !e.Text.All(char.IsDigit); };
+            DataObject.AddPastingHandler(textBox, (s, e) =>
+            {
+                if (e.DataObject.GetDataPresent(DataFormats.Text))
+                {
+                    string text = (string)e.DataObject.GetData(DataFormats.Text);
+                    if (!text.All(char.IsDigit)) e.CancelCommand();
+                }
+                else e.CancelCommand();
+            });
         }
 
         private IOrderedEnumerable<IGrouping<string, ToolOptionDefinition>> GetToolOptionGroups()

@@ -129,6 +129,7 @@ namespace SimpleLLMChatGUI
                 "jevapikey=",
                 "jevmodel=",
                 "showjevconfidence=1",
+                "maxconsecutivefailedtoolcalls=10",
             };
         }
     }

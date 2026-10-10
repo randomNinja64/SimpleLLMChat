@@ -26,6 +26,32 @@ namespace SimpleLLMChatCLI.Tests
                 TestAssert.True(!TokenEstimator.ShouldSummarize(100, 1000), "no summarize");
             });
 
+            TestRunner.Run("ConsecutiveToolFailures.streak", () =>
+            {
+                int streak = 0;
+
+                ConsecutiveToolFailures.Record(ref streak, 0, true, 1);
+                TestAssert.Equal(0, streak, "limit 0 ignores failure");
+
+                ConsecutiveToolFailures.Record(ref streak, 3, true, 1);
+                ConsecutiveToolFailures.Record(ref streak, 3, true, 1);
+                TestAssert.Equal(2, streak, "two failures");
+
+                ConsecutiveToolFailures.Record(ref streak, 3, false, 1);
+                TestAssert.Equal(2, streak, "non-run leaves streak");
+
+                ConsecutiveToolFailures.Record(ref streak, 3, true, 0);
+                TestAssert.Equal(0, streak, "success resets");
+
+                ConsecutiveToolFailures.Record(ref streak, 3, true, 1);
+                ConsecutiveToolFailures.Record(ref streak, 3, true, 2);
+                ConsecutiveToolFailures.Record(ref streak, 3, true, -1);
+                TestAssert.Equal(3, streak, "three failures");
+
+                ConsecutiveToolFailures.Record(ref streak, 3, true, 0);
+                TestAssert.Equal(0, streak, "later success clears a reached limit");
+            });
+
             TestRunner.Run("ToolApproval.roundtrip", () =>
             {
                 string msg = ToolApproval.FormatApprovalMessage("read_file", "{\\\"filename\\\":\\\"a.txt\\\"}");

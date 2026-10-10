@@ -34,6 +34,7 @@ namespace SimpleLLMChatGUI
         private string _jevApiKey;
         private string _jevModel;
         private bool _showJevConfidence = true;
+        private int _maxConsecutiveFailedToolCalls = 10;
 
         private static readonly List<string> DisplayModeOptionList =
             new List<string> { "Shown", "Collapsed", "Hidden" };
@@ -221,6 +222,16 @@ namespace SimpleLLMChatGUI
             set { _showJevConfidence = value; OnPropertyChanged(nameof(ShowJevConfidence)); }
         }
 
+        public int MaxConsecutiveFailedToolCalls
+        {
+            get { return _maxConsecutiveFailedToolCalls; }
+            set
+            {
+                _maxConsecutiveFailedToolCalls = value < 0 ? 0 : value;
+                OnPropertyChanged(nameof(MaxConsecutiveFailedToolCalls));
+            }
+        }
+
         private void InitializeDefaults()
         {
             ServerURL = "";
@@ -251,6 +262,7 @@ namespace SimpleLLMChatGUI
             JevApiKey = "";
             JevModel = "";
             ShowJevConfidence = true;
+            MaxConsecutiveFailedToolCalls = 10;
         }
 
         private void SaveIni(string path)
