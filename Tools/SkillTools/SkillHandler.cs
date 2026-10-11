@@ -34,14 +34,27 @@ namespace SkillTools
             sb.AppendLine();
 
             if (skills.Count == 0)
-            {
                 sb.AppendLine("(no skills installed)");
-                return sb.ToString().Trim();
+            else
+            {
+                foreach (SkillInfo skill in skills)
+                    sb.AppendLine(skill.FolderName + ": " + TruncateDescription(skill.Description, out _));
             }
 
-            foreach (SkillInfo skill in skills)
-                sb.AppendLine(skill.FolderName + ": " + TruncateDescription(skill.Description, out _));
+            AppendHarvestRule(sb);
             return sb.ToString().Trim();
+        }
+
+        private static void AppendHarvestRule(StringBuilder sb)
+        {
+            if (ToolHelper.GetConfigValue("selfImprovement") == "0")
+                return;
+
+            sb.AppendLine();
+            sb.AppendLine("Self-improvement:");
+            sb.AppendLine("When you work out a non-trivial procedure (more than a single obvious step) and it has worked, save it before the final reply if it is likely to recur.");
+            sb.AppendLine("Update a skill you used when it was missing a step or had a wrong command. Otherwise create one.");
+            sb.AppendLine("Do not save one-off investigations, facts about the user, or a transcript of this chat. The skill must be usable with no memory of this conversation.");
         }
 
         public static string ViewSkill(string name, string relativePath)

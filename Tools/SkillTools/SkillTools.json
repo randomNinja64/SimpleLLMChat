@@ -3,7 +3,8 @@
     "executable": "SkillTools.exe",
     "context_injector": "get_skills_context",
     "options": [
-        { "name": "skillsDirectory", "label": "Skills Directory (in tool folder if unspecified)", "type": "string", "default": "" }
+        { "name": "skillsDirectory", "label": "Skills Directory (in tool folder if unspecified)", "type": "string", "default": "" },
+        { "name": "selfImprovement", "label": "Self-improvement (creates and updates skills)", "type": "bool", "default": "1" }
     ],
     "tools": [
         {

@@ -202,8 +202,9 @@ SimpleLLMChat includes the following 7 tool packages:
     - `view_skill`: Loads a skill's full `SKILL.md`, absolute path to the skill folder, and relative paths for linked files (optional `relative_path` loads one relative file)
   - Configuration Options
     - `skillsDirectory`: Directory to scan recursively for skill folders (folders containing 'SKILL.md') (default: `skills` folder next to `SkillTools.exe`)
+    - `selfImprovement`: Enables/disables automatic skill creation/updates for non-trivial procedures (default: `1`)
   - Context Injector
-    - `get_skills_context`: Injects the skills directory path, skill names and descriptions, and instructions to load matching skills via `view_skill`, run scripts as shell commands under the skill root, and author skills with `create_skill` / `edit_skill` / `edit_skill_file` / `remove_skill`.
+    - `get_skills_context`: Injects the skills directory path, skill names and descriptions, and instructions to load matching skills via `view_skill`, run scripts as shell commands under the skill root, and author skills with `create_skill` / `edit_skill` / `edit_skill_file` / `remove_skill`. When self-improvement is enabled, instructions are injected to tell the agent to create/update skills when non-trivial procedures are completed successfully.
 - Web Tools
   - Tools
     - `download_file`: Downloads a file using cURL

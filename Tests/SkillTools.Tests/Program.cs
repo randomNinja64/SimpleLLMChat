@@ -223,6 +223,50 @@ namespace SkillTools.Tests
                         new JObject(), cfg);
                     TestAssert.Equal(0, ctx.ExitCode, "exit");
                     TestAssert.Contains(ctx.Text, "(no skills installed)", "empty");
+                    TestAssert.Contains(ctx.Text, "save it before the final reply", "self-improvement default on");
+                });
+
+                TestRunner.Run("get_skills_context_self_improvement_on", () =>
+                {
+                    string dir = Path.Combine(ws.Path, "harvest-on");
+                    Directory.CreateDirectory(dir);
+                    JObject cfg = new JObject
+                    {
+                        ["skillsDirectory"] = dir,
+                        ["selfImprovement"] = "1"
+                    };
+                    ToolInvokeResult create = ToolClient.InvokeProduct(Exe, "create_skill",
+                        new JObject
+                        {
+                            ["name"] = "deploy-staging",
+                            ["description"] = "Deploy the staging server",
+                            ["instructions"] = "Run the deploy."
+                        }, cfg);
+                    TestAssert.Equal(0, create.ExitCode, "create");
+
+                    ToolInvokeResult ctx = ToolClient.InvokeProduct(Exe, "get_skills_context",
+                        new JObject(), cfg);
+                    TestAssert.Equal(0, ctx.ExitCode, "exit");
+                    TestAssert.Contains(ctx.Text, "deploy-staging", "lists skill");
+                    TestAssert.Contains(ctx.Text, "save it before the final reply", "self-improvement on");
+                });
+
+                TestRunner.Run("get_skills_context_self_improvement_off", () =>
+                {
+                    string dir = Path.Combine(ws.Path, "harvest-off");
+                    Directory.CreateDirectory(dir);
+                    JObject cfg = new JObject
+                    {
+                        ["skillsDirectory"] = dir,
+                        ["selfImprovement"] = "0"
+                    };
+                    ToolInvokeResult ctx = ToolClient.InvokeProduct(Exe, "get_skills_context",
+                        new JObject(), cfg);
+                    TestAssert.Equal(0, ctx.ExitCode, "exit");
+                    TestAssert.Contains(ctx.Text, "(no skills installed)", "empty");
+                    TestAssert.True(
+                        ctx.Text.IndexOf("save it before the final reply", StringComparison.Ordinal) < 0,
+                        "self-improvement off");
                 });
             }
         }
