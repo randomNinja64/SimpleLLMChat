@@ -24,7 +24,7 @@ namespace FileTools
                     case "write_file":
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
-                            string content = ToolHelper.JsonExtractString(argumentsJson, "content")?.Trim() ?? "";
+                            string content = ToolHelper.JsonExtractString(argumentsJson, "content") ?? "";
                             int exitCode;
                             string output = FileHandler.WriteFile(filename, content, out exitCode);
                             return new ToolResult(output, exitCode);
