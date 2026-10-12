@@ -9,7 +9,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 
 namespace SimpleLLMChatGUI
 {
@@ -307,11 +306,9 @@ namespace SimpleLLMChatGUI
 
         private static void AttachTooltip(Hyperlink hyperlink, string text)
         {
-            var tooltip = new ToolTip { Content = text, Placement = PlacementMode.Mouse };
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            timer.Tick += (s, _) => { timer.Stop(); tooltip.IsOpen = true; };
-            hyperlink.MouseEnter += (s, _) => timer.Start();
-            hyperlink.MouseLeave += (s, _) => { timer.Stop(); tooltip.IsOpen = false; };
+            hyperlink.ToolTip = text;
+            ToolTipService.SetInitialShowDelay(hyperlink, 1000);
+            ToolTipService.SetPlacement(hyperlink, PlacementMode.Mouse);
         }
 
         private static void OnHyperlinkClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
