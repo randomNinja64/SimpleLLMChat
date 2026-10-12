@@ -175,8 +175,11 @@ namespace SimpleLLMChatGUI
             if (tokenTracker != null)
                 tokenTracker.Reset();
 
-            // Start the process
-            if (!processHandler.StartProcess("SimpleLLMChatCLI.exe"))
+            // CLI is always installed next to this executable. An absolute path
+            // and that folder as the working directory ignore the shortcut Start-in
+            // directory and any other SimpleLLMChatCLI.exe on PATH.
+            string cliPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SimpleLLMChatCLI.exe");
+            if (!processHandler.StartProcess(cliPath))
             {
                 MessageBox.Show("Failed to start LLM process. Please check if SimpleLLMChatCLI.exe exists.");
                 return;

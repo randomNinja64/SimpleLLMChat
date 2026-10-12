@@ -41,6 +41,9 @@ namespace SimpleLLMChatGUI
 
                 llmProcess = new Process();
                 llmProcess.StartInfo.FileName = executablePath;
+                string workingDirectory = Path.GetDirectoryName(executablePath);
+                if (!string.IsNullOrEmpty(workingDirectory))
+                    llmProcess.StartInfo.WorkingDirectory = workingDirectory;
                 llmProcess.StartInfo.UseShellExecute = false;
                 llmProcess.StartInfo.RedirectStandardOutput = true;
                 llmProcess.StartInfo.RedirectStandardError = true;
