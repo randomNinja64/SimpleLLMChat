@@ -22,6 +22,12 @@ public static partial class StatusPipe
         return PipeNamePrefix + processId.ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Named event the GUI sets to stop the CLI's turn in progress.</summary>
+    public static string GetCancelEventName(int processId)
+    {
+        return "SimpleLLMChat.Cancel." + processId.ToString(CultureInfo.InvariantCulture);
+    }
+
     private static bool TryStripPrefix(string line, string prefix, out string rest)
     {
         rest = null;

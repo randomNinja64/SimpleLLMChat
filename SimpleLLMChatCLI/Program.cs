@@ -29,6 +29,7 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
             ChatOutput.WriteLine("| /reload: Reload configuration                   |");
             ChatOutput.WriteLine("| /save <path>: Save chat markdown                |");
+            ChatOutput.WriteLine("| Ctrl+C: Stop the response in progress           |");
             ChatOutput.WriteLine("===================================================");
         }
 
@@ -76,6 +77,7 @@ namespace SimpleLLMChatCLI
             // Always-on status pipe for GUI (and optional external monitors)
             StatusPipe = new StatusPipeServer();
             StatusPipe.Start();
+            Cancel.Listen();
 
             try
             {
@@ -365,6 +367,7 @@ namespace SimpleLLMChatCLI
                     textPrompt = userInput;
                 }
 
+                Cancel.Begin();
                 client.ProcessConversation(conversation,
                                 textPrompt,
                                 imageBase64,
@@ -373,6 +376,7 @@ namespace SimpleLLMChatCLI
                                 enabledTools,
                                 toolsRequiringApproval,
                                 false);
+                Cancel.End();
             }
         }
     }

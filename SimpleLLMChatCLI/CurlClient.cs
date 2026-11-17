@@ -30,6 +30,7 @@ namespace SimpleLLMChatCLI
                 byte[] body = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
                 int exitCode = CurlHttpsClient.Post(url, apiKey, body, noBuffer: true, process =>
                 {
+                    Cancel.OnAbort(process.Kill);
                     Thread errThread = new Thread(() =>
                     {
                         try { stderr = process.StandardError.ReadToEnd(); }
@@ -43,6 +44,9 @@ namespace SimpleLLMChatCLI
                     parsed = true;
                     errThread.Join(5000);
                 });
+
+                if (Cancel.Requested)
+                    return result;
 
                 if (exitCode != 0)
                 {

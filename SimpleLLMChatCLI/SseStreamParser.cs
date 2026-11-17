@@ -33,8 +33,13 @@ namespace SimpleLLMChatCLI
             DateTime reasoningStart = DateTime.MinValue;
 
             string line;
-            while ((line = reader.ReadLine()) != null)
+            while (true)
             {
+                // A stop aborts the connection mid-read; keep what streamed so far.
+                try { line = reader.ReadLine(); }
+                catch { if (!Cancel.Requested) throw; break; }
+                if (line == null) break;
+
                 if (!line.StartsWith("data: ")) continue;
 
                 string jsonPart = line.Substring(6);

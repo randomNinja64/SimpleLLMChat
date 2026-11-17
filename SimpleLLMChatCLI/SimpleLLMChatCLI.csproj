@@ -43,6 +43,7 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cancel.cs" />
     <Compile Include="ChatOutput.cs" />
     <Compile Include="ConsecutiveToolFailures.cs" />
     <Compile Include="ImageEncoder.cs" />

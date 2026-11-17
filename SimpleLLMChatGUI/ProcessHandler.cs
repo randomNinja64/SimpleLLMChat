@@ -172,6 +172,23 @@ namespace SimpleLLMChatGUI
             return SendInput(command);
         }
 
+        /// <summary>Asks the CLI to stop the turn in progress.</summary>
+        public void SendStop()
+        {
+            try
+            {
+                using (var stopEvent = System.Threading.EventWaitHandle.OpenExisting(
+                    StatusPipe.GetCancelEventName(llmProcess.Id)))
+                {
+                    stopEvent.Set();
+                }
+            }
+            catch
+            {
+                // CLI already gone; nothing to stop.
+            }
+        }
+
         public bool SendReload()
         {
             return SendInput("/reload");

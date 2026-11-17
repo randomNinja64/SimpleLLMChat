@@ -188,6 +188,7 @@ namespace SimpleLLMChatGUI
             if (!string.IsNullOrEmpty(_reasoningEffort))
                 processHandler.SendReasoningEffort(_reasoningEffort);
 
+            sendButton.IsEnabled = true;
             SetInputControlsEnabled(true);
             chatInput.Focus();
         }
@@ -433,11 +434,18 @@ namespace SimpleLLMChatGUI
         {
             attachButton.IsEnabled = enabled;
             chatInput.IsEnabled = enabled;
-            sendButton.IsEnabled = enabled;
+            // While input is disabled, the send button acts as Stop.
+            sendButton.Content = enabled ? "Send" : "Stop";
         }
 
         private void sendButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!chatInput.IsEnabled)
+            {
+                processHandler.SendStop();
+                return;
+            }
+
             string userInput = chatInput.Text;
 
             ChatTurn userTurn = AddTurn();

@@ -75,14 +75,15 @@ namespace SimpleLLMChatGUI.Tests
                 throw new TestFailureException("sendButton does not support InvokePattern");
             invoke.Invoke();
 
-            // Wait until disabled then enabled again (generation complete).
+            // Wait until the input is disabled then enabled again (generation complete;
+            // the send button stays enabled as Stop meanwhile).
             // Fast replies can flip enabled→disabled→enabled between polls; also
             // accept "still enabled after a short settle" only if we never saw busy.
             Stopwatch sw = Stopwatch.StartNew();
             bool sawDisabled = false;
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
-                send = FindById("sendButton");
+                send = FindById("chatInput");
                 if (send == null)
                 {
                     Thread.Sleep(50);

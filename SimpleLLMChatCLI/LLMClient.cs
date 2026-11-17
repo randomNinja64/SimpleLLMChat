@@ -160,6 +160,14 @@ public partial class LLMClient
                 conversation, enabledTools, approvalSet, toolCallDisplay,
                 outputOnly, contextInjections, startBlock, onContentStart);
 
+            if (Cancel.Requested)
+            {
+                // Keep the partial reply; half-streamed tool calls are dropped.
+                if (!string.IsNullOrEmpty(response.Content))
+                    conversation.Add(new ChatMessage("assistant", response.Content));
+                break;
+            }
+
             if (response.FinishReason == "request_failed")
             {
                 if (!outputOnly)
@@ -174,6 +182,9 @@ public partial class LLMClient
                     conversation, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock,
                     ref consecutiveFailedToolCalls, maxConsecutiveFailedToolCalls))
                     return;
+
+                if (Cancel.Requested)
+                    break;
 
                 if (maxConsecutiveFailedToolCalls > 0
                     && consecutiveFailedToolCalls >= maxConsecutiveFailedToolCalls)
@@ -201,6 +212,12 @@ public partial class LLMClient
             if (!outputOnly)
                 ChatOutput.EndLine();
             break;
+        }
+
+        if (Cancel.Requested && startBlock != null)
+        {
+            startBlock();
+            ChatOutput.WriteLine("[Stopped]");
         }
     }
 
@@ -307,7 +324,11 @@ public partial class LLMClient
             bool askUser = false;
             double? jevConfidence = null;
 
-            if (!enabledSet.Contains(call.Name))
+            if (Cancel.Requested)
+            {
+                // Stopped: skip this call; its result is filled in below.
+            }
+            else if (!enabledSet.Contains(call.Name))
             {
                 exitCode = -1;
                 toolContent = ToolRegistry.FormatCommandResult(
@@ -360,7 +381,7 @@ public partial class LLMClient
 
             // The tool call block itself was already streamed above (if not suppressed
             // for approval); only pad a blank line before the approval prompt here.
-            if (askUser)
+            if (askUser && !Cancel.Requested)
             {
                 if (!outputOnly && startBlock != null)
                     startBlock();
@@ -377,9 +398,19 @@ public partial class LLMClient
                 }
             }
 
-            if (runTool)
+            if (runTool && !Cancel.Requested)
             {
                 registry.ExecuteToolCall(call.Name, call.Arguments, out toolContent, out exitCode, out toolImage, out toolImageMime);
+            }
+
+            // Every recorded call needs a result, or the API rejects the next request.
+            if (Cancel.Requested)
+            {
+                exitCode = -1;
+                toolContent = ToolRegistry.FormatCommandResult(
+                    call.Name, "Tool execution was cancelled by the user.", exitCode);
+                toolImage = null;
+                toolImageMime = null;
             }
 
             ConsecutiveToolFailures.Record(
@@ -434,6 +465,8 @@ public partial class LLMClient
         }
 
         string summary = SummarizeConversation(conversation);
+        if (Cancel.Requested)
+            return;
         if (string.IsNullOrEmpty(summary))
         {
             int contextWindow = config.GetConfigInt("contextWindowSize", 0);

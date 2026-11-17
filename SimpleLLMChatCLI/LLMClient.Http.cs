@@ -54,6 +54,7 @@ public partial class LLMClient
 
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
             request.ContentLength = payloadBytes.Length;
+            Cancel.OnAbort(request.Abort);
 
             using (var stream = request.GetRequestStream())
             {
@@ -69,6 +70,9 @@ public partial class LLMClient
         }
         catch (Exception ex)
         {
+            if (Cancel.Requested)
+                return new LLMCompletionResponse(string.Empty, null, string.Empty);
+
             string reason;
             WebException webEx = ex as WebException;
             if (webEx != null && webEx.Response is HttpWebResponse errorResponse)
@@ -118,7 +122,13 @@ public partial class LLMClient
             string input = Console.ReadLine();
             ChatOutput.EndInputLine();
             if (input == null)
+            {
+                // Ctrl+C ends ReadLine before its handler has run; give it a moment.
+                System.Threading.Thread.Sleep(100);
+                if (Cancel.Requested)
+                    return false;
                 continue;
+            }
 
             input = input.Trim();
             if (input.Length == 0)

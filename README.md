@@ -116,6 +116,7 @@ Tool-specific configuration options for the included tools are available in the 
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
 - To clear the chat, press `Clear Chat`.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
+- To cancel the currently generating response, press `Stop` (shown while generating).
 
 **CLI**: To run the CLI in interactive/REPL mode, open `SimpleLLMChatCLI.exe` directly or from a terminal.
 
@@ -128,6 +129,7 @@ Interactive mode provides the following commands:
 - `/reasoning`: Sets reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); `/reasoning` alone uses the API default
 - `/reload`: Reloads configuration in place (doesn't clear chat)
 - `/save <path>`: Save chat markdown
+- `Ctrl+C` - Stop the currently generating response
 
 The application can also be used in a non-interactive mode.
 

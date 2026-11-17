@@ -352,6 +352,7 @@ namespace SimpleLLMChatCLI
 
             using (Process process = Process.Start(psi))
             {
+                Cancel.OnAbort(process.Kill);
                 process.StandardInput.Write(stdinData ?? "");
                 process.StandardInput.Close();
 
@@ -367,7 +368,8 @@ namespace SimpleLLMChatCLI
                     exited = true;
                 }
 
-                if (!exited)
+                // Stopped: like a timeout, don't wait on output a child may still hold open.
+                if (!exited || Cancel.Requested)
                 {
                     try { process.Kill(); } catch { }
                     try { process.WaitForExit(2000); } catch { }
