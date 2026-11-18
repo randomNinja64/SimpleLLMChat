@@ -804,6 +804,89 @@ namespace SimpleLLMChatCLI.Tests
                     }
                 }
             });
+
+            TestRunner.Run("cli.no_user_prompts_hides_you_prompt", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("dialogue:\nYou: from-model");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string exe = Path.Combine(ws.Path, "SimpleLLMChatCLI.exe");
+
+                    // Without the flag the prompt is printed.
+                    using (CliProcess cli = new CliProcess(exe, "--no-banners", ws.Path))
+                    {
+                        TestAssert.True(WaitStdoutContains(cli, "You: ", 15000), "prompt shown by default");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit default");
+                    }
+
+                    // With the flag the only "You:" on stdout is the model's own text.
+                    using (CliProcess cli = new CliProcess(exe, "--no-banners --no-user-prompts", ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("hello");
+                        TestAssert.True(WaitStdoutContains(cli, "from-model", 20000), "reply");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+
+                        string stdout = cli.Stdout.Replace("\r\n", "\n");
+                        TestAssert.Contains(stdout, "\nYou: from-model", "model line kept");
+                        TestAssert.Equal(
+                            stdout.IndexOf("You:", StringComparison.Ordinal),
+                            stdout.LastIndexOf("You:", StringComparison.Ordinal),
+                            "no prompt printed");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.no_user_prompts_hides_approval_prompt", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    if (!ShellToolsPackaged(ws))
+                        TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
+
+                    server.StreamDelayMs = 0;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_no_prompt",
+                        "{\"command\":\"echo NO_PROMPT_OK\"}");
+                    server.EnqueueContent("no-prompt-final");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners --no-user-prompts",
+                        ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("please run the command");
+                        string tool, args;
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out _), "approval on pipe");
+                        TestAssert.Equal("run_shell_command", tool, "tool");
+                        TestAssert.True(WaitStdoutContains(cli, "Run tool: run_shell_command", 5000), "approval message kept");
+
+                        // Still reads the answer from stdin with no prompt printed.
+                        cli.WriteLine("Y");
+                        TestAssert.True(WaitStdoutContains(cli, "no-prompt-final", 20000), "final");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+
+                        TestAssert.ContainsIgnoreCase(cli.Stdout, "NO_PROMPT_OK", "approved tool ran");
+                        TestAssert.True(
+                            cli.Stdout.IndexOf("Approve?", StringComparison.Ordinal) < 0,
+                            "no approval prompt");
+                    }
+                }
+            });
         }
 
         static TempWorkspace PackageCliWorkspace()

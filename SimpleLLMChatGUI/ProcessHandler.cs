@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace SimpleLLMChatGUI
 {
@@ -10,7 +9,6 @@ namespace SimpleLLMChatGUI
     {
         private Process llmProcess;
         private bool disposed;
-        private StringBuilder textBuffer = new StringBuilder(); // Buffer for incomplete You: strip
         private readonly Decoder utf8Decoder = Encoding.UTF8.GetDecoder();
         // 256-byte read plus a 3-byte character carried from the previous read.
         private readonly char[] charBuffer = new char[260];
@@ -50,9 +48,8 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.RedirectStandardInput = true;
                 llmProcess.StartInfo.StandardErrorEncoding = Encoding.UTF8;
                 llmProcess.StartInfo.CreateNoWindow = true;
-                llmProcess.StartInfo.Arguments = "--no-banners";
+                llmProcess.StartInfo.Arguments = "--no-banners --no-user-prompts";
                 llmProcess.ErrorDataReceived += OnErrorDataReceived;
-                textBuffer.Clear();
                 llmProcess.Start();
                 llmProcess.BeginErrorReadLine();
 
@@ -228,7 +225,7 @@ namespace SimpleLLMChatGUI
                 {
                     int written = utf8Decoder.GetChars(buffer, 0, bytesRead, charBuffer, 0);
                     if (written > 0)
-                        ProcessTextChunk(new string(charBuffer, 0, written));
+                        OutputText(new string(charBuffer, 0, written));
                 }
                 catch
                 {
@@ -260,64 +257,11 @@ namespace SimpleLLMChatGUI
             return false;
         }
 
-        private static int GetPartialSuffixLength(string text, string marker)
-        {
-            int maxLength = Math.Min(marker.Length - 1, text.Length);
-            for (int length = maxLength; length > 0; length--)
-            {
-                if (text.EndsWith(marker.Substring(0, length), StringComparison.Ordinal))
-                    return length;
-            }
-
-            return 0;
-        }
-
-        private void ProcessTextChunk(string textChunk)
-        {
-            if (string.IsNullOrEmpty(textChunk))
-                return;
-
-            if (textBuffer.Length > 0)
-            {
-                textBuffer.Append(textChunk);
-                textChunk = textBuffer.ToString();
-                textBuffer.Clear();
-            }
-
-            // Hold back a trailing partial "You:" so the CLI prompt is not split
-            // across chunks before OutputText can strip it. Turn-end is STATUS ready.
-            int holdBack = GetPartialSuffixLength(textChunk, "You:");
-            if (holdBack > 0)
-            {
-                if (holdBack < textChunk.Length)
-                    OutputText(textChunk.Substring(0, textChunk.Length - holdBack));
-                textBuffer.Append(textChunk.Substring(textChunk.Length - holdBack));
-                return;
-            }
-
-            OutputText(textChunk);
-        }
-
         private void OutputText(string text)
         {
             if (!string.IsNullOrEmpty(text))
             {
-                // CLI still prints You: / Approve? for TTY; strip from the GUI transcript.
-                // Approval interaction is STATUS approval on the control pipe.
-                string filteredText = Regex.Replace(
-                    text,
-                    @"(^|\r?\n)[ \t]*You:[ \t]*",
-                    match => match.Groups[1].Value,
-                    RegexOptions.Multiline
-                );
-                filteredText = Regex.Replace(
-                    filteredText,
-                    @"(^|\r?\n)[ \t]*" + Regex.Escape(ToolApproval.ApprovalPrompt),
-                    match => match.Groups[1].Value,
-                    RegexOptions.Multiline
-                );
-
-                filteredText = NormalizeLineEndings(filteredText);
+                string filteredText = NormalizeLineEndings(text);
 
                 if (!string.IsNullOrEmpty(filteredText))
                 {

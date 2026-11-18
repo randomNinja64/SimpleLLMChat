@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Windows.Automation;
 
@@ -55,6 +56,13 @@ namespace SimpleLLMChatGUI.Tests
 
         public void SendTurn(string text, int timeoutMs)
         {
+            Submit(text);
+            WaitForTurnComplete(timeoutMs);
+        }
+
+        /// <summary>Types a message and presses Send without waiting for the reply.</summary>
+        public void Submit(string text)
+        {
             AutomationElement input = FindById("chatInput");
             AutomationElement send = FindById("sendButton");
             if (input == null || send == null)
@@ -74,6 +82,11 @@ namespace SimpleLLMChatGUI.Tests
             if (invoke == null)
                 throw new TestFailureException("sendButton does not support InvokePattern");
             invoke.Invoke();
+        }
+
+        public void WaitForTurnComplete(int timeoutMs)
+        {
+            AutomationElement send;
 
             // Wait until the input is disabled then enabled again (generation complete;
             // the send button stays enabled as Stop meanwhile).
@@ -105,6 +118,82 @@ namespace SimpleLLMChatGUI.Tests
                 Thread.Sleep(50);
             }
             throw new TestFailureException("Turn did not complete within " + timeoutMs + " ms");
+        }
+
+        /// <summary>
+        /// Text of every loaded chat turn: document text plus the labels and
+        /// bodies of collapsible blocks.
+        /// </summary>
+        public string ReadChatText()
+        {
+            StringBuilder sb = new StringBuilder();
+            AutomationElement list = FindById("chatList");
+            if (list == null)
+                return "";
+
+            foreach (AutomationElement el in list.FindAll(TreeScope.Descendants, Condition.TrueCondition))
+            {
+                try
+                {
+                    object pattern;
+                    if (el.TryGetCurrentPattern(TextPattern.Pattern, out pattern))
+                        sb.AppendLine(((TextPattern)pattern).DocumentRange.GetText(-1));
+                    else if (el.Current.ControlType == ControlType.Text)
+                        sb.AppendLine(el.Current.Name);
+                }
+                catch (ElementNotAvailableException)
+                {
+                    // turn re-rendered mid-walk
+                }
+            }
+            return sb.ToString();
+        }
+
+        public bool WaitForChatText(string needle, int timeoutMs)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                if (ReadChatText().IndexOf(needle, StringComparison.Ordinal) >= 0)
+                    return true;
+                Thread.Sleep(100);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Waits for the GUI's message box, presses Yes or No, and returns its text.
+        /// </summary>
+        public string AnswerMessageBox(bool yes, int timeoutMs)
+        {
+            Condition isDialog = new AndCondition(
+                new PropertyCondition(AutomationElement.ProcessIdProperty, _gui.Id),
+                new PropertyCondition(AutomationElement.ClassNameProperty, "#32770"));
+
+            Stopwatch sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                AutomationElement dialog =
+                    AutomationElement.RootElement.FindFirst(TreeScope.Children, isDialog)
+                    ?? _window.FindFirst(TreeScope.Descendants, isDialog);
+                // IDYES = 6, IDNO = 7
+                AutomationElement button = dialog == null ? null : dialog.FindFirst(
+                    TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.AutomationIdProperty, yes ? "6" : "7"));
+                if (button != null)
+                {
+                    StringBuilder text = new StringBuilder();
+                    foreach (AutomationElement label in dialog.FindAll(
+                        TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)))
+                        text.AppendLine(label.Current.Name);
+
+                    ((InvokePattern)button.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+                    return text.ToString();
+                }
+                Thread.Sleep(100);
+            }
+            throw new TestFailureException("Message box did not appear within " + timeoutMs + " ms");
         }
 
         public Process FindCliProcess()

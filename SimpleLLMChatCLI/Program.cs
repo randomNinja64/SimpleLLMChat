@@ -10,6 +10,7 @@ namespace SimpleLLMChatCLI
     {
         public static ConfigHandler Config;
         public static StatusPipeServer StatusPipe;
+        public static bool ShowUserPrompts = true;
 
         // Print interactive CLI instructions
         private static readonly string[] ValidReasoningEfforts =
@@ -146,6 +147,12 @@ namespace SimpleLLMChatCLI
                         continue;
                     }
 
+                    if (arg == "--no-user-prompts")
+                    {
+                        ShowUserPrompts = false;
+                        continue;
+                    }
+
                     // Check for output-only flag
                     if (arg == "-o" || arg == "--output-only")
                     {
@@ -229,7 +236,8 @@ namespace SimpleLLMChatCLI
                 // Pad to exactly one blank line before the prompt, regardless of
                 // how the previous turn's output ended.
                 ChatOutput.StartBlock();
-                ChatOutput.Write("You: ");
+                if (ShowUserPrompts)
+                    ChatOutput.Write("You: ");
                 StatusPipe.PublishDiscrete(global::StatusPipe.ReadyLine);
                 string userInput = Console.ReadLine();
                 ChatOutput.EndInputLine();

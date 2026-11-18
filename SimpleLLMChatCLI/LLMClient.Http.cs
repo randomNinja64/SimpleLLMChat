@@ -116,7 +116,8 @@ public partial class LLMClient
 
         while (true)
         {
-            ChatOutput.Write(ToolApproval.ApprovalPrompt);
+            if (Program.ShowUserPrompts)
+                ChatOutput.Write(ToolApproval.ApprovalPrompt);
             Console.Out.Flush();
 
             string input = Console.ReadLine();

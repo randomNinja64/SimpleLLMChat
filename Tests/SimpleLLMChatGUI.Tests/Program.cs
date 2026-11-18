@@ -66,6 +66,77 @@ namespace SimpleLLMChatGUI.Tests
                 TestAssert.True(threw, "should throw");
             });
 
+            TestRunner.Run("gui.model_you_line_kept", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageGuiWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("dialogue:\n\nYou: from-model");
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
+
+                    using (GuiDriver gui = new GuiDriver(ws.Path))
+                    {
+                        gui.WaitUntilReady(30000);
+                        gui.SendTurn("hello", 60000);
+
+                        TestAssert.True(gui.WaitForChatText("from-model", 10000), "reply shown");
+                        string chat = gui.ReadChatText();
+                        TestAssert.Contains(chat, "You: hello", "user turn");
+                        TestAssert.Contains(chat, "You: from-model", "model's You: line kept");
+                    }
+                }
+            });
+
+            TestRunner.Run("gui.approval_dialog_runs_tool", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageGuiWorkspace())
+                {
+                    // The GUI test host has no tools of its own; borrow the CLI suite's copy.
+                    string shellTools = Path.Combine(
+                        AppDomain.CurrentDomain.BaseDirectory, "..", "SimpleLLMChatCLI.Tests", "tools", "ShellTools");
+                    if (!File.Exists(Path.Combine(shellTools, "ShellTools.exe")))
+                        TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
+                    string toolsDst = Path.Combine(ws.Path, "tools", "ShellTools");
+                    Directory.CreateDirectory(toolsDst);
+                    foreach (string file in Directory.GetFiles(shellTools))
+                        File.Copy(file, Path.Combine(toolsDst, Path.GetFileName(file)), true);
+
+                    server.StreamDelayMs = 0;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_gui_approve",
+                        "{\"command\":\"echo GUI_APPROVE_OK\"}");
+                    server.EnqueueContent("gui-approve-final");
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
+                    // Later keys win, so this overrides the empty defaults above.
+                    File.AppendAllText(
+                        Path.Combine(ws.Path, "LLMSettings.ini"),
+                        "\r\ntools=run_shell_command\r\ntoolsrequiringapproval=run_shell_command\r\n");
+
+                    using (GuiDriver gui = new GuiDriver(ws.Path))
+                    {
+                        gui.WaitUntilReady(30000);
+                        gui.Submit("please run the command");
+
+                        string dialog = gui.AnswerMessageBox(true, 30000);
+                        TestAssert.Contains(dialog, "run_shell_command", "dialog names tool");
+                        TestAssert.Contains(dialog, "GUI_APPROVE_OK", "dialog shows arguments");
+
+                        gui.WaitForTurnComplete(60000);
+                        TestAssert.True(gui.WaitForChatText("gui-approve-final", 10000), "final reply shown");
+                        TestAssert.ContainsIgnoreCase(server.LastBody, "GUI_APPROVE_OK", "approved tool ran");
+                        TestAssert.True(
+                            server.LastBody.IndexOf("cancelled by the user", StringComparison.Ordinal) < 0,
+                            "not cancelled");
+                        TestAssert.True(
+                            gui.ReadChatText().IndexOf("Approve?", StringComparison.Ordinal) < 0,
+                            "no approval prompt in transcript");
+                    }
+                }
+            });
+
             TestRunner.Run("gui.window_and_long_chat", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
