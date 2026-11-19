@@ -13,7 +13,7 @@
             "name": "maxControls",
             "label": "Max controls per query",
             "type": "int",
-            "default": "80"
+            "default": "250"
         }
     ],
     "tools": [

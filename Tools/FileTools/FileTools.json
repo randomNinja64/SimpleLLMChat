@@ -2,7 +2,7 @@
     "name": "File Tools",
     "executable": "FileTools.exe",
     "options": [
-        { "name": "maxFileContentLength", "label": "Maximum Processing Length for File Content", "type": "int", "default": "8000" }
+        { "name": "maxFileContentLength", "label": "Maximum Processing Length for File Content", "type": "int", "default": "10000" }
     ],
     "tools": [
         {
