@@ -43,7 +43,7 @@ namespace FileTools
                 // Edits are spliced into the text as read, so everything outside them keeps
                 // its bytes; the encoding is remembered so the file is written back the same way.
                 Encoding encoding;
-                string original = ReadDetectingEncoding(expandedPath, out encoding);
+                string original = TextNormalization.ReadDetectingEncoding(expandedPath, out encoding);
 
                 List<string> errors;
                 string newContent;
@@ -80,39 +80,6 @@ namespace FileTools
                 exitCode = 1;
                 return "error: " + ex.Message;
             }
-        }
-
-        /// <summary>
-        /// Reads a text file and reports the encoding to write it back with: a BOM decides
-        /// when present; otherwise valid UTF-8 stays BOM-less UTF-8 and anything else is
-        /// treated as the system ANSI code page.
-        /// </summary>
-        private static string ReadDetectingEncoding(string path, out Encoding encoding)
-        {
-            byte[] bytes = File.ReadAllBytes(path);
-
-            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
-                encoding = new UTF8Encoding(true);
-            else if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
-                encoding = Encoding.Unicode;
-            else if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
-                encoding = Encoding.BigEndianUnicode;
-            else
-            {
-                try
-                {
-                    string text = new UTF8Encoding(false, true).GetString(bytes);
-                    encoding = new UTF8Encoding(false);
-                    return text;
-                }
-                catch (DecoderFallbackException)
-                {
-                    encoding = Encoding.Default;
-                }
-            }
-
-            int preamble = encoding.GetPreamble().Length;
-            return encoding.GetString(bytes, preamble, bytes.Length - preamble);
         }
 
         private static int ApplyBlocksInMemory(string originalContent, List<Block> blocks,

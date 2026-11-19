@@ -21,7 +21,7 @@ namespace FileTools
                     return $"error: File not found: {filename}";
                 }
 
-                string content = File.ReadAllText(filename, Encoding.UTF8);
+                string content = TextNormalization.ReadDetectingEncoding(filename, out _);
                 int totalLength = content.Length;
 
                 // Validate offset
