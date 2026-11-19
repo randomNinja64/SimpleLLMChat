@@ -129,7 +129,7 @@ namespace SimpleLLMChatGUI
         public int ChatFontSize
         {
             get { return _chatFontSize; }
-            set { _chatFontSize = value; OnPropertyChanged(nameof(ChatFontSize)); }
+            set { _chatFontSize = FontHandler.ClampFontSize(value); OnPropertyChanged(nameof(ChatFontSize)); }
         }
 
         public bool RagEnabled

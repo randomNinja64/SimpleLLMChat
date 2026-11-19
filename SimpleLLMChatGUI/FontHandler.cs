@@ -33,7 +33,13 @@ namespace SimpleLLMChatGUI
 
         public static int GetFontSize()
         {
-            return App.Config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
+            return ClampFontSize(App.Config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize));
+        }
+
+        /// <summary>WPF throws on a font size outside 1..35791.</summary>
+        public static int ClampFontSize(int size)
+        {
+            return Math.Max(1, Math.Min(35791, size));
         }
 
         internal static FontFamily TryGetFontFamily(string fontFamilyName)

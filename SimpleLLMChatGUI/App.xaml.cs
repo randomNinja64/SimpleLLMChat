@@ -25,6 +25,12 @@ namespace SimpleLLMChatGUI
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+            // Report an unexpected UI-thread error instead of closing the app.
+            DispatcherUnhandledException += (s, args) =>
+            {
+                MessageBox.Show(args.Exception.Message, "Unexpected Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                args.Handled = true;
+            };
             LoadSettings();
         }
 

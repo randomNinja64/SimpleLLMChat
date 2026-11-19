@@ -134,6 +134,14 @@ public partial class LLMClient
             if (input.Length == 0)
                 continue;
 
+            // A command sent while the turn was running (the GUI's /save, /reload,
+            // /reasoning) is not an answer: keep it for the main loop.
+            if (input.StartsWith("/"))
+            {
+                Program.DeferredInput.Enqueue(input);
+                continue;
+            }
+
             if (string.Equals(input, "Y", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(input, "yes", StringComparison.OrdinalIgnoreCase))
             {

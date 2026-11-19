@@ -11,6 +11,10 @@ namespace SimpleLLMChatCLI
         public static ConfigHandler Config;
         public static ChatPipeServer Pipe;
 
+        // Commands that arrived on stdin while a tool approval was waiting for Y/N.
+        // The main loop runs them once the turn ends.
+        public static readonly Queue<string> DeferredInput = new Queue<string>();
+
         // Print interactive CLI instructions
         private static readonly string[] ValidReasoningEfforts =
         {
@@ -231,7 +235,7 @@ namespace SimpleLLMChatCLI
                 ChatOutput.StartBlock();
                 ChatOutput.Write("You: ", false);
                 Pipe.PublishDiscrete(ChatPipe.ReadyLine);
-                string userInput = Console.ReadLine();
+                string userInput = DeferredInput.Count > 0 ? DeferredInput.Dequeue() : Console.ReadLine();
                 ChatOutput.EndInputLine();
 
                 // Stdin is closed (piped input ended, or the GUI went away): there is

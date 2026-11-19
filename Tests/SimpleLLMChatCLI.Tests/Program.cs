@@ -513,6 +513,59 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.approval_keeps_queued_command", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_queued",
+                        "{\"command\":\"echo QUEUED_MARKER\"}");
+                    server.EnqueueContent("queued-final-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
+                    string mdPath = Path.Combine(ws.Path, "queued.md");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("please run the command");
+                        string tool, args;
+                        TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out _), "approval");
+                        // A command lands on stdin ahead of the answer, as when the
+                        // GUI's Save Chat is clicked mid-turn.
+                        cli.WriteLine("/save \"" + mdPath + "\"");
+                        cli.WriteLine("N");
+                        TestAssert.True(WaitStdoutContains(cli, "queued-final-ok", 20000), "final");
+                        TestAssert.True(
+                            cli.Stdout.IndexOf("Please enter Y or N", StringComparison.Ordinal) < 0,
+                            "command not read as an answer");
+
+                        string md = "";
+                        DateTime deadline = DateTime.UtcNow.AddMilliseconds(10000);
+                        while (DateTime.UtcNow < deadline)
+                        {
+                            if (File.Exists(mdPath))
+                            {
+                                md = File.ReadAllText(mdPath, Encoding.UTF8);
+                                if (md.IndexOf("queued-final-ok", StringComparison.Ordinal) >= 0)
+                                    break;
+                            }
+                            System.Threading.Thread.Sleep(50);
+                        }
+                        TestAssert.Contains(md, "queued-final-ok", "save ran after the turn");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.tool_loop_echo", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
