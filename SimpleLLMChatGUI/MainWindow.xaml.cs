@@ -166,6 +166,8 @@ namespace SimpleLLMChatGUI
             processHandler = new ProcessHandler();
 
             processHandler.OutputReceived += OnOutputReceived;
+            processHandler.BlockStarted += OnBlockStarted;
+            processHandler.BlockEnded += OnBlockEnded;
             processHandler.ErrorOccurred += OnErrorOccurred;
             processHandler.CliErrorReceived += OnCliErrorReceived;
             processHandler.GenerationComplete += OnGenerationComplete;
@@ -204,10 +206,12 @@ namespace SimpleLLMChatGUI
 
         private void OnOutputReceived(string text)
         {
-            // BeginInvoke so stdout reading is not gated behind UI paint/scroll work.
+            // BeginInvoke so pipe reading is not gated behind UI paint/scroll work.
             Dispatcher.BeginInvoke((Action)(() =>
             {
-                AppendStreamingText(text);
+                if (_streamingTurn == null)
+                    _streamingTurn = AddTurn();
+                _streamingTurn.AppendText(text);
                 ScrollChatToEnd();
             }));
         }
@@ -216,21 +220,22 @@ namespace SimpleLLMChatGUI
         /// Each thinking / tool-call block gets its own turn, so the chat list's
         /// item margin separates them the way it separates user and LLM turns.
         /// </summary>
-        private void AppendStreamingText(string text)
+        private void OnBlockStarted(ChatBlockKind kind, string name)
         {
-            string remaining = text;
-            while (!string.IsNullOrEmpty(remaining))
+            Dispatcher.BeginInvoke((Action)(() =>
             {
+                if (_streamingTurn != null && _streamingTurn.HasRenderedContent())
+                    EndStreamingTurn();
                 if (_streamingTurn == null)
                     _streamingTurn = AddTurn();
+                _streamingTurn.BeginBlock(kind, name);
+                ScrollChatToEnd();
+            }));
+        }
 
-                string leftover = _streamingTurn.AppendText(remaining);
-                if (leftover == null)
-                    return;
-
-                EndStreamingTurn();
-                remaining = leftover;
-            }
+        private void OnBlockEnded()
+        {
+            Dispatcher.BeginInvoke((Action)EndStreamingTurn);
         }
 
         private void EndStreamingTurn()
@@ -266,7 +271,7 @@ namespace SimpleLLMChatGUI
         private bool OnApprovalRequested(string toolName, string arguments, string confidence)
         {
             bool approved = false;
-            // Run after queued stdout updates so the approval block's leading
+            // Run after queued output updates so the approval block's leading
             // separator can be removed before the (hidden) GUI prompt is shown.
             Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
             {
@@ -294,8 +299,7 @@ namespace SimpleLLMChatGUI
 
         private void OnGenerationComplete()
         {
-            // Background so any already-queued stdout AppendStreamingText
-            // (Normal) runs first — STATUS ready can race the last pipe bytes.
+            // Background so any already-queued output updates (Normal) run first.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
             {
                 EndStreamingTurn();

@@ -105,6 +105,9 @@
     <Compile Include="..\Shared\StatusPipe\StatusPipe.cs">
       <Link>Shared\StatusPipe\StatusPipe.cs</Link>
     </Compile>
+    <Compile Include="..\Shared\StatusPipe\StatusPipe.Chat.cs">
+      <Link>Shared\StatusPipe\StatusPipe.Chat.cs</Link>
+    </Compile>
     <Compile Include="..\Shared\StatusPipe\StatusPipe.Tokens.cs">
       <Link>Shared\StatusPipe\StatusPipe.Tokens.cs</Link>
     </Compile>

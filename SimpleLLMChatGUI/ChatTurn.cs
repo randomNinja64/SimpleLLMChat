@@ -26,7 +26,7 @@ namespace SimpleLLMChatGUI
         private bool? _expanded;
         private int _durationSeconds;
         private ChatBlockDisplayMode? _blockMode;
-        private CollapsibleBlockKind? _blockKind;
+        private ChatBlockKind? _blockKind;
         private string _blockName;
         private int _bodyLength;
         private bool _restoring;
@@ -131,11 +131,22 @@ namespace SimpleLLMChatGUI
             _document = null;
         }
 
-        public string AppendText(string text)
+        /// <summary>
+        /// Appends plain text, or body text while a collapsible block is open.
+        /// </summary>
+        public void AppendText(string text)
         {
             if (_completed) throw new InvalidOperationException("Cannot append to a completed turn.");
             if (string.IsNullOrEmpty(text))
-                return null;
+                return;
+
+            if (_activeBlock != null)
+            {
+                if (string.IsNullOrEmpty(_activeBlock.BodyText.Text))
+                    text = text.TrimStart('\r', '\n');
+                AppendBody(text);
+                return;
+            }
 
             if (!_hasContent)
             {
@@ -144,72 +155,25 @@ namespace SimpleLLMChatGUI
                 // spacing comes from ListBoxItem Margin.
                 text = text.TrimStart('\r', '\n');
                 if (text.Length == 0)
-                    return null;
+                    return;
                 _hasContent = true;
 
                 // Always start real content in a fresh paragraph.
                 Document.Blocks.Add(new Paragraph());
             }
 
-            string remaining = text;
-            while (!string.IsNullOrEmpty(remaining))
-            {
-                if (_activeBlock == null)
-                {
-                    int openIndex;
-                    int openLength;
-                    if (!TryFindTag(remaining, CollapsibleOpenTags, out openIndex, out openLength))
-                    {
-                        AppendPlain(remaining);
-                        return null;
-                    }
+            AppendPlain(text);
+        }
 
-                    string openTag = remaining.Substring(openIndex, openLength);
-                    if (openIndex > 0)
-                        AppendPlain(remaining.Substring(0, openIndex));
-
-                    // A collapsible block always opens a turn of its own, so
-                    // batched tool calls are spaced by the chat list's item margin.
-                    if (HasRenderedContent())
-                        return remaining.Substring(openIndex);
-
-                    remaining = remaining.Substring(openIndex + openLength);
-                    if (openTag.Equals("[tool call]", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string name;
-                        remaining = TakeToolCallName(remaining, out name);
-                        StartCollapsibleBlock(name, CollapsibleBlockKind.ToolCall);
-                    }
-                    else if (openTag.Equals("[tool output]", StringComparison.OrdinalIgnoreCase))
-                    {
-                        remaining = remaining.TrimStart('\r', '\n');
-                        StartCollapsibleBlock(null, CollapsibleBlockKind.ToolOutput);
-                    }
-                    else
-                    {
-                        remaining = remaining.TrimStart('\r', '\n');
-                        StartCollapsibleBlock(null, CollapsibleBlockKind.Thinking);
-                    }
-                }
-                else
-                {
-                    int closeIndex;
-                    int closeLength;
-                    if (!TryFindTag(remaining, CollapsibleCloseTags, out closeIndex, out closeLength))
-                    {
-                        AppendBody(remaining);
-                        return null;
-                    }
-
-                    if (closeIndex > 0)
-                        AppendBody(remaining.Substring(0, closeIndex));
-
-                    EndCollapsibleBlock();
-                    return remaining.Substring(closeIndex + closeLength).TrimStart('\r', '\n');
-                }
-            }
-
-            return null;
+        /// <summary>
+        /// Opens a collapsible block from a status pipe block event. Completing
+        /// the turn closes it.
+        /// </summary>
+        public void BeginBlock(ChatBlockKind kind, string name)
+        {
+            if (_completed) throw new InvalidOperationException("Cannot append to a completed turn.");
+            _hasContent = true;
+            StartCollapsibleBlock(string.IsNullOrEmpty(name) ? null : name, kind);
         }
 
         /// <summary>

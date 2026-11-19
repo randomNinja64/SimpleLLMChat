@@ -9,11 +9,10 @@ namespace SimpleLLMChatGUI
     {
         private Process llmProcess;
         private bool disposed;
-        private readonly Decoder utf8Decoder = Encoding.UTF8.GetDecoder();
-        // 256-byte read plus a 3-byte character carried from the previous read.
-        private readonly char[] charBuffer = new char[260];
 
         public event Action<string> OutputReceived;
+        public event Action<ChatBlockKind, string> BlockStarted;
+        public event Action BlockEnded;
         public event Action<string> ErrorOccurred;
         public event Action<string> CliErrorReceived;
         public event Action GenerationComplete;
@@ -48,7 +47,7 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.RedirectStandardInput = true;
                 llmProcess.StartInfo.StandardErrorEncoding = Encoding.UTF8;
                 llmProcess.StartInfo.CreateNoWindow = true;
-                llmProcess.StartInfo.Arguments = "--no-banners --no-user-prompts";
+                llmProcess.StartInfo.Arguments = "--no-banners";
                 llmProcess.ErrorDataReceived += OnErrorDataReceived;
                 llmProcess.Start();
                 llmProcess.BeginErrorReadLine();
@@ -58,9 +57,13 @@ namespace SimpleLLMChatGUI
                 statusPipeClient.IndexingStatusReceived += OnIndexingStatusPipeReceived;
                 statusPipeClient.ReadyReceived += OnStatusPipeReady;
                 statusPipeClient.ApprovalReceived += OnStatusPipeApproval;
+                statusPipeClient.TextReceived += OutputText;
+                statusPipeClient.BlockStarted += OnStatusPipeBlockStarted;
+                statusPipeClient.BlockEnded += OnStatusPipeBlockEnded;
                 statusPipeClient.Start();
 
-                // 256 byte async buffer
+                // Chat output arrives on the status pipe. Stdout is only drained
+                // so the CLI never blocks on a full buffer.
                 var buffer = new byte[256];
                 Stream outputStream = llmProcess.StandardOutput.BaseStream;
                 BeginReadOutput(outputStream, buffer);
@@ -89,6 +92,20 @@ namespace SimpleLLMChatGUI
             Action<int> handler = StatusReceived;
             if (handler != null)
                 handler(tokens);
+        }
+
+        private void OnStatusPipeBlockStarted(ChatBlockKind kind, string name)
+        {
+            Action<ChatBlockKind, string> handler = BlockStarted;
+            if (handler != null)
+                handler(kind, name);
+        }
+
+        private void OnStatusPipeBlockEnded()
+        {
+            Action handler = BlockEnded;
+            if (handler != null)
+                handler();
         }
 
         private void OnStatusPipeReady()
@@ -120,6 +137,9 @@ namespace SimpleLLMChatGUI
                 statusPipeClient.IndexingStatusReceived -= OnIndexingStatusPipeReceived;
                 statusPipeClient.ReadyReceived -= OnStatusPipeReady;
                 statusPipeClient.ApprovalReceived -= OnStatusPipeApproval;
+                statusPipeClient.TextReceived -= OutputText;
+                statusPipeClient.BlockStarted -= OnStatusPipeBlockStarted;
+                statusPipeClient.BlockEnded -= OnStatusPipeBlockEnded;
                 statusPipeClient.Dispose();
                 statusPipeClient = null;
             }
@@ -220,21 +240,7 @@ namespace SimpleLLMChatGUI
             }
 
             if (bytesRead > 0)
-            {
-                try
-                {
-                    int written = utf8Decoder.GetChars(buffer, 0, bytesRead, charBuffer, 0);
-                    if (written > 0)
-                        OutputText(new string(charBuffer, 0, written));
-                }
-                catch
-                {
-                    // Skip this chunk if decoding fails. The read loop keeps going.
-                }
-
-                // Continue reading
                 BeginReadOutput(stream, buffer);
-            }
         }
 
         public bool SendApprovalResponse(bool approved)
@@ -286,6 +292,8 @@ namespace SimpleLLMChatGUI
             disposed = true;
             DisposeStatusPipeClient();
             OutputReceived = null;
+            BlockStarted = null;
+            BlockEnded = null;
             ErrorOccurred = null;
             CliErrorReceived = null;
             GenerationComplete = null;

@@ -139,7 +139,6 @@ To pass in an image alongside a prompt, use `SimpleLLMChatCLI.exe --image <path>
 
 CLI mode provides the following additional flags:
 - `--no-banners`: Suppresses instructional prompts
-- `--no-user-prompts`: Suppresses input prompts (`You:` and `Approve?`), primarily used for GUI mode
 - `-o`, `--output-only`: Outputs only the model's response text (no thinking, tool-call, or tool-output UI). Tools that do not require approval still run silently. If the model calls a tool that requires approval, the session ends with `Error: Model called <tool> which requires approval`.
 - `--reasoning-effort`: Sets initial reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`)
 

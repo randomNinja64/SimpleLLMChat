@@ -67,6 +67,27 @@ public sealed class StatusPipeServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Streams a chat output event. Not remembered for replay on connect.
+    /// </summary>
+    public void PublishEvent(string line)
+    {
+        lock (_sync)
+        {
+            if (_writer == null)
+                return;
+
+            try
+            {
+                _writer.WriteLine(line);
+            }
+            catch
+            {
+                DropConnection();
+            }
+        }
+    }
+
     public void PublishLine(string line)
     {
         if (string.IsNullOrEmpty(line))
@@ -101,7 +122,10 @@ public sealed class StatusPipeServer : IDisposable
                 PipeDirection.Out,
                 1,
                 PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous))
+                PipeOptions.Asynchronous,
+                0,
+                // Room for streamed chat text so writes rarely wait on the reader.
+                65536))
             {
                 pipe.WaitForConnection();
                 if (!_running)
