@@ -125,10 +125,9 @@ public partial class LLMClient
             if (input == null)
             {
                 // Ctrl+C ends ReadLine before its handler has run; give it a moment.
+                // Otherwise stdin is closed and no answer can arrive, so deny.
                 System.Threading.Thread.Sleep(100);
-                if (Cancel.Requested)
-                    return false;
-                continue;
+                return false;
             }
 
             input = input.Trim();

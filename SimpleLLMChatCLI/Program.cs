@@ -234,12 +234,10 @@ namespace SimpleLLMChatCLI
                 string userInput = Console.ReadLine();
                 ChatOutput.EndInputLine();
 
+                // Stdin is closed (piped input ended, or the GUI went away): there is
+                // nothing left to read, so exit instead of prompting forever.
                 if (userInput == null)
-                {
-                    // No Enter was echoed; don't pad the re-prompt.
-                    ChatOutput.MarkSeparated();
-                    continue;
-                }
+                    break;
 
                 userInput = userInput.Replace("<<NEWLINE>>", "\n");
 
