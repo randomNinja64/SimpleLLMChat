@@ -12,13 +12,7 @@ namespace SimpleLLMChatCLI
     internal static class CurlClient
     {
         public static LLMClient.LLMCompletionResponse SendRequest(
-            string serverUrl, string apiKey, JObject payload,
-            Action<string> outputCallback,
-            Action<string> onReasoningChunk,
-            Action<int> onReasoningSummary,
-            Action<ToolRegistry.ToolCall> onToolCallChunk = null,
-            Action onContentStart = null,
-            Action startBlock = null)
+            string serverUrl, string apiKey, JObject payload, StreamSink sink)
         {
             string url = serverUrl.TrimEnd('/') + "/chat/completions";
             try
@@ -38,9 +32,7 @@ namespace SimpleLLMChatCLI
                     });
                     errThread.IsBackground = true;
                     errThread.Start();
-                    result = SseStreamParser.Parse(
-                        process.StandardOutput, outputCallback, onReasoningChunk, onReasoningSummary,
-                        onToolCallChunk, onContentStart, startBlock);
+                    result = new SseStreamParser(sink).Read(process.StandardOutput);
                     parsed = true;
                     errThread.Join(5000);
                 });

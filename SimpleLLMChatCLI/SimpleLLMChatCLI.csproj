@@ -53,6 +53,8 @@
     <Compile Include="LLMClient.Request.cs" />
     <Compile Include="LLMClient.Http.cs" />
     <Compile Include="SseStreamParser.cs" />
+    <Compile Include="StreamSink.cs" />
+    <Compile Include="TurnSettings.cs" />
     <Compile Include="ChatPipeServer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

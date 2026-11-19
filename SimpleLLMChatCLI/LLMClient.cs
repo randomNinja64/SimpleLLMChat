@@ -63,30 +63,28 @@ public partial class LLMClient
         }
     }
 
+    /// <summary>State that lives for one turn.</summary>
+    private sealed class Turn
+    {
+        public List<ChatMessage> Conversation;
+        public TurnSettings Settings;
+        public StreamSink Sink;
+        public List<string> ContextInjections;
+        public int ConsecutiveFailedToolCalls;
+    }
+
     public void ProcessConversation(
         List<ChatMessage> conversation,
         string userMessage,
         string image,
         string imageMime,
-        string assistantName,
-        List<string> enabledTools,
-        List<string> toolsRequiringApproval,
-        bool outputOnly)
+        TurnSettings settings)
     {
-        ChatBlockDisplayMode toolCallDisplay = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed);
-        ChatBlockDisplayMode toolOutputDisplay = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown);
-        int maxConsecutiveFailedToolCalls = Math.Max(0, config.GetConfigInt("maxconsecutivefailedtoolcalls", 10));
-        int consecutiveFailedToolCalls = 0;
-
-        HashSet<string> enabledSet = new HashSet<string>(
-            enabledTools ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-        HashSet<string> approvalSet = new HashSet<string>(
-            toolsRequiringApproval ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        StreamSink sink = StreamSink.For(settings);
+        Turn turn = new Turn { Conversation = conversation, Settings = settings, Sink = sink };
 
         MaybeSummarizeInBackground(
-            conversation,
-            outputOnly,
-            "\n\n[Continue from this context. The user's next message follows.]");
+            turn, "\n\n[Continue from this context. The user's next message follows.]");
 
         RagHost.FlushPendingErrorOnce();
         RagHost.WaitIfIndexing();
@@ -103,8 +101,8 @@ public partial class LLMClient
             if (everyTurn || isNewChat)
             {
                 AutoRagResult rag = AutoRagContext.TryRetrieve(config, userMessage, contentForLlm);
-                if (!outputOnly && !string.IsNullOrEmpty(rag.UserStatusLine))
-                    ChatOutput.WriteLine(rag.UserStatusLine);
+                if (!string.IsNullOrEmpty(rag.UserStatusLine))
+                    sink.Notice(rag.UserStatusLine);
                 contentForLlm = rag.MergedPrompt;
             }
         }
@@ -117,48 +115,17 @@ public partial class LLMClient
             ImageMime = string.IsNullOrEmpty(imageMime) ? null : imageMime
         });
 
-        List<string> contextInjections = registry != null
-            ? registry.GetContextInjections(enabledTools)
+        turn.ContextInjections = registry != null
+            ? registry.GetContextInjections(settings.EnabledTools)
             : new List<string>();
-
-        // The assistant name is printed once per turn:
-        //   "LLM: output"  when the response starts with plain output, or
-        //   "LLM:" on its own block when a [thinking]/[tool ...] block comes first.
-        bool assistantHeaderPrinted = false;
-        Action startBlock = null;
-        Action onContentStart = null;
-        if (!outputOnly)
-        {
-            // Runs before tagged blocks ([thinking], [thought for ...], [tool ...], errors).
-            startBlock = () =>
-            {
-                ChatOutput.StartBlock();
-                if (!assistantHeaderPrinted)
-                {
-                    assistantHeaderPrinted = true;
-                    ChatOutput.WriteLine(assistantName + ":");
-                    ChatOutput.StartBlock();
-                }
-            };
-            // Runs before the first content chunk of each response.
-            onContentStart = () =>
-            {
-                ChatOutput.StartBlock();
-                if (!assistantHeaderPrinted)
-                {
-                    assistantHeaderPrinted = true;
-                    ChatOutput.Write(assistantName + ": ");
-                }
-            };
-        }
 
         while (true)
         {
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
-            LLMCompletionResponse response = StreamModelCall(
-                conversation, enabledTools, approvalSet, toolCallDisplay,
-                outputOnly, contextInjections, startBlock, onContentStart);
+            LLMCompletionResponse response = SendMessages(
+                conversation, settings.EnabledTools, sink, turn.ContextInjections);
+            sink.EndResponse();
 
             if (Cancel.Requested)
             {
@@ -170,35 +137,27 @@ public partial class LLMClient
 
             if (response.FinishReason == "request_failed")
             {
-                if (!outputOnly)
-                    ChatOutput.StartBlock();
-                ChatOutput.WriteLine("Request to LLM Failed (" + response.Content + ")");
+                sink.Error("Request to LLM Failed (" + response.Content + ")");
                 break;
             }
 
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
-                if (!RunToolCalls(
-                    conversation, response.Content, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock,
-                    ref consecutiveFailedToolCalls, maxConsecutiveFailedToolCalls))
+                if (!RunToolCalls(turn, response))
                     return;
 
                 if (Cancel.Requested)
                     break;
 
-                if (maxConsecutiveFailedToolCalls > 0
-                    && consecutiveFailedToolCalls >= maxConsecutiveFailedToolCalls)
+                if (settings.MaxConsecutiveFailures > 0
+                    && turn.ConsecutiveFailedToolCalls >= settings.MaxConsecutiveFailures)
                 {
-                    if (!outputOnly && startBlock != null)
-                        startBlock();
-                    ChatOutput.WriteLine("[Stopped: " + consecutiveFailedToolCalls + " consecutive tool calls failed]");
+                    sink.Error("[Stopped: " + turn.ConsecutiveFailedToolCalls + " consecutive tool calls failed]");
                     break;
                 }
 
                 MaybeSummarizeInBackground(
-                    conversation,
-                    outputOnly,
-                    "\n\n[Continue from this context. The user's original request is being processed.]");
+                    turn, "\n\n[Continue from this context. The user's original request is being processed.]");
                 continue;
             }
 
@@ -209,142 +168,34 @@ public partial class LLMClient
             });
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
-            if (!outputOnly)
-                ChatOutput.EndLine();
+            sink.EndLine();
             break;
         }
 
-        if (Cancel.Requested && startBlock != null)
-        {
-            startBlock();
-            ChatOutput.WriteLine("[Stopped]");
-        }
-    }
-
-    /// <summary>
-    /// One model call. Streams [tool call] tags as arguments arrive. A call that
-    /// still needs approval is not tagged here; the approval prompt shows it.
-    /// </summary>
-    private LLMCompletionResponse StreamModelCall(
-        List<ChatMessage> conversation,
-        List<string> enabledTools,
-        HashSet<string> approvalSet,
-        ChatBlockDisplayMode toolCallDisplay,
-        bool outputOnly,
-        List<string> contextInjections,
-        Action startBlock,
-        Action onContentStart)
-    {
-        bool toolCallUiOpen = false;
-        bool toolCallArgsEndedWithNewline = true;
-        bool currentToolCallSuppressed = false;
-        Action<ToolRegistry.ToolCall> toolCallStreamCallback = null;
-        if (!outputOnly)
-        {
-            toolCallStreamCallback = (toolCall) =>
-            {
-                if (!string.IsNullOrEmpty(toolCall.Name) && string.IsNullOrEmpty(toolCall.Arguments))
-                {
-                    if (toolCallUiOpen)
-                    {
-                        if (!toolCallArgsEndedWithNewline)
-                            ChatOutput.WriteLine();
-                        ChatOutput.EndBlock("[/tool call]\n");
-                    }
-
-                    currentToolCallSuppressed = !IsAutoToolApproval() && approvalSet.Contains(toolCall.Name);
-
-                    if (!currentToolCallSuppressed)
-                    {
-                        startBlock();
-                        ChatOutput.BeginBlock(
-                            ChatBlockKind.ToolCall, toolCall.Name, "[tool call] " + toolCall.Name + "\n");
-                        toolCallUiOpen = true;
-                        toolCallArgsEndedWithNewline = true;
-                    }
-                    else
-                    {
-                        toolCallUiOpen = false;
-                    }
-                }
-                else if (!string.IsNullOrEmpty(toolCall.Arguments)
-                    && !currentToolCallSuppressed
-                    && toolCallDisplay != ChatBlockDisplayMode.Hidden)
-                {
-                    ChatOutput.Write(toolCall.Arguments);
-                    toolCallArgsEndedWithNewline = toolCall.Arguments.EndsWith("\n");
-                }
-            };
-        }
-
-        // Some models inline <think>...</think> in their content. The terminal
-        // shows the tags as sent; pipe clients get a thinking block instead.
-        bool inThink = false;
-        Action<string> writeContent = null;
-        writeContent = (text) =>
-        {
-            string tag = inThink ? "</think>" : "<think>";
-            int at = text.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
-            if (at < 0)
-            {
-                ChatOutput.Write(text);
-                return;
-            }
-
-            ChatOutput.Write(text.Substring(0, at));
-            if (inThink)
-                ChatOutput.EndBlock(text.Substring(at, tag.Length));
-            else
-                ChatOutput.BeginBlock(ChatBlockKind.Thinking, null, text.Substring(at, tag.Length));
-            inThink = !inThink;
-            writeContent(text.Substring(at + tag.Length));
-        };
-
-        LLMCompletionResponse response = sendMessages(
-            conversation, enabledTools, writeContent, toolCallStreamCallback,
-            onContentStart, startBlock, outputOnly, contextInjections);
-
-        if (inThink)
-            ChatOutput.EndBlock(null);
-
-        if (toolCallUiOpen)
-        {
-            if (!toolCallArgsEndedWithNewline)
-                ChatOutput.WriteLine();
-            ChatOutput.EndBlock("[/tool call]\n");
-        }
-
-        return response;
+        if (Cancel.Requested)
+            sink.Notice("[Stopped]");
     }
 
     /// <summary>
     /// Records the assistant tool call, then approves and runs each call.
     /// Returns false when output-only mode must stop because a call needs approval.
     /// </summary>
-    private bool RunToolCalls(
-        List<ChatMessage> conversation,
-        string assistantContent,
-        List<ToolRegistry.ToolCall> toolCalls,
-        HashSet<string> enabledSet,
-        HashSet<string> approvalSet,
-        ChatBlockDisplayMode toolOutputDisplay,
-        bool outputOnly,
-        Action startBlock,
-        ref int consecutiveFailedToolCalls,
-        int maxConsecutiveFailedToolCalls)
+    private bool RunToolCalls(Turn turn, LLMCompletionResponse response)
     {
+        List<ChatMessage> conversation = turn.Conversation;
+        TurnSettings settings = turn.Settings;
+        StreamSink sink = turn.Sink;
+
         conversation.Add(new ChatMessage
         {
             Role = "assistant",
             // Keep any text the model sent alongside the calls so it stays in history.
-            Content = assistantContent ?? string.Empty,
-            ToolCalls = toolCalls
+            Content = response.Content ?? string.Empty,
+            ToolCalls = response.ToolCalls
         });
 
-        for (int i = 0; i < toolCalls.Count; i++)
+        foreach (ToolRegistry.ToolCall call in response.ToolCalls)
         {
-            ToolRegistry.ToolCall call = toolCalls[i];
-
             int exitCode = 0;
             string toolContent = string.Empty;
             string toolImage = null;
@@ -357,7 +208,7 @@ public partial class LLMClient
             {
                 // Stopped: skip this call; its result is filled in below.
             }
-            else if (!enabledSet.Contains(call.Name))
+            else if (!settings.EnabledSet.Contains(call.Name))
             {
                 exitCode = -1;
                 toolContent = ToolRegistry.FormatCommandResult(
@@ -366,7 +217,7 @@ public partial class LLMClient
                     exitCode
                 );
             }
-            else if (IsAutoToolApproval())
+            else if (settings.AutoApproval)
             {
                 JevGateDecision decision = JevDecisionClient.Decide(
                     config,
@@ -376,24 +227,22 @@ public partial class LLMClient
                     RecentMessagesForDecision(conversation));
                 if (decision.Choice == JevGateChoice.Allow)
                 {
-                    if (!outputOnly && config.GetConfigBool("showjevconfidence", true))
+                    if (settings.ShowJevConfidence)
                     {
-                        if (startBlock != null)
-                            startBlock();
-                        string approved = decision.Confidence.HasValue
+                        sink.Notice(decision.Confidence.HasValue
                             ? "[" + call.Name + " auto allowed, confidence " + decision.Confidence.Value.ToString("0.00", CultureInfo.InvariantCulture) + "]"
-                            : "[" + call.Name + " auto allowed]";
-                        ChatOutput.WriteLine(approved);
+                            : "[" + call.Name + " auto allowed]");
                     }
                     runTool = true;
                 }
                 else
                 {
                     askUser = true;
-                    jevConfidence = ConfidenceForDisplay(decision.Confidence);
+                    if (settings.ShowJevConfidence)
+                        jevConfidence = decision.Confidence;
                 }
             }
-            else if (approvalSet.Contains(call.Name))
+            else if (settings.ApprovalSet.Contains(call.Name))
             {
                 askUser = true;
             }
@@ -402,18 +251,17 @@ public partial class LLMClient
                 runTool = true;
             }
 
-            if (askUser && outputOnly)
+            if (askUser && settings.OutputOnly)
             {
                 ChatOutput.WriteLine("Error: Model called " + call.Name + " which requires approval");
                 return false;
             }
 
-            // The tool call block itself was already streamed above (if not suppressed
-            // for approval); only pad a blank line before the approval prompt here.
+            // The tool call block itself was already streamed (if not suppressed
+            // for approval); the prompt that follows shows the call.
             if (askUser && !Cancel.Requested)
             {
-                if (!outputOnly && startBlock != null)
-                    startBlock();
+                sink.BeginApproval();
                 if (requestToolApproval(call.Name, call.Arguments, jevConfidence))
                     runTool = true;
                 else
@@ -443,7 +291,7 @@ public partial class LLMClient
             }
 
             ConsecutiveToolFailures.Record(
-                ref consecutiveFailedToolCalls, maxConsecutiveFailedToolCalls, runTool, exitCode);
+                ref turn.ConsecutiveFailedToolCalls, settings.MaxConsecutiveFailures, runTool, exitCode);
 
             conversation.Add(new ChatMessage
             {
@@ -454,22 +302,7 @@ public partial class LLMClient
                 ImageMime = toolImageMime
             });
 
-            if (!outputOnly)
-            {
-                startBlock();
-                ChatOutput.BeginBlock(ChatBlockKind.ToolOutput, null, "[tool output]\n");
-                if (toolOutputDisplay == ChatBlockDisplayMode.Hidden)
-                {
-                    ChatOutput.WriteLine("Exit Code: " + exitCode);
-                }
-                else
-                {
-                    ChatOutput.Write(toolContent ?? "");
-                    if (string.IsNullOrEmpty(toolContent) || !toolContent.EndsWith("\n"))
-                        ChatOutput.WriteLine();
-                }
-                ChatOutput.EndBlock("[/tool output]\n");
-            }
+            sink.ToolOutput(toolContent, exitCode);
         }
 
         return true;
@@ -479,19 +312,18 @@ public partial class LLMClient
     /// If context usage is high, summarize on this thread and replace the conversation
     /// with a compact summary message. The summary text itself is not shown.
     /// </summary>
-    private void MaybeSummarizeInBackground(List<ChatMessage> conversation, bool outputOnly, string continueHint)
+    private void MaybeSummarizeInBackground(Turn turn, string continueHint)
     {
+        List<ChatMessage> conversation = turn.Conversation;
+        StreamSink sink = turn.Sink;
+
         int statusChars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
         PublishStatusTokens(statusChars);
 
         if (!TokenEstimator.ShouldSummarize(statusChars, config.GetConfigInt("contextWindowSize", 0)))
             return;
 
-        if (!outputOnly)
-        {
-            ChatOutput.StartBlock();
-            ChatOutput.WriteLine("[Context usage high - summarizing conversation...]");
-        }
+        sink.Notice("[Context usage high - summarizing conversation...]");
 
         string summary = SummarizeConversation(conversation);
         if (Cancel.Requested)
@@ -502,13 +334,10 @@ public partial class LLMClient
             int dropped = DropOldestMessagesUntilFit(conversation, contextWindow);
             int chars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
             PublishStatusTokens(chars);
-            if (!outputOnly)
-            {
-                if (dropped > 0)
-                    ChatOutput.WriteLine("[Summarization failed - dropped older messages]");
-                if (TokenEstimator.ShouldSummarize(chars, contextWindow))
-                    ChatOutput.WriteLine("[Summarization failed - current turn still exceeds the context window]");
-            }
+            if (dropped > 0)
+                sink.Notice("[Summarization failed - dropped older messages]");
+            if (TokenEstimator.ShouldSummarize(chars, contextWindow))
+                sink.Notice("[Summarization failed - current turn still exceeds the context window]");
             return;
         }
 
@@ -517,8 +346,7 @@ public partial class LLMClient
             "user",
             "[Previous conversation summary]\n" + summary + continueHint));
 
-        if (!outputOnly)
-            ChatOutput.WriteLine("[Conversation summarized - continuing...]");
+        sink.Notice("[Conversation summarized - continuing...]");
 
         PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
     }
@@ -553,21 +381,6 @@ public partial class LLMClient
             dropped++;
         }
         return dropped;
-    }
-
-    private bool IsAutoToolApproval()
-    {
-        return string.Equals(
-            config.GetConfigValue("toolapprovalmode"),
-            "auto",
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private double? ConfidenceForDisplay(double? confidence)
-    {
-        if (!confidence.HasValue || !config.GetConfigBool("showjevconfidence", true))
-            return null;
-        return confidence;
     }
 
     private static List<JevContextMessage> RecentMessagesForDecision(List<ChatMessage> conversation)
@@ -663,8 +476,8 @@ public partial class LLMClient
             "Focus on: the main topics discussed, important details or decisions, " +
             "and anything that still needs follow-up."));
 
-        // No tools, null output — silent background pass.
-        LLMCompletionResponse response = sendMessages(summaryConversation, new List<string>(), null);
+        // No tools, silent sink: a background pass.
+        LLMCompletionResponse response = SendMessages(summaryConversation, new List<string>(), StreamSink.Silent);
         if (response.FinishReason == "request_failed")
             return string.Empty;
 

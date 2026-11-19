@@ -11,41 +11,17 @@ namespace SimpleLLMChatCLI
 {
 public partial class LLMClient
 {
-    LLMCompletionResponse sendMessages(
+    private LLMCompletionResponse SendMessages(
         List<ChatMessage> conversation,
         List<string> enabledTools,
-        Action<string> outputCallback = null,
-        Action<ToolRegistry.ToolCall> toolCallCallback = null,
-        Action onContentStart = null,
-        Action startBlock = null,
-        bool outputOnly = false,
+        StreamSink sink,
         List<string> contextInjections = null)
     {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools, contextInjections), outputCallback, toolCallCallback, onContentStart, startBlock, outputOnly);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools, contextInjections), sink);
     }
 
-    private LLMCompletionResponse SendHttpRequest(JObject payload, Action<string> outputCallback = null,
-        Action<ToolRegistry.ToolCall> toolCallCallback = null,
-        Action onContentStart = null, Action startBlock = null, bool outputOnly = false)
+    private LLMCompletionResponse SendHttpRequest(JObject payload, StreamSink sink)
     {
-        Action<string> onReasoningChunk = null;
-        Action<int> onReasoningSummary = null;
-        if (outputCallback != null && !outputOnly)
-        {
-            bool showThinking = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed)
-                != ChatBlockDisplayMode.Hidden;
-            // Straight to ChatOutput: reasoning text is not scanned for inline <think> tags.
-            onReasoningChunk = showThinking ? (Action<string>)(text => ChatOutput.Write(text)) : null;
-            if (!showThinking)
-            {
-                onReasoningSummary = s =>
-                {
-                    if (startBlock != null) startBlock();
-                    outputCallback("[thought for " + s + " second" + (s == 1 ? "" : "s") + "]\n");
-                };
-            }
-        }
-
         try
         {
             var request = (HttpWebRequest)WebRequest.Create($"{config.GetConfigValue("llmserver")}/chat/completions");
@@ -66,7 +42,7 @@ public partial class LLMClient
             using (var responseStream = httpResponse.GetResponseStream())
             using (var reader = new StreamReader(responseStream, Encoding.UTF8))
             {
-                return SseStreamParser.Parse(reader, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
+                return new SseStreamParser(sink).Read(reader);
             }
         }
         catch (Exception ex)
@@ -92,7 +68,7 @@ public partial class LLMClient
 
             string serverUrl = config.GetConfigValue("llmserver") ?? "";
             if (TlsCurlFallback.CanAttempt(serverUrl, ex))
-                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, outputCallback, onReasoningChunk, onReasoningSummary, toolCallCallback, onContentStart, startBlock);
+                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, sink);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }

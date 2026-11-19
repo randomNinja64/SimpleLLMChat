@@ -1,37 +1,30 @@
 using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
 namespace SimpleLLMChatCLI
 {
-    internal static class SseStreamParser
+    /// <summary>
+    /// Reads one streamed chat completion, sending output to a sink as it arrives.
+    /// </summary>
+    internal sealed class SseStreamParser
     {
-        public static LLMClient.LLMCompletionResponse Parse(
-            TextReader reader,
-            Action<string> onContentChunk,
-            Action<string> onReasoningChunk,
-            Action<int> onReasoningSummary,
-            Action<ToolRegistry.ToolCall> onToolCallChunk = null,
-            Action onContentStart = null,
-            Action startBlock = null)
+        private readonly StreamSink _sink;
+        private readonly StringBuilder _output = new StringBuilder();
+        private readonly Dictionary<int, ToolRegistry.ToolCall> _toolCalls = new Dictionary<int, ToolRegistry.ToolCall>();
+        private readonly Dictionary<int, int> _streamedArgumentLength = new Dictionary<int, int>();
+        private string _finishReason = string.Empty;
+        private bool _inReasoning;
+        private bool _firstContent = true;
+
+        public SseStreamParser(StreamSink sink)
         {
-            LLMClient.LLMCompletionResponse response = new LLMClient.LLMCompletionResponse
-            {
-                Content = string.Empty,
-                ToolCalls = new List<ToolRegistry.ToolCall>(),
-                FinishReason = string.Empty
-            };
+            _sink = sink;
+        }
 
-            StringBuilder output = new StringBuilder();
-            Dictionary<int, ToolRegistry.ToolCall> partialToolCalls = new Dictionary<int, ToolRegistry.ToolCall>();
-            Dictionary<int, int> toolCallArgumentLength = new Dictionary<int, int>();
-            bool inReasoning = false;
-            bool firstContent = true;
-            bool reasoningEndedWithNewline = false;
-            DateTime reasoningStart = DateTime.MinValue;
-
+        public LLMClient.LLMCompletionResponse Read(TextReader reader)
+        {
             string line;
             while (true)
             {
@@ -60,11 +53,7 @@ namespace SimpleLLMChatCLI
                 JToken errorToken = obj["error"];
                 if (errorToken != null && errorToken.Type != JTokenType.Null)
                 {
-                    if (onContentChunk != null)
-                    {
-                        startBlock?.Invoke();
-                        onContentChunk("[API Error] " + jsonPart.Trim() + "\n");
-                    }
+                    _sink.Error("[API Error] " + jsonPart.Trim());
                     continue;
                 }
 
@@ -74,11 +63,7 @@ namespace SimpleLLMChatCLI
                     if (choices == null) continue;
 
                     foreach (JObject choice in choices)
-                    {
-                        ProcessChoice(choice, ref response, output, ref inReasoning, ref firstContent,
-                            ref reasoningEndedWithNewline, ref reasoningStart, partialToolCalls, toolCallArgumentLength,
-                            onContentChunk, onReasoningChunk, onReasoningSummary, onToolCallChunk, onContentStart, startBlock);
-                    }
+                        ProcessChoice(choice);
                 }
                 catch
                 {
@@ -86,87 +71,51 @@ namespace SimpleLLMChatCLI
                 }
             }
 
-            CloseReasoningIfOpen(ref inReasoning, reasoningEndedWithNewline, reasoningStart,
-                onReasoningChunk, onReasoningSummary);
+            CloseReasoningIfOpen();
 
-            response.ToolCalls.AddRange(partialToolCalls.Values);
-            response.Content = output.ToString();
-            return response;
+            return new LLMClient.LLMCompletionResponse(
+                _output.ToString(), new List<ToolRegistry.ToolCall>(_toolCalls.Values), _finishReason);
         }
 
-        private static void ProcessChoice(
-            JObject choice,
-            ref LLMClient.LLMCompletionResponse response,
-            StringBuilder output,
-            ref bool inReasoning,
-            ref bool firstContent,
-            ref bool reasoningEndedWithNewline,
-            ref DateTime reasoningStart,
-            Dictionary<int, ToolRegistry.ToolCall> partialToolCalls,
-            Dictionary<int, int> toolCallArgumentLength,
-            Action<string> onContentChunk,
-            Action<string> onReasoningChunk,
-            Action<int> onReasoningSummary,
-            Action<ToolRegistry.ToolCall> onToolCallChunk,
-            Action onContentStart,
-            Action startBlock)
+        private void ProcessChoice(JObject choice)
         {
             string reasoningChunk = (string)choice["delta"]?["reasoning_content"]
                 ?? (string)choice["delta"]?["reasoning"];
             if (!string.IsNullOrEmpty(reasoningChunk))
             {
-                if (onReasoningChunk != null)
+                if (!_inReasoning)
                 {
-                    if (!inReasoning)
-                    {
-                        startBlock?.Invoke();
-                        ChatOutput.BeginBlock(ChatBlockKind.Thinking, null, "[thinking]\n");
-                        inReasoning = true;
-                    }
-                    onReasoningChunk(reasoningChunk);
-                    reasoningEndedWithNewline = reasoningChunk.EndsWith("\n");
+                    _inReasoning = true;
+                    _sink.ReasoningStarted();
                 }
-                else if (!inReasoning)
-                {
-                    reasoningStart = DateTime.UtcNow;
-                    inReasoning = true;
-                }
+                _sink.Reasoning(reasoningChunk);
             }
 
             string content = (string)choice["delta"]?["content"];
             if (!string.IsNullOrEmpty(content))
             {
-                if (inReasoning)
-                {
-                    bool wasShowingReasoning = onReasoningChunk != null;
-                    CloseReasoningIfOpen(ref inReasoning, reasoningEndedWithNewline, reasoningStart,
-                        onReasoningChunk, onReasoningSummary);
-                    if (wasShowingReasoning)
-                        firstContent = true;
-                }
-                if (firstContent)
-                {
+                // Content after a shown thinking block starts a new block of its own.
+                if (_inReasoning && _sink.ShowsReasoning)
+                    _firstContent = true;
+                CloseReasoningIfOpen();
+
+                if (_firstContent)
                     content = content.TrimStart('\n');
-                    if (content.Length > 0)
-                    {
-                        firstContent = false;
-                        // Lets the caller pad the block and decide whether to
-                        // print the assistant name prefix before the first chunk.
-                        onContentStart?.Invoke();
-                        onContentChunk?.Invoke(content);
-                        output.Append(content);
-                    }
-                }
-                else
+                if (content.Length > 0)
                 {
-                    onContentChunk?.Invoke(content);
-                    output.Append(content);
+                    if (_firstContent)
+                    {
+                        _firstContent = false;
+                        _sink.ContentStart();
+                    }
+                    _sink.Content(content);
+                    _output.Append(content);
                 }
             }
 
             string finishReason = (string)choice["finish_reason"];
             if (!string.IsNullOrEmpty(finishReason))
-                response.FinishReason = finishReason;
+                _finishReason = finishReason;
 
             JArray toolCalls = (JArray)choice["delta"]?["tool_calls"];
             if (toolCalls != null)
@@ -174,90 +123,62 @@ namespace SimpleLLMChatCLI
                 // Close any open thinking block before tool-call UI streams — a model that
                 // reasons and then calls a tool with no text in between would otherwise leave
                 // [thinking] open, and the [tool call] block would render as if nested inside it.
-                CloseReasoningIfOpen(ref inReasoning, reasoningEndedWithNewline, reasoningStart,
-                    onReasoningChunk, onReasoningSummary);
+                CloseReasoningIfOpen();
 
-                AccumulateToolCalls(toolCalls, partialToolCalls, toolCallArgumentLength, onToolCallChunk);
+                AccumulateToolCalls(toolCalls);
             }
         }
 
-        private static void AccumulateToolCalls(
-            JArray toolCalls,
-            Dictionary<int, ToolRegistry.ToolCall> partialToolCalls,
-            Dictionary<int, int> toolCallArgumentLength,
-            Action<ToolRegistry.ToolCall> onToolCallChunk)
+        private void AccumulateToolCalls(JArray toolCalls)
         {
             foreach (JObject call in toolCalls)
             {
                 int index = call["index"]?.Value<int>() ?? 0;
-                if (!partialToolCalls.ContainsKey(index))
+                if (!_toolCalls.ContainsKey(index))
                 {
-                    partialToolCalls[index] = new ToolRegistry.ToolCall();
-                    toolCallArgumentLength[index] = 0;
+                    _toolCalls[index] = new ToolRegistry.ToolCall();
+                    _streamedArgumentLength[index] = 0;
                 }
 
-                ToolRegistry.ToolCall tc = partialToolCalls[index];
+                ToolRegistry.ToolCall tc = _toolCalls[index];
                 string id = (string)call["id"];
                 if (!string.IsNullOrEmpty(id)) tc.Id = id;
 
                 JObject function = (JObject)call["function"];
-                if (function != null)
+                if (function == null)
+                    continue;
+
+                string name = (string)function["name"];
+                string argsChunk = (string)function["arguments"];
+
+                if (!string.IsNullOrEmpty(name))
                 {
-                    string name = (string)function["name"];
-                    string argsChunk = (string)function["arguments"];
+                    tc.Name = name;
+                    // Announce the tool call as soon as its name is known, before any arguments arrive.
+                    if (_streamedArgumentLength[index] == 0)
+                        _sink.ToolCallStarted(name);
+                }
 
-                    if (!string.IsNullOrEmpty(name))
+                if (!string.IsNullOrEmpty(argsChunk))
+                {
+                    tc.Arguments += argsChunk;
+                    // Arguments that arrived before the name are streamed once it is known.
+                    if (!string.IsNullOrEmpty(tc.Name))
                     {
-                        tc.Name = name;
-                        // Announce the tool call as soon as its name is known, before any arguments arrive.
-                        if (onToolCallChunk != null && toolCallArgumentLength[index] == 0)
-                            onToolCallChunk(new ToolRegistry.ToolCall { Name = name, Arguments = "", Id = tc.Id });
-                    }
-
-                    if (!string.IsNullOrEmpty(argsChunk))
-                    {
-                        tc.Arguments += argsChunk;
-                        if (onToolCallChunk != null && !string.IsNullOrEmpty(tc.Name))
-                        {
-                            int alreadyStreamed = toolCallArgumentLength[index];
-                            if (tc.Arguments.Length > alreadyStreamed)
-                            {
-                                string newChunk = tc.Arguments.Substring(alreadyStreamed);
-                                onToolCallChunk(new ToolRegistry.ToolCall { Name = tc.Name, Arguments = newChunk, Id = tc.Id });
-                                toolCallArgumentLength[index] = tc.Arguments.Length;
-                            }
-                        }
+                        _sink.ToolCallArgs(tc.Arguments.Substring(_streamedArgumentLength[index]));
+                        _streamedArgumentLength[index] = tc.Arguments.Length;
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Closes an in-progress reasoning span, if any: emits the [/thinking] closing tag
-        /// when reasoning text is being streamed, or reports the elapsed time via
-        /// <paramref name="onReasoningSummary"/> when reasoning is hidden.
-        /// </summary>
-        private static void CloseReasoningIfOpen(
-            ref bool inReasoning, bool reasoningEndedWithNewline, DateTime reasoningStart,
-            Action<string> onReasoningChunk, Action<int> onReasoningSummary)
+        private void CloseReasoningIfOpen()
         {
-            if (!inReasoning) return;
+            if (!_inReasoning)
+                return;
 
-            if (onReasoningChunk != null)
-            {
-                // Closing tag on its own line; blank line before the next block
-                // comes from the caller's StartBlock.
-                if (!reasoningEndedWithNewline)
-                    onReasoningChunk("\n");
-                ChatOutput.EndBlock("[/thinking]\n");
-            }
-            else
-            {
-                int secs = Math.Max(1, (int)(DateTime.UtcNow - reasoningStart).TotalSeconds);
-                onReasoningSummary?.Invoke(secs);
-            }
-
-            inReasoning = false;
+            _inReasoning = false;
+            _sink.ReasoningEnded();
         }
     }
 }

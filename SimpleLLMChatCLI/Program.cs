@@ -110,15 +110,7 @@ namespace SimpleLLMChatCLI
             // Auto-RAG index check on launch when enabled
             RagHost.Initialize(Config);
 
-            // Get enabled tools
-            List<string> enabledTools = Config.GetConfigList("tools");
-
-            // Get tools requiring approval
-            List<string> toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
-
-            string assistantName = Config.GetConfigValue("assistantname");
-            if (string.IsNullOrWhiteSpace(assistantName))
-                assistantName = AppConstants.DefaultAssistantName;
+            TurnSettings settings = TurnSettings.FromConfig(Config, false);
 
             // Conversation storage
             List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
@@ -215,10 +207,7 @@ namespace SimpleLLMChatCLI
                         textPrompt,
                         base64Image,
                         imageMime,
-                        assistantName,
-                        enabledTools,
-                        toolsRequiringApproval,
-                        outputOnly);
+                        TurnSettings.FromConfig(Config, outputOnly));
                     return;
                 }
             }
@@ -266,13 +255,9 @@ namespace SimpleLLMChatCLI
                         AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
                     registry.Clear();
                     registry.LoadToolsFromDirectory(toolsDir);
-                    enabledTools = Config.GetConfigList("tools");
-                    toolsRequiringApproval = Config.GetConfigList("toolsrequiringapproval");
-                    assistantName = Config.GetConfigValue("assistantname");
-                    if (string.IsNullOrWhiteSpace(assistantName))
-                        assistantName = AppConstants.DefaultAssistantName;
+                    settings = TurnSettings.FromConfig(Config, false);
                     RagHost.OnConfigReloaded(Config);
-                    client.RefreshBaseCharacterOverhead(enabledTools);
+                    client.RefreshBaseCharacterOverhead(settings.EnabledTools);
                     client.PublishStatusTokens(
                         LLMClient.GetConversationCharacterCount(conversation) + client.GetBaseCharacterOverhead());
 
@@ -311,7 +296,7 @@ namespace SimpleLLMChatCLI
                             if (string.Equals(label, "user", StringComparison.OrdinalIgnoreCase))
                                 label = "You";
                             else if (string.Equals(label, "assistant", StringComparison.OrdinalIgnoreCase))
-                                label = assistantName;
+                                label = settings.AssistantName;
                             else if (string.Equals(label, "tool", StringComparison.OrdinalIgnoreCase))
                                 label = "Tool";
                             if (markdown.Length > 0)
@@ -370,14 +355,7 @@ namespace SimpleLLMChatCLI
                 }
 
                 Cancel.Begin();
-                client.ProcessConversation(conversation,
-                                textPrompt,
-                                imageBase64,
-                                imageMime,
-                                assistantName,
-                                enabledTools,
-                                toolsRequiringApproval,
-                                false);
+                client.ProcessConversation(conversation, textPrompt, imageBase64, imageMime, settings);
                 Cancel.End();
             }
         }
