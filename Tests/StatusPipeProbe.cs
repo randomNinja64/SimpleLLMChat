@@ -95,6 +95,56 @@ public sealed class StatusPipeProbe : IDisposable
         return tokens;
     }
 
+    /// <summary>All chat text events received so far, concatenated.</summary>
+    public string ChatText()
+    {
+        StringBuilder sb = new StringBuilder();
+        lock (_gate)
+        {
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                string text;
+                if (StatusPipe.TryParseTextLine(_lines[i], out text))
+                    sb.Append(text);
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Chat events in order, one per line: "text ...", "block Kind name", "endblock".
+    /// Consecutive text events are joined.
+    /// </summary>
+    public string ChatEvents()
+    {
+        StringBuilder sb = new StringBuilder();
+        bool inText = false;
+        lock (_gate)
+        {
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                string text, name;
+                ChatBlockKind kind;
+                if (StatusPipe.TryParseTextLine(_lines[i], out text))
+                {
+                    sb.Append(inText ? "" : "\ntext ").Append(text.Replace("\n", "\\n"));
+                    inText = true;
+                }
+                else if (StatusPipe.TryParseBlockLine(_lines[i], out kind, out name))
+                {
+                    sb.Append("\nblock " + kind + " " + name);
+                    inText = false;
+                }
+                else if (StatusPipe.TryParseEndBlockLine(_lines[i]))
+                {
+                    sb.Append("\nendblock");
+                    inText = false;
+                }
+            }
+        }
+        return sb.Append('\n').ToString();
+    }
+
     public bool WaitForReady(int timeoutMs)
     {
         return WaitFor(line => StatusPipe.TryParseReadyLine(line), timeoutMs);

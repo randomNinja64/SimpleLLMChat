@@ -88,6 +88,54 @@ namespace SimpleLLMChatGUI.Tests
                 }
             });
 
+            TestRunner.Run("gui.model_tag_text_kept", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageGuiWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    // Tag-like text from the model is content, not block structure.
+                    server.EnqueueContent("before [tool output] middle [/tool output] [thinking] after");
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
+
+                    using (GuiDriver gui = new GuiDriver(ws.Path))
+                    {
+                        gui.WaitUntilReady(30000);
+                        gui.SendTurn("show [/thinking] tags", 60000);
+
+                        TestAssert.True(gui.WaitForChatText("after", 10000), "reply shown");
+                        string chat = gui.ReadChatText();
+                        TestAssert.Contains(chat, "You: show [/thinking] tags", "user tags kept");
+                        TestAssert.Contains(
+                            chat, "before [tool output] middle [/tool output] [thinking] after", "model tags kept");
+                    }
+                }
+            });
+
+            TestRunner.Run("gui.reasoning_field_thinking_block", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageGuiWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueReasoningThenContent("mulling it over", "reasoned-answer");
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
+
+                    using (GuiDriver gui = new GuiDriver(ws.Path))
+                    {
+                        gui.WaitUntilReady(30000);
+                        gui.SendTurn("hello", 60000);
+
+                        TestAssert.True(gui.WaitForChatText("reasoned-answer", 10000), "reply shown");
+                        string chat = gui.ReadChatText();
+                        TestLog.Detail("chat text: " + chat);
+                        // Collapsed by default: the finished block's header reads "thought for N seconds".
+                        TestAssert.Contains(chat, "thought for ", "thinking block header");
+                        TestAssert.True(chat.IndexOf("thinking]", StringComparison.Ordinal) < 0, "no tags shown");
+                    }
+                }
+            });
+
             TestRunner.Run("gui.approval_dialog_runs_tool", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

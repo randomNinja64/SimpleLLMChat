@@ -805,7 +805,7 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
-            TestRunner.Run("cli.no_user_prompts_hides_you_prompt", () =>
+            TestRunner.Run("cli.pipe_text_omits_you_prompt", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
                 using (TempWorkspace ws = PackageCliWorkspace())
@@ -813,18 +813,9 @@ namespace SimpleLLMChatCLI.Tests
                     server.StreamDelayMs = 0;
                     server.EnqueueContent("dialogue:\nYou: from-model");
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
-                    string exe = Path.Combine(ws.Path, "SimpleLLMChatCLI.exe");
 
-                    // Without the flag the prompt is printed.
-                    using (CliProcess cli = new CliProcess(exe, "--no-banners", ws.Path))
-                    {
-                        TestAssert.True(WaitStdoutContains(cli, "You: ", 15000), "prompt shown by default");
-                        cli.WriteLine("/exit");
-                        TestAssert.True(cli.WaitForExit(10000), "exit default");
-                    }
-
-                    // With the flag the only "You:" on stdout is the model's own text.
-                    using (CliProcess cli = new CliProcess(exe, "--no-banners --no-user-prompts", ws.Path))
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
                     using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
                     {
                         probe.Start();
@@ -834,17 +825,19 @@ namespace SimpleLLMChatCLI.Tests
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
 
-                        string stdout = cli.Stdout.Replace("\r\n", "\n");
-                        TestAssert.Contains(stdout, "\nYou: from-model", "model line kept");
+                        // The terminal gets the prompt; the pipe only the model's own "You:".
+                        TestAssert.True(cli.Stdout.StartsWith("You: ", StringComparison.Ordinal), "prompt on stdout");
+                        string chat = probe.ChatText();
+                        TestAssert.Contains(chat, "dialogue:\nYou: from-model", "model line on pipe");
                         TestAssert.Equal(
-                            stdout.IndexOf("You:", StringComparison.Ordinal),
-                            stdout.LastIndexOf("You:", StringComparison.Ordinal),
-                            "no prompt printed");
+                            chat.IndexOf("You:", StringComparison.Ordinal),
+                            chat.LastIndexOf("You:", StringComparison.Ordinal),
+                            "no prompt on pipe");
                     }
                 }
             });
 
-            TestRunner.Run("cli.no_user_prompts_hides_approval_prompt", () =>
+            TestRunner.Run("cli.pipe_tool_blocks_and_no_approval_prompt", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
                 using (TempWorkspace ws = PackageCliWorkspace())
@@ -853,37 +846,122 @@ namespace SimpleLLMChatCLI.Tests
                         TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
 
                     server.StreamDelayMs = 0;
+                    // First call runs unprompted, second needs approval.
                     server.EnqueueToolCall(
                         "run_shell_command",
-                        "call_no_prompt",
-                        "{\"command\":\"echo NO_PROMPT_OK\"}");
-                    server.EnqueueContent("no-prompt-final");
-                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
+                        "call_pipe_block",
+                        "{\"command\":\"echo PIPE_BLOCK_OK\"}");
+                    server.EnqueueContent("pipe-block-final");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "");
 
                     using (CliProcess cli = new CliProcess(
-                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
-                        "--no-banners --no-user-prompts",
-                        ws.Path))
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
                     using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
                         cli.WriteLine("please run the command");
+                        TestAssert.True(WaitStdoutContains(cli, "pipe-block-final", 20000), "final");
+
+                        // Now require approval and run it again.
+                        server.EnqueueToolCall(
+                            "run_shell_command",
+                            "call_pipe_approve",
+                            "{\"command\":\"echo PIPE_APPROVE_OK\"}");
+                        server.EnqueueContent("pipe-approve-final");
+                        File.AppendAllText(
+                            Path.Combine(ws.Path, "LLMSettings.ini"),
+                            "\r\ntoolsrequiringapproval=run_shell_command\r\n");
+                        cli.WriteLine("/reload");
+                        cli.WriteLine("again please");
                         string tool, args;
                         TestAssert.True(probe.WaitForApproval(20000, out tool, out args, out _), "approval on pipe");
-                        TestAssert.Equal("run_shell_command", tool, "tool");
-                        TestAssert.True(WaitStdoutContains(cli, "Run tool: run_shell_command", 5000), "approval message kept");
-
-                        // Still reads the answer from stdin with no prompt printed.
+                        TestAssert.True(WaitStdoutContains(cli, "Approve? (Y/N): ", 5000), "prompt on stdout");
                         cli.WriteLine("Y");
-                        TestAssert.True(WaitStdoutContains(cli, "no-prompt-final", 20000), "final");
+                        TestAssert.True(WaitStdoutContains(cli, "pipe-approve-final", 20000), "approved final");
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
 
-                        TestAssert.ContainsIgnoreCase(cli.Stdout, "NO_PROMPT_OK", "approved tool ran");
-                        TestAssert.True(
-                            cli.Stdout.IndexOf("Approve?", StringComparison.Ordinal) < 0,
-                            "no approval prompt");
+                        // Terminal keeps the tags.
+                        TestAssert.Contains(cli.Stdout, "[tool call] run_shell_command", "stdout tool call tag");
+                        TestAssert.Contains(cli.Stdout, "[/tool output]", "stdout tool output tag");
+
+                        // Pipe carries blocks as events and neither tags nor prompts as text.
+                        string events = probe.ChatEvents();
+                        TestLog.Detail("chat events:" + events);
+                        TestAssert.Contains(events, "\nblock ToolCall run_shell_command\ntext {\"command\":\"echo PIPE_BLOCK_OK\"}", "tool call block");
+                        TestAssert.Contains(events, "\nblock ToolOutput \ntext ", "tool output block");
+                        TestAssert.Contains(events, "\nendblock\n", "block end");
+                        string chat = probe.ChatText();
+                        TestAssert.ContainsIgnoreCase(chat, "PIPE_APPROVE_OK", "approved tool output on pipe");
+                        TestAssert.Contains(chat, "Run tool: run_shell_command", "approval message on pipe");
+                        TestAssert.True(chat.IndexOf("Approve?", StringComparison.Ordinal) < 0, "no approval prompt on pipe");
+                        TestAssert.True(chat.IndexOf("[tool", StringComparison.Ordinal) < 0, "no open tags on pipe");
+                        TestAssert.True(chat.IndexOf("[/tool", StringComparison.Ordinal) < 0, "no close tags on pipe");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.pipe_inline_think_block", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    // 16-char stream chunks: "<think>pondering" then "</think>answer".
+                    server.EnqueueContent("<think>pondering</think>answer");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("hello");
+                        TestAssert.True(WaitStdoutContains(cli, "answer", 20000), "reply");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+
+                        TestAssert.Contains(cli.Stdout, "<think>pondering</think>answer", "stdout unchanged");
+                        string events = probe.ChatEvents();
+                        TestLog.Detail("chat events:" + events);
+                        TestAssert.Contains(events, "\nblock Thinking \ntext pondering\nendblock\ntext answer", "thinking block");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.pipe_reasoning_field_block", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueReasoningThenContent("mulling it over", "reasoned-answer");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
+                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("hello");
+                        TestAssert.True(WaitStdoutContains(cli, "reasoned-answer", 20000), "reply");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+
+                        TestAssert.Contains(
+                            cli.Stdout.Replace("\r\n", "\n"),
+                            "[thinking]\nmulling it over\n[/thinking]\n",
+                            "stdout tags");
+                        string events = probe.ChatEvents();
+                        TestLog.Detail("chat events:" + events);
+                        TestAssert.Contains(
+                            events, "\nblock Thinking \ntext mulling it over\\n\nendblock\ntext ", "thinking block");
+                        string chat = probe.ChatText();
+                        TestAssert.Contains(chat, "reasoned-answer", "answer on pipe");
+                        TestAssert.True(chat.IndexOf("thinking]", StringComparison.Ordinal) < 0, "no tags on pipe");
                     }
                 }
             });

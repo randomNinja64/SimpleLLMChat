@@ -63,6 +63,7 @@ public sealed class FakeOpenAiServer : IDisposable
         public bool IsApiError;
         public bool IncludeNullError;
         public string Content;
+        public string Reasoning;
         public string ToolName;
         public string ToolId;
         public string ToolArguments;
@@ -129,6 +130,19 @@ public sealed class FakeOpenAiServer : IDisposable
             _script.Enqueue(new ScriptedReply
             {
                 IsToolCall = false,
+                Content = content ?? ""
+            });
+        }
+    }
+
+    /// <summary>Streams a reasoning_content delta, then the content.</summary>
+    public void EnqueueReasoningThenContent(string reasoning, string content)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                Reasoning = reasoning ?? "",
                 Content = content ?? ""
             });
         }
@@ -282,7 +296,17 @@ public sealed class FakeOpenAiServer : IDisposable
             else if (scripted != null && scripted.IsToolCall)
                 WriteToolCallSse(output, scripted);
             else
+            {
+                if (scripted != null && !string.IsNullOrEmpty(scripted.Reasoning))
+                {
+                    byte[] reasoning = Encoding.UTF8.GetBytes(
+                        "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"" +
+                        EscapeJson(scripted.Reasoning) + "\"}}]}\n\n");
+                    output.Write(reasoning, 0, reasoning.Length);
+                    output.Flush();
+                }
                 WriteContentSse(output, ResolveContent(scripted), scripted != null && scripted.IncludeNullError);
+            }
         }
         ctx.Response.Close();
     }
