@@ -7,6 +7,11 @@ set OUT=%ROOT%SimpleLLMChat
 for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -prerelease -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe`) do set MSBUILD=%%i
 if not defined MSBUILD (echo ERROR: MSBuild not found. & exit /b 1)
 
+:: Restore NuGet packages (packages.config) into packages\
+echo Restoring packages ...
+"%MSBUILD%" "%ROOT%SimpleLLMChat.sln" /t:Restore /p:RestorePackagesConfig=true /v:minimal || exit /b %ERRORLEVEL%
+echo.
+
 :: Build solution
 echo Building solution ...
 "%MSBUILD%" "%ROOT%SimpleLLMChat.sln" /p:Configuration=Release /m /v:minimal || exit /b %ERRORLEVEL%

@@ -18,6 +18,14 @@ if not defined MSBUILD (echo ERROR: MSBuild not found. & exit /b 1)
 
 
 
+echo === Restoring NuGet packages ===
+
+"%MSBUILD%" "%ROOT%SimpleLLMChat.sln" /t:Restore /p:RestorePackagesConfig=true /v:minimal || exit /b %ERRORLEVEL%
+
+echo.
+
+
+
 echo === Building product solution (Release) ===
 
 "%MSBUILD%" "%ROOT%SimpleLLMChat.sln" /p:Configuration=Release /m /v:minimal || exit /b %ERRORLEVEL%
