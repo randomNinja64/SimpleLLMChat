@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-public static partial class StatusPipe
+public static partial class ChatPipe
 {
     public const string IndexingPrefix = "STATUS indexing=";
 
@@ -86,7 +86,7 @@ public static partial class StatusPipe
     }
 }
 
-/// <summary>Parsed indexing progress event from the status pipe.</summary>
+/// <summary>Parsed indexing progress event from the chat pipe.</summary>
 public sealed class IndexingStatusEvent
 {
     public string Phase;

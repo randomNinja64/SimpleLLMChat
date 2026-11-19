@@ -53,7 +53,7 @@
     <Compile Include="LLMClient.Request.cs" />
     <Compile Include="LLMClient.Http.cs" />
     <Compile Include="SseStreamParser.cs" />
-    <Compile Include="StatusPipeServer.cs" />
+    <Compile Include="ChatPipeServer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ToolRegistry.cs" />
@@ -102,23 +102,23 @@
     <Compile Include="..\Shared\JsonHttpClient.cs">
       <Link>Shared\JsonHttpClient.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe\StatusPipe.cs">
-      <Link>Shared\StatusPipe\StatusPipe.cs</Link>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.cs">
+      <Link>Shared\ChatPipe\ChatPipe.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe\StatusPipe.Chat.cs">
-      <Link>Shared\StatusPipe\StatusPipe.Chat.cs</Link>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.Chat.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Chat.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe\StatusPipe.Tokens.cs">
-      <Link>Shared\StatusPipe\StatusPipe.Tokens.cs</Link>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.Tokens.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Tokens.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe\StatusPipe.Indexing.cs">
-      <Link>Shared\StatusPipe\StatusPipe.Indexing.cs</Link>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.Indexing.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Indexing.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe\StatusPipe.Ready.cs">
-      <Link>Shared\StatusPipe\StatusPipe.Ready.cs</Link>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.Ready.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Ready.cs</Link>
     </Compile>
-    <Compile Include="..\Shared\StatusPipe\StatusPipe.Approval.cs">
-      <Link>Shared\StatusPipe\StatusPipe.Approval.cs</Link>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.Approval.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Approval.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>

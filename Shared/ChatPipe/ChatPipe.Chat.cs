@@ -11,7 +11,7 @@ public enum ChatBlockKind
     ToolOutput
 }
 
-public static partial class StatusPipe
+public static partial class ChatPipe
 {
     public const string TextPrefix = "TEXT ";
     public const string StartBlockPrefix = "STARTBLOCK ";

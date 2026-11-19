@@ -604,10 +604,10 @@ public partial class LLMClient
 
     public void PublishStatusTokens(int characterCount)
     {
-        if (Program.StatusPipe == null)
+        if (Program.Pipe == null)
             return;
 
-        Program.StatusPipe.PublishStatus(TokenEstimator.ApproximateTokens(characterCount));
+        Program.Pipe.PublishStatus(TokenEstimator.ApproximateTokens(characterCount));
     }
 
     /// <summary>

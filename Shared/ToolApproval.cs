@@ -2,7 +2,7 @@ using System;
 
 /// <summary>
 /// Shared tool-approval prompt text for TTY stdout and GUI MessageBox formatting.
-/// GUI turn/approval control uses StatusPipe (STATUS approval), not stdout scraping.
+/// GUI turn/approval control uses ChatPipe (STATUS approval), not stdout scraping.
 /// </summary>
 public static class ToolApproval
 {

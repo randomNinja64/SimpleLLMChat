@@ -5,9 +5,9 @@ using System.Text;
 using System.Threading;
 
 /// <summary>
-/// GUI-side named pipe client. Connects to SimpleLLMChat.Status.{cliPid} and raises events.
+/// GUI-side named pipe client. Connects to SimpleLLMChat.Chat.{cliPid} and raises events.
 /// </summary>
-public sealed class StatusPipeClient : IDisposable
+public sealed class ChatPipeClient : IDisposable
 {
     private readonly int _processId;
     private Thread _thread;
@@ -22,7 +22,7 @@ public sealed class StatusPipeClient : IDisposable
     public event Action<ChatBlockKind, string> BlockStarted;
     public event Action BlockEnded;
 
-    public StatusPipeClient(int processId)
+    public ChatPipeClient(int processId)
     {
         _processId = processId;
     }
@@ -35,13 +35,13 @@ public sealed class StatusPipeClient : IDisposable
         _running = true;
         _thread = new Thread(ClientLoop);
         _thread.IsBackground = true;
-        _thread.Name = "StatusPipeClient";
+        _thread.Name = "ChatPipeClient";
         _thread.Start();
     }
 
     private void ClientLoop()
     {
-        string pipeName = StatusPipe.GetPipeName(_processId);
+        string pipeName = ChatPipe.GetPipeName(_processId);
         int attempt = 0;
 
         while (_running && attempt < 50)
@@ -61,7 +61,7 @@ public sealed class StatusPipeClient : IDisposable
                             break;
 
                         string text;
-                        if (StatusPipe.TryParseTextLine(line, out text))
+                        if (ChatPipe.TryParseTextLine(line, out text))
                         {
                             Action<string> handler = TextReceived;
                             if (handler != null)
@@ -71,7 +71,7 @@ public sealed class StatusPipeClient : IDisposable
 
                         ChatBlockKind blockKind;
                         string blockName;
-                        if (StatusPipe.TryParseBlockLine(line, out blockKind, out blockName))
+                        if (ChatPipe.TryParseBlockLine(line, out blockKind, out blockName))
                         {
                             Action<ChatBlockKind, string> handler = BlockStarted;
                             if (handler != null)
@@ -79,7 +79,7 @@ public sealed class StatusPipeClient : IDisposable
                             continue;
                         }
 
-                        if (StatusPipe.TryParseEndBlockLine(line))
+                        if (ChatPipe.TryParseEndBlockLine(line))
                         {
                             Action handler = BlockEnded;
                             if (handler != null)
@@ -87,7 +87,7 @@ public sealed class StatusPipeClient : IDisposable
                             continue;
                         }
 
-                        if (StatusPipe.TryParseReadyLine(line))
+                        if (ChatPipe.TryParseReadyLine(line))
                         {
                             Action handler = ReadyReceived;
                             if (handler != null)
@@ -98,7 +98,7 @@ public sealed class StatusPipeClient : IDisposable
                         string approvalTool;
                         string approvalArgs;
                         string approvalConfidence;
-                        if (StatusPipe.TryParseApprovalLine(line, out approvalTool, out approvalArgs, out approvalConfidence))
+                        if (ChatPipe.TryParseApprovalLine(line, out approvalTool, out approvalArgs, out approvalConfidence))
                         {
                             Action<string, string, string> handler = ApprovalReceived;
                             if (handler != null)
@@ -107,7 +107,7 @@ public sealed class StatusPipeClient : IDisposable
                         }
 
                         int tokens;
-                        if (StatusPipe.TryParseStatusLine(line, out tokens))
+                        if (ChatPipe.TryParseStatusLine(line, out tokens))
                         {
                             Action<int> handler = StatusReceived;
                             if (handler != null)
@@ -116,7 +116,7 @@ public sealed class StatusPipeClient : IDisposable
                         }
 
                         IndexingStatusEvent indexing;
-                        if (StatusPipe.TryParseIndexingLine(line, out indexing))
+                        if (ChatPipe.TryParseIndexingLine(line, out indexing))
                         {
                             Action<IndexingStatusEvent> indexingHandler = IndexingStatusReceived;
                             if (indexingHandler != null)

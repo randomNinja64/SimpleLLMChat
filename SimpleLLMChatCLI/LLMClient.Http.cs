@@ -104,14 +104,14 @@ public partial class LLMClient
         {
             string confidenceText = confidence.Value.ToString("0.00", CultureInfo.InvariantCulture);
             ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments, confidenceText));
-            if (Program.StatusPipe != null)
-                Program.StatusPipe.PublishDiscrete(StatusPipe.FormatApproval(toolName, arguments, confidence.Value));
+            if (Program.Pipe != null)
+                Program.Pipe.PublishDiscrete(ChatPipe.FormatApproval(toolName, arguments, confidence.Value));
         }
         else
         {
             ChatOutput.WriteLine(ToolApproval.FormatApprovalMessage(toolName, arguments));
-            if (Program.StatusPipe != null)
-                Program.StatusPipe.PublishDiscrete(StatusPipe.FormatApproval(toolName, arguments));
+            if (Program.Pipe != null)
+                Program.Pipe.PublishDiscrete(ChatPipe.FormatApproval(toolName, arguments));
         }
         Console.Out.Flush();
 

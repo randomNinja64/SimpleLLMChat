@@ -9,7 +9,7 @@ namespace SimpleLLMChatCLI
     internal class Program
     {
         public static ConfigHandler Config;
-        public static StatusPipeServer StatusPipe;
+        public static ChatPipeServer Pipe;
 
         // Print interactive CLI instructions
         private static readonly string[] ValidReasoningEfforts =
@@ -74,9 +74,9 @@ namespace SimpleLLMChatCLI
             Config = new ConfigHandler(Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
 
-            // Always-on status pipe for GUI (and optional external monitors)
-            StatusPipe = new StatusPipeServer();
-            StatusPipe.Start();
+            // Always-on chat pipe for GUI (and optional external monitors)
+            Pipe = new ChatPipeServer();
+            Pipe.Start();
             Cancel.Listen();
 
             try
@@ -85,10 +85,10 @@ namespace SimpleLLMChatCLI
             }
             finally
             {
-                if (StatusPipe != null)
+                if (Pipe != null)
                 {
-                    StatusPipe.Dispose();
-                    StatusPipe = null;
+                    Pipe.Dispose();
+                    Pipe = null;
                 }
             }
         }
@@ -230,7 +230,7 @@ namespace SimpleLLMChatCLI
                 // how the previous turn's output ended.
                 ChatOutput.StartBlock();
                 ChatOutput.Write("You: ", false);
-                StatusPipe.PublishDiscrete(global::StatusPipe.ReadyLine);
+                Pipe.PublishDiscrete(ChatPipe.ReadyLine);
                 string userInput = Console.ReadLine();
                 ChatOutput.EndInputLine();
 

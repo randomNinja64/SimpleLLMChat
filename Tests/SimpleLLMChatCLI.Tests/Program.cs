@@ -269,7 +269,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "startup ready");
@@ -325,7 +325,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -348,24 +348,24 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
-            TestRunner.Run("StatusPipe.ready_parse", () =>
+            TestRunner.Run("ChatPipe.ready_parse", () =>
             {
-                TestAssert.True(StatusPipe.TryParseReadyLine(StatusPipe.ReadyLine), "ready");
-                TestAssert.True(!StatusPipe.TryParseReadyLine("STATUS tokens=1"), "not ready");
+                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.ReadyLine), "ready");
+                TestAssert.True(!ChatPipe.TryParseReadyLine("STATUS tokens=1"), "not ready");
             });
 
-            TestRunner.Run("StatusPipe.approval_roundtrip", () =>
+            TestRunner.Run("ChatPipe.approval_roundtrip", () =>
             {
                 string args = "{\"command\":\"echo hi\\nnext\"}";
-                string line = StatusPipe.FormatApproval("run_shell_command", args);
+                string line = ChatPipe.FormatApproval("run_shell_command", args);
                 string name, parsed, confidence;
-                TestAssert.True(StatusPipe.TryParseApprovalLine(line, out name, out parsed, out confidence), "parse");
+                TestAssert.True(ChatPipe.TryParseApprovalLine(line, out name, out parsed, out confidence), "parse");
                 TestAssert.Equal("run_shell_command", name, "name");
                 TestAssert.Equal(args, parsed, "args");
                 TestAssert.True(string.IsNullOrEmpty(confidence), "no confidence");
 
-                string withConfidence = StatusPipe.FormatApproval("run_shell_command", args, 0.91);
-                TestAssert.True(StatusPipe.TryParseApprovalLine(withConfidence, out name, out parsed, out confidence), "parse confidence");
+                string withConfidence = ChatPipe.FormatApproval("run_shell_command", args, 0.91);
+                TestAssert.True(ChatPipe.TryParseApprovalLine(withConfidence, out name, out parsed, out confidence), "parse confidence");
                 TestAssert.Equal("0.91", confidence, "confidence");
                 TestAssert.Equal(args, parsed, "args with confidence");
             });
@@ -429,7 +429,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -468,7 +468,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -495,7 +495,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -561,7 +561,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -692,7 +692,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -739,7 +739,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -786,7 +786,7 @@ namespace SimpleLLMChatCLI.Tests
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
                         ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -816,7 +816,7 @@ namespace SimpleLLMChatCLI.Tests
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -856,7 +856,7 @@ namespace SimpleLLMChatCLI.Tests
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -914,7 +914,7 @@ namespace SimpleLLMChatCLI.Tests
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");
@@ -942,7 +942,7 @@ namespace SimpleLLMChatCLI.Tests
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"), "--no-banners", ws.Path))
-                    using (StatusPipeProbe probe = new StatusPipeProbe(cli.Id))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
                     {
                         probe.Start();
                         TestAssert.True(probe.WaitForReady(15000), "ready");

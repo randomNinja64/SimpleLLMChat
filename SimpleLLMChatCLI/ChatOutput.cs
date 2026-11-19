@@ -28,18 +28,18 @@ namespace SimpleLLMChatCLI
         public static void BeginBlock(ChatBlockKind kind, string name, string consoleTag)
         {
             Write(consoleTag, false);
-            Publish(StatusPipe.StartBlockPrefix + kind + " " + StatusPipe.SanitizeToken(name));
+            Publish(ChatPipe.StartBlockPrefix + kind + " " + ChatPipe.SanitizeToken(name));
         }
 
         public static void EndBlock(string consoleTag)
         {
             Write(consoleTag, false);
-            Publish(StatusPipe.EndBlockLine);
+            Publish(ChatPipe.EndBlockLine);
         }
 
         private static void Publish(string line)
         {
-            StatusPipeServer pipe = Program.StatusPipe;
+            ChatPipeServer pipe = Program.Pipe;
             if (pipe != null)
                 pipe.PublishEvent(line);
         }
@@ -50,7 +50,7 @@ namespace SimpleLLMChatCLI
         /// separated by exactly one blank line even when the model streams
         /// extra trailing newlines, and keeps StartBlock's tracking accurate.
         /// All chat output must flow through here; it is also streamed to the
-        /// status pipe as text events. Pass toPipe false for terminal-only text
+        /// chat pipe as text events. Pass toPipe false for terminal-only text
         /// (input prompts, block tags): pipe clients draw their own prompts and
         /// receive block events.
         /// </summary>
@@ -110,7 +110,7 @@ namespace SimpleLLMChatCLI
                 // Flush so streaming matches NyoCoder's direct UI callback.
                 Console.Out.Flush();
                 if (toPipe)
-                    Publish(StatusPipe.TextPrefix + StatusPipe.EncodePipeArg(sb.ToString()));
+                    Publish(ChatPipe.TextPrefix + ChatPipe.EncodePipeArg(sb.ToString()));
             }
         }
 

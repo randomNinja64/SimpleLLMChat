@@ -4,7 +4,7 @@ using System.Threading;
 namespace SimpleLLMChatCLI.RAG
 {
     /// <summary>
-    /// CLI host for indexing lifecycle, status-pipe progress, and deferred error reporting.
+    /// CLI host for indexing lifecycle, chat-pipe progress, and deferred error reporting.
     /// Serializes indexing with a single-run guard (concurrent requests are dropped; a
     /// reconcile request that arrives while busy is remembered and runs once afterward).
     /// </summary>
@@ -168,43 +168,43 @@ namespace SimpleLLMChatCLI.RAG
 
         private static void OnProgress(IndexProgress progress)
         {
-            if (progress == null || Program.StatusPipe == null)
+            if (progress == null || Program.Pipe == null)
             {
-                if (progress != null && string.Equals(progress.Phase, StatusPipe.IndexingPhaseError, StringComparison.OrdinalIgnoreCase))
+                if (progress != null && string.Equals(progress.Phase, ChatPipe.IndexingPhaseError, StringComparison.OrdinalIgnoreCase))
                     RememberError(progress.Message);
                 return;
             }
 
-            if (string.Equals(progress.Phase, StatusPipe.IndexingPhaseStart, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseStart, StringComparison.OrdinalIgnoreCase))
             {
-                Program.StatusPipe.PublishLine(StatusPipe.FormatIndexingStart(progress.Total));
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingStart(progress.Total));
             }
-            else if (string.Equals(progress.Phase, StatusPipe.IndexingPhaseProgress, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseProgress, StringComparison.OrdinalIgnoreCase))
             {
-                Program.StatusPipe.PublishLine(StatusPipe.FormatIndexingProgress(
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingProgress(
                     progress.Current, progress.Total, progress.File));
             }
-            else if (string.Equals(progress.Phase, StatusPipe.IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))
             {
-                Program.StatusPipe.PublishLine(StatusPipe.FormatIndexingDone(progress.FileCount));
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingDone(progress.FileCount));
                 lock (Sync) { _pendingError = null; }
             }
-            else if (string.Equals(progress.Phase, StatusPipe.IndexingPhaseCleared, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseCleared, StringComparison.OrdinalIgnoreCase))
             {
-                Program.StatusPipe.PublishLine(StatusPipe.FormatIndexingCleared());
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingCleared());
                 lock (Sync) { _pendingError = null; }
             }
-            else if (string.Equals(progress.Phase, StatusPipe.IndexingPhaseError, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseError, StringComparison.OrdinalIgnoreCase))
             {
-                Program.StatusPipe.PublishLine(StatusPipe.FormatIndexingError(progress.Message));
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingError(progress.Message));
                 RememberError(progress.Message);
             }
         }
 
         private static void PublishError(string message)
         {
-            if (Program.StatusPipe != null)
-                Program.StatusPipe.PublishLine(StatusPipe.FormatIndexingError(message));
+            if (Program.Pipe != null)
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingError(message));
             RememberError(message);
         }
 

@@ -5,7 +5,7 @@ using System.Windows;
 namespace SimpleLLMChatGUI
 {
     /// <summary>
-    /// Holds latest RAG indexing status from the CLI status pipe for the Options RAG pane
+    /// Holds latest RAG indexing status from the CLI chat pipe for the Options RAG pane
     /// (NyoCoder-style brief + detail lines).
     /// </summary>
     public sealed class IndexingStatusSnapshot
@@ -47,7 +47,7 @@ namespace SimpleLLMChatGUI
             string detail;
             bool busy = false;
 
-            if (string.Equals(status.Phase, StatusPipe.IndexingPhaseStart, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(status.Phase, ChatPipe.IndexingPhaseStart, StringComparison.OrdinalIgnoreCase))
             {
                 brief = status.Total > 0
                     ? string.Format(CultureInfo.CurrentCulture, "Indexing... 0/{0}", status.Total)
@@ -55,7 +55,7 @@ namespace SimpleLLMChatGUI
                 detail = "Scanning knowledge folder.";
                 busy = true;
             }
-            else if (string.Equals(status.Phase, StatusPipe.IndexingPhaseProgress, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(status.Phase, ChatPipe.IndexingPhaseProgress, StringComparison.OrdinalIgnoreCase))
             {
                 brief = string.Format(CultureInfo.CurrentCulture, "Indexing... {0}/{1}",
                     status.Current, status.Total);
@@ -64,20 +64,20 @@ namespace SimpleLLMChatGUI
                     : "Current file: " + status.File;
                 busy = true;
             }
-            else if (string.Equals(status.Phase, StatusPipe.IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(status.Phase, ChatPipe.IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))
             {
                 brief = status.FileCount > 0 ? "Index: Ready" : "Index: Empty";
                 detail = string.Format(CultureInfo.CurrentCulture,
                     "{0} file(s) in index.", status.FileCount);
                 busy = false;
             }
-            else if (string.Equals(status.Phase, StatusPipe.IndexingPhaseCleared, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(status.Phase, ChatPipe.IndexingPhaseCleared, StringComparison.OrdinalIgnoreCase))
             {
                 brief = "Index: cleared";
                 detail = "On-disk index removed. Run Index Now to rebuild.";
                 busy = false;
             }
-            else if (string.Equals(status.Phase, StatusPipe.IndexingPhaseError, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(status.Phase, ChatPipe.IndexingPhaseError, StringComparison.OrdinalIgnoreCase))
             {
                 string err = string.IsNullOrEmpty(status.Message) ? "unknown" : status.Message.Trim();
                 brief = "Index: error";

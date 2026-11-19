@@ -9,7 +9,7 @@ using System.Threading;
 /// CLI-side named pipe server. Listens on a background thread; PublishLine is a no-op when disconnected.
 /// Identical consecutive lines are deduped (tokens and indexing).
 /// </summary>
-public sealed class StatusPipeServer : IDisposable
+public sealed class ChatPipeServer : IDisposable
 {
     private readonly string _pipeName;
     private readonly object _sync = new object();
@@ -19,9 +19,9 @@ public sealed class StatusPipeServer : IDisposable
     private StreamWriter _writer;
     private string _lastLine = string.Empty;
 
-    public StatusPipeServer()
+    public ChatPipeServer()
     {
-        _pipeName = StatusPipe.GetPipeName(System.Diagnostics.Process.GetCurrentProcess().Id);
+        _pipeName = ChatPipe.GetPipeName(System.Diagnostics.Process.GetCurrentProcess().Id);
     }
 
     public void Start()
@@ -32,13 +32,13 @@ public sealed class StatusPipeServer : IDisposable
         _running = true;
         _thread = new Thread(ServerLoop);
         _thread.IsBackground = true;
-        _thread.Name = "StatusPipeServer";
+        _thread.Name = "ChatPipeServer";
         _thread.Start();
     }
 
     public void PublishStatus(int tokens)
     {
-        PublishLine(StatusPipe.TokensPrefix + tokens.ToString(CultureInfo.InvariantCulture));
+        PublishLine(ChatPipe.TokensPrefix + tokens.ToString(CultureInfo.InvariantCulture));
     }
 
     /// <summary>

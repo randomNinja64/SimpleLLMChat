@@ -166,7 +166,7 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
-        /// Opens a collapsible block from a status pipe block event. Completing
+        /// Opens a collapsible block from a chat pipe block event. Completing
         /// the turn closes it.
         /// </summary>
         public void BeginBlock(ChatBlockKind kind, string name)

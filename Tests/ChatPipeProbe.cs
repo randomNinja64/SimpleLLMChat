@@ -5,9 +5,9 @@ using System.Text;
 using System.Threading;
 
 /// <summary>
-/// Connects to SimpleLLMChat.Status.{pid} and waits for control-plane lines.
+/// Connects to SimpleLLMChat.Chat.{pid} and waits for control-plane lines.
 /// </summary>
-public sealed class StatusPipeProbe : IDisposable
+public sealed class ChatPipeProbe : IDisposable
 {
     private readonly int _processId;
     private Thread _thread;
@@ -17,7 +17,7 @@ public sealed class StatusPipeProbe : IDisposable
     private readonly System.Collections.Generic.List<string> _lines =
         new System.Collections.Generic.List<string>();
 
-    public StatusPipeProbe(int processId)
+    public ChatPipeProbe(int processId)
     {
         _processId = processId;
     }
@@ -31,14 +31,14 @@ public sealed class StatusPipeProbe : IDisposable
         _thread = new Thread(ClientLoop)
         {
             IsBackground = true,
-            Name = "StatusPipeProbe"
+            Name = "ChatPipeProbe"
         };
         _thread.Start();
     }
 
     private void ClientLoop()
     {
-        string pipeName = StatusPipe.GetPipeName(_processId);
+        string pipeName = ChatPipe.GetPipeName(_processId);
         int attempt = 0;
 
         while (_running && attempt < 100)
@@ -48,7 +48,7 @@ public sealed class StatusPipeProbe : IDisposable
                 var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.In);
                 pipe.Connect(200);
                 _pipe = pipe;
-                TestLog.Detail("StatusPipeProbe connected: " + pipeName);
+                TestLog.Detail("ChatPipeProbe connected: " + pipeName);
 
                 using (var reader = new StreamReader(pipe, Encoding.UTF8))
                 {
@@ -59,7 +59,7 @@ public sealed class StatusPipeProbe : IDisposable
                             break;
                         lock (_gate)
                             _lines.Add(line);
-                        TestLog.Detail("StatusPipeProbe: " + line);
+                        TestLog.Detail("ChatPipeProbe: " + line);
                     }
                 }
                 break;
@@ -88,7 +88,7 @@ public sealed class StatusPipeProbe : IDisposable
             for (int i = 0; i < _lines.Count; i++)
             {
                 int parsed;
-                if (StatusPipe.TryParseStatusLine(_lines[i], out parsed))
+                if (ChatPipe.TryParseStatusLine(_lines[i], out parsed))
                     tokens = parsed;
             }
         }
@@ -104,7 +104,7 @@ public sealed class StatusPipeProbe : IDisposable
             for (int i = 0; i < _lines.Count; i++)
             {
                 string text;
-                if (StatusPipe.TryParseTextLine(_lines[i], out text))
+                if (ChatPipe.TryParseTextLine(_lines[i], out text))
                     sb.Append(text);
             }
         }
@@ -125,17 +125,17 @@ public sealed class StatusPipeProbe : IDisposable
             {
                 string text, name;
                 ChatBlockKind kind;
-                if (StatusPipe.TryParseTextLine(_lines[i], out text))
+                if (ChatPipe.TryParseTextLine(_lines[i], out text))
                 {
                     sb.Append(inText ? "" : "\ntext ").Append(text.Replace("\n", "\\n"));
                     inText = true;
                 }
-                else if (StatusPipe.TryParseBlockLine(_lines[i], out kind, out name))
+                else if (ChatPipe.TryParseBlockLine(_lines[i], out kind, out name))
                 {
                     sb.Append("\nblock " + kind + " " + name);
                     inText = false;
                 }
-                else if (StatusPipe.TryParseEndBlockLine(_lines[i]))
+                else if (ChatPipe.TryParseEndBlockLine(_lines[i]))
                 {
                     sb.Append("\nendblock");
                     inText = false;
@@ -147,7 +147,7 @@ public sealed class StatusPipeProbe : IDisposable
 
     public bool WaitForReady(int timeoutMs)
     {
-        return WaitFor(line => StatusPipe.TryParseReadyLine(line), timeoutMs);
+        return WaitFor(line => ChatPipe.TryParseReadyLine(line), timeoutMs);
     }
 
     public bool WaitForApproval(int timeoutMs, out string toolName, out string arguments, out string confidence)
@@ -158,7 +158,7 @@ public sealed class StatusPipeProbe : IDisposable
         bool ok = WaitFor(line =>
         {
             string n, a, c;
-            if (!StatusPipe.TryParseApprovalLine(line, out n, out a, out c))
+            if (!ChatPipe.TryParseApprovalLine(line, out n, out a, out c))
                 return false;
             name = n;
             args = a;

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-public static partial class StatusPipe
+public static partial class ChatPipe
 {
     public const string TokensPrefix = "STATUS tokens=";
 

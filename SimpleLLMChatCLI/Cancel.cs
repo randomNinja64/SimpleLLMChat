@@ -30,7 +30,7 @@ namespace SimpleLLMChatCLI
             };
 
             EventWaitHandle stopEvent = new EventWaitHandle(
-                false, EventResetMode.AutoReset, StatusPipe.GetCancelEventName(Process.GetCurrentProcess().Id));
+                false, EventResetMode.AutoReset, ChatPipe.GetCancelEventName(Process.GetCurrentProcess().Id));
             Thread thread = new Thread(() =>
             {
                 while (true)

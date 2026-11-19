@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 
 /// <summary>
-/// Interactive CLI process with redirected stdin/stdout for StatusPipe tests.
+/// Interactive CLI process with redirected stdin/stdout for ChatPipe tests.
 /// </summary>
 public sealed class CliProcess : IDisposable
 {

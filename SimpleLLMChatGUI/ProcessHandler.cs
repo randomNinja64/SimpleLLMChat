@@ -19,7 +19,7 @@ namespace SimpleLLMChatGUI
         public event Func<string, string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
 
-        private StatusPipeClient statusPipeClient;
+        private ChatPipeClient chatPipeClient;
 
         public bool IsProcessRunning
         {
@@ -34,7 +34,7 @@ namespace SimpleLLMChatGUI
         {
             try
             {
-                DisposeStatusPipeClient();
+                DisposeChatPipeClient();
 
                 llmProcess = new Process();
                 llmProcess.StartInfo.FileName = executablePath;
@@ -52,17 +52,17 @@ namespace SimpleLLMChatGUI
                 llmProcess.Start();
                 llmProcess.BeginErrorReadLine();
 
-                statusPipeClient = new StatusPipeClient(llmProcess.Id);
-                statusPipeClient.StatusReceived += OnStatusPipeReceived;
-                statusPipeClient.IndexingStatusReceived += OnIndexingStatusPipeReceived;
-                statusPipeClient.ReadyReceived += OnStatusPipeReady;
-                statusPipeClient.ApprovalReceived += OnStatusPipeApproval;
-                statusPipeClient.TextReceived += OutputText;
-                statusPipeClient.BlockStarted += OnStatusPipeBlockStarted;
-                statusPipeClient.BlockEnded += OnStatusPipeBlockEnded;
-                statusPipeClient.Start();
+                chatPipeClient = new ChatPipeClient(llmProcess.Id);
+                chatPipeClient.StatusReceived += OnChatPipeStatus;
+                chatPipeClient.IndexingStatusReceived += OnChatPipeIndexingStatus;
+                chatPipeClient.ReadyReceived += OnChatPipeReady;
+                chatPipeClient.ApprovalReceived += OnChatPipeApproval;
+                chatPipeClient.TextReceived += OutputText;
+                chatPipeClient.BlockStarted += OnChatPipeBlockStarted;
+                chatPipeClient.BlockEnded += OnChatPipeBlockEnded;
+                chatPipeClient.Start();
 
-                // Chat output arrives on the status pipe. Stdout is only drained
+                // Chat output arrives on the chat pipe. Stdout is only drained
                 // so the CLI never blocks on a full buffer.
                 var buffer = new byte[256];
                 Stream outputStream = llmProcess.StandardOutput.BaseStream;
@@ -87,35 +87,35 @@ namespace SimpleLLMChatGUI
                 handler(e.Data);
         }
 
-        private void OnStatusPipeReceived(int tokens)
+        private void OnChatPipeStatus(int tokens)
         {
             Action<int> handler = StatusReceived;
             if (handler != null)
                 handler(tokens);
         }
 
-        private void OnStatusPipeBlockStarted(ChatBlockKind kind, string name)
+        private void OnChatPipeBlockStarted(ChatBlockKind kind, string name)
         {
             Action<ChatBlockKind, string> handler = BlockStarted;
             if (handler != null)
                 handler(kind, name);
         }
 
-        private void OnStatusPipeBlockEnded()
+        private void OnChatPipeBlockEnded()
         {
             Action handler = BlockEnded;
             if (handler != null)
                 handler();
         }
 
-        private void OnStatusPipeReady()
+        private void OnChatPipeReady()
         {
             Action handler = GenerationComplete;
             if (handler != null)
                 handler();
         }
 
-        private void OnStatusPipeApproval(string toolName, string arguments, string confidence)
+        private void OnChatPipeApproval(string toolName, string arguments, string confidence)
         {
             bool approved = false;
             if (ApprovalRequested != null)
@@ -124,24 +124,24 @@ namespace SimpleLLMChatGUI
             SendApprovalResponse(approved);
         }
 
-        private void OnIndexingStatusPipeReceived(IndexingStatusEvent status)
+        private void OnChatPipeIndexingStatus(IndexingStatusEvent status)
         {
             IndexingStatusHub.Publish(status);
         }
 
-        private void DisposeStatusPipeClient()
+        private void DisposeChatPipeClient()
         {
-            if (statusPipeClient != null)
+            if (chatPipeClient != null)
             {
-                statusPipeClient.StatusReceived -= OnStatusPipeReceived;
-                statusPipeClient.IndexingStatusReceived -= OnIndexingStatusPipeReceived;
-                statusPipeClient.ReadyReceived -= OnStatusPipeReady;
-                statusPipeClient.ApprovalReceived -= OnStatusPipeApproval;
-                statusPipeClient.TextReceived -= OutputText;
-                statusPipeClient.BlockStarted -= OnStatusPipeBlockStarted;
-                statusPipeClient.BlockEnded -= OnStatusPipeBlockEnded;
-                statusPipeClient.Dispose();
-                statusPipeClient = null;
+                chatPipeClient.StatusReceived -= OnChatPipeStatus;
+                chatPipeClient.IndexingStatusReceived -= OnChatPipeIndexingStatus;
+                chatPipeClient.ReadyReceived -= OnChatPipeReady;
+                chatPipeClient.ApprovalReceived -= OnChatPipeApproval;
+                chatPipeClient.TextReceived -= OutputText;
+                chatPipeClient.BlockStarted -= OnChatPipeBlockStarted;
+                chatPipeClient.BlockEnded -= OnChatPipeBlockEnded;
+                chatPipeClient.Dispose();
+                chatPipeClient = null;
             }
         }
 
@@ -195,7 +195,7 @@ namespace SimpleLLMChatGUI
             try
             {
                 using (var stopEvent = System.Threading.EventWaitHandle.OpenExisting(
-                    StatusPipe.GetCancelEventName(llmProcess.Id)))
+                    ChatPipe.GetCancelEventName(llmProcess.Id)))
                 {
                     stopEvent.Set();
                 }
@@ -290,7 +290,7 @@ namespace SimpleLLMChatGUI
                 return;
 
             disposed = true;
-            DisposeStatusPipeClient();
+            DisposeChatPipeClient();
             OutputReceived = null;
             BlockStarted = null;
             BlockEnded = null;

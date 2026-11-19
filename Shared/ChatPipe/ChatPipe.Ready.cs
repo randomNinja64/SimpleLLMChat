@@ -1,6 +1,6 @@
 using System;
 
-public static partial class StatusPipe
+public static partial class ChatPipe
 {
     public const string ReadyLine = "STATUS ready";
 
