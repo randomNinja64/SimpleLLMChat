@@ -179,7 +179,7 @@ public partial class LLMClient
             if (response.ToolCalls != null && response.ToolCalls.Count > 0)
             {
                 if (!RunToolCalls(
-                    conversation, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock,
+                    conversation, response.Content, response.ToolCalls, enabledSet, approvalSet, toolOutputDisplay, outputOnly, startBlock,
                     ref consecutiveFailedToolCalls, maxConsecutiveFailedToolCalls))
                     return;
 
@@ -323,6 +323,7 @@ public partial class LLMClient
     /// </summary>
     private bool RunToolCalls(
         List<ChatMessage> conversation,
+        string assistantContent,
         List<ToolRegistry.ToolCall> toolCalls,
         HashSet<string> enabledSet,
         HashSet<string> approvalSet,
@@ -335,7 +336,8 @@ public partial class LLMClient
         conversation.Add(new ChatMessage
         {
             Role = "assistant",
-            Content = string.Empty,
+            // Keep any text the model sent alongside the calls so it stays in history.
+            Content = assistantContent ?? string.Empty,
             ToolCalls = toolCalls
         });
 
