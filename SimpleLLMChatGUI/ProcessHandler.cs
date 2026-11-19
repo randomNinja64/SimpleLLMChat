@@ -8,6 +8,7 @@ namespace SimpleLLMChatGUI
     public class ProcessHandler : IDisposable
     {
         private Process llmProcess;
+        private StreamWriter stdinWriter;
         private bool disposed;
 
         public event Action<string> OutputReceived;
@@ -50,6 +51,8 @@ namespace SimpleLLMChatGUI
                 llmProcess.StartInfo.Arguments = "--no-banners";
                 llmProcess.ErrorDataReceived += OnErrorDataReceived;
                 llmProcess.Start();
+                // The CLI reads stdin as UTF-8; Process.StandardInput would use the ANSI code page.
+                stdinWriter = new StreamWriter(llmProcess.StandardInput.BaseStream, new UTF8Encoding(false));
                 llmProcess.BeginErrorReadLine();
 
                 chatPipeClient = new ChatPipeClient(llmProcess.Id);
@@ -153,8 +156,8 @@ namespace SimpleLLMChatGUI
                 {
                     // Encode multi-line text as single line: replace newlines with <<NEWLINE>> marker
                     string encodedInput = input.Replace("\r\n", "<<NEWLINE>>").Replace("\n", "<<NEWLINE>>").Replace("\r", "<<NEWLINE>>");
-                    llmProcess.StandardInput.WriteLine(encodedInput);
-                    llmProcess.StandardInput.Flush();
+                    stdinWriter.WriteLine(encodedInput);
+                    stdinWriter.Flush();
                     return true;
                 }
                 catch (Exception ex)
@@ -249,8 +252,8 @@ namespace SimpleLLMChatGUI
             {
                 try
                 {
-                    llmProcess.StandardInput.WriteLine(approved ? "Y" : "N");
-                    llmProcess.StandardInput.Flush();
+                    stdinWriter.WriteLine(approved ? "Y" : "N");
+                    stdinWriter.Flush();
                     return true;
                 }
                 catch (Exception ex)

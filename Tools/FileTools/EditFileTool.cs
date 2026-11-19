@@ -40,8 +40,10 @@ namespace FileTools
                     return "error: No edits provided. Provide at least one edit with old_string and new_string.";
                 }
 
-                string original = TextNormalization.NormalizeLineEndings(
-                    File.ReadAllText(expandedPath, Encoding.UTF8));
+                // Edits are spliced into the text as read, so everything outside them keeps
+                // its bytes; the encoding is remembered so the file is written back the same way.
+                Encoding encoding;
+                string original = ReadDetectingEncoding(expandedPath, out encoding);
 
                 List<string> errors;
                 string newContent;
@@ -61,7 +63,7 @@ namespace FileTools
                     return "No changes were necessary (file already matches).";
                 }
 
-                File.WriteAllText(expandedPath, newContent, Encoding.UTF8);
+                File.WriteAllText(expandedPath, newContent, encoding);
 
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine("Applied " + appliedCount + " edit(s).");
@@ -80,6 +82,39 @@ namespace FileTools
             }
         }
 
+        /// <summary>
+        /// Reads a text file and reports the encoding to write it back with: a BOM decides
+        /// when present; otherwise valid UTF-8 stays BOM-less UTF-8 and anything else is
+        /// treated as the system ANSI code page.
+        /// </summary>
+        private static string ReadDetectingEncoding(string path, out Encoding encoding)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+                encoding = new UTF8Encoding(true);
+            else if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+                encoding = Encoding.Unicode;
+            else if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+                encoding = Encoding.BigEndianUnicode;
+            else
+            {
+                try
+                {
+                    string text = new UTF8Encoding(false, true).GetString(bytes);
+                    encoding = new UTF8Encoding(false);
+                    return text;
+                }
+                catch (DecoderFallbackException)
+                {
+                    encoding = Encoding.Default;
+                }
+            }
+
+            int preamble = encoding.GetPreamble().Length;
+            return encoding.GetString(bytes, preamble, bytes.Length - preamble);
+        }
+
         private static int ApplyBlocksInMemory(string originalContent, List<Block> blocks,
             out string newContent, out List<string> errors)
         {
@@ -92,7 +127,10 @@ namespace FileTools
                 Block block = blocks[i];
                 int blockNum = i + 1;
 
-                int occurrences = CountOccurrences(current, block.Search);
+                // Match on an LF-normalized view, but splice into the text as read so lines
+                // outside the edit keep their own line endings.
+                string normalized = TextNormalization.NormalizeLineEndings(current);
+                int occurrences = CountOccurrences(normalized, block.Search);
                 if (occurrences == 0)
                 {
                     errors.Add(BuildNotFoundError(block.Search, blockNum));
@@ -107,13 +145,29 @@ namespace FileTools
                     continue;
                 }
 
-                int index = current.IndexOf(block.Search, StringComparison.Ordinal);
-                current = current.Substring(0, index) + block.Replace + current.Substring(index + block.Search.Length);
+                int index = normalized.IndexOf(block.Search, StringComparison.Ordinal);
+                int start = ToOriginalOffset(current, index);
+                int end = ToOriginalOffset(current, index + block.Search.Length);
+                // New lines take CRLF when the file uses it.
+                string replacement = current.Contains("\r\n") ? block.Replace.Replace("\n", "\r\n") : block.Replace;
+                current = current.Substring(0, start) + replacement + current.Substring(end);
                 appliedCount++;
             }
 
             newContent = current;
             return appliedCount;
+        }
+
+        /// <summary>
+        /// Maps an offset in the LF-normalized text back to the text as read, where a CRLF
+        /// is two characters instead of one.
+        /// </summary>
+        private static int ToOriginalOffset(string text, int normalizedOffset)
+        {
+            int i = 0;
+            for (int n = 0; n < normalizedOffset; n++)
+                i += text[i] == '\r' && i + 1 < text.Length && text[i + 1] == '\n' ? 2 : 1;
+            return i;
         }
 
         private static List<Block> ParseEdits(JArray edits)
