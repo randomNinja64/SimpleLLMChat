@@ -52,7 +52,7 @@ namespace MemoryTools
                 }
             }
 
-            File.WriteAllText(path, content, Encoding.UTF8);
+            File.WriteAllText(path, content, new UTF8Encoding(false));
 
             var sb = new StringBuilder();
             sb.Append(exists ? "Memory updated: " + name : "Memory saved: " + name);

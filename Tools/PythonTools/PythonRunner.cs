@@ -46,7 +46,8 @@ namespace PythonTools
 
                 try
                 {
-                    // Write the script content to the temporary file
+                    // Write the script content to the temporary file. The BOM is kept on purpose:
+                    // Python 2 rejects non-ASCII source that has neither a BOM nor a coding line.
                     File.WriteAllText(tempScriptPath, scriptContent, Encoding.UTF8);
 
                     // Execute the Python script

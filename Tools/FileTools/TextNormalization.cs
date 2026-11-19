@@ -37,5 +37,23 @@ namespace FileTools
                 return File.ReadAllText(path, encoding);
             }
         }
+
+        /// <summary>
+        /// Encoding for writing a whole file: the one its BOM names when the file already
+        /// exists with a BOM, otherwise UTF-8 without a BOM.
+        /// </summary>
+        internal static Encoding EncodingForOverwrite(string path)
+        {
+            Encoding utf8NoBom = new UTF8Encoding(false);
+            if (!File.Exists(path))
+                return utf8NoBom;
+
+            using (StreamReader reader = new StreamReader(path, utf8NoBom, true))
+            {
+                // A BOM is detected on the first read; without one the encoding stays as given.
+                reader.Peek();
+                return reader.CurrentEncoding;
+            }
+        }
     }
 }

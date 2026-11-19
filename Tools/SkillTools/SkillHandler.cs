@@ -107,7 +107,7 @@ namespace SkillTools
             Directory.CreateDirectory(skillDir);
             string content = BuildSkillMarkdown(name, description, instructions);
             string skillRoot = Path.GetFullPath(skillDir);
-            File.WriteAllText(Path.Combine(skillDir, "SKILL.md"), content, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(skillDir, "SKILL.md"), content, new UTF8Encoding(false));
             string result = "Skill created: " + name
                 + "\nSkill root: " + skillRoot
                 + "\nSKILL.md was written. To add scripts, references, or other supporting files, use edit_skill_file"
@@ -147,7 +147,7 @@ namespace SkillTools
 
             // Keep frontmatter name aligned with the folder identity
             string content = BuildSkillMarkdown(existing.FolderName, newDescription, newInstructions);
-            File.WriteAllText(existing.SkillMdPath, content, Encoding.UTF8);
+            File.WriteAllText(existing.SkillMdPath, content, new UTF8Encoding(false));
 
             var updated = new List<string>();
             if (updateDescription)
@@ -184,7 +184,7 @@ namespace SkillTools
             if (!string.IsNullOrEmpty(parent) && !Directory.Exists(parent))
                 Directory.CreateDirectory(parent);
 
-            File.WriteAllText(full, content, Encoding.UTF8);
+            File.WriteAllText(full, content, new UTF8Encoding(false));
             return "Skill file written: " + displayRelative
                 + "\nSkill root: " + existing.DirectoryPath;
         }

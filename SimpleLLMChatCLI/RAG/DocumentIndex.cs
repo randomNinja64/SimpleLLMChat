@@ -142,7 +142,7 @@ namespace SimpleLLMChatCLI.RAG
             Manifest.KnowledgePath = KnowledgePath;
 
             string json = JsonConvert.SerializeObject(Manifest, Formatting.Indented);
-            File.WriteAllText(ManifestPath, json, Encoding.UTF8);
+            File.WriteAllText(ManifestPath, json, new UTF8Encoding(false));
             Vectors.Save(VectorsPath);
         }
 

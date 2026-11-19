@@ -73,8 +73,9 @@ namespace FileTools
                     return errorMessage;
                 }
 
-                // UTF-8 without a BOM: a BOM breaks .bat/.cmd files and strict JSON parsers.
-                File.WriteAllText(filename, content, new UTF8Encoding(false));
+                // UTF-8 without a BOM (a BOM breaks the first line of .bat/.cmd files), unless
+                // the file being replaced already has one.
+                File.WriteAllText(filename, content, TextNormalization.EncodingForOverwrite(filename));
                 return $"File written successfully: {filename}";
             }
             catch (Exception ex)

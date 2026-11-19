@@ -133,7 +133,7 @@ public sealed class ChatPipeServer : IDisposable
 
                 lock (_sync)
                 {
-                    _writer = new StreamWriter(pipe, Encoding.UTF8);
+                    _writer = new StreamWriter(pipe, new UTF8Encoding(false));
                     _writer.AutoFlush = true;
 
                     try
