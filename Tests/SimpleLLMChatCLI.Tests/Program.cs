@@ -305,6 +305,51 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.rag_injects_whole_chunk", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("rag-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    // Later keys win: turn RAG on, embeddings on the same fake server.
+                    File.AppendAllText(
+                        Path.Combine(ws.Path, "LLMSettings.ini"),
+                        "ragenabled=1\r\nembeddingsmodel=test-embed\r\n");
+
+                    // One 30-line file is a single chunk under the default 60-line chunk size.
+                    StringBuilder notes = new StringBuilder();
+                    for (int i = 1; i <= 30; i++)
+                        notes.Append("RAGLINE-" + i.ToString("00", CultureInfo.InvariantCulture) + "\r\n");
+                    Directory.CreateDirectory(Path.Combine(ws.Path, "knowledge"));
+                    File.WriteAllText(Path.Combine(ws.Path, "knowledge", "notes.txt"), notes.ToString(), Encoding.UTF8);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("what do the notes say");
+                        TestAssert.True(WaitStdoutContains(cli, "rag-reply-ok", 30000), "reply");
+                        TestAssert.Contains(cli.Stdout, "[reading notes.txt]", "status line");
+                        TestAssert.True(server.EmbeddingsRequestCount >= 2, "index and query embedded");
+
+                        // The chat request carries the whole chunk, not just its opening lines.
+                        string chatBody = server.LastBody;
+                        TestAssert.Contains(chatBody, "Retrieved Context", "context block");
+                        TestAssert.Contains(chatBody, "RAGLINE-01", "first line");
+                        TestAssert.Contains(chatBody, "RAGLINE-11", "line past the old 10-line cut");
+                        TestAssert.Contains(chatBody, "RAGLINE-30", "last line");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.image_counts_toward_tokens", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

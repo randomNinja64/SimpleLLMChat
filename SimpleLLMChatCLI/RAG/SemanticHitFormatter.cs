@@ -13,8 +13,6 @@ namespace SimpleLLMChatCLI.RAG
 
     public static class SemanticHitFormatter
     {
-        private const int SnippetLines = 10;
-
         public static IndexedHitSet Search(DocumentIndex index, ConfigHandler config, string query, int maxResults)
         {
             if (index == null || !index.HasIndex)
@@ -82,8 +80,10 @@ namespace SimpleLLMChatCLI.RAG
         {
             try
             {
+                // The whole indexed chunk; ragMaxSnippetLength bounds it below,
+                // the same limit applied to the text that was embedded.
                 int from = Math.Max(1, startLine);
-                int to = Math.Min(endLine, from + SnippetLines - 1);
+                int to = endLine;
 
                 var sb = new StringBuilder();
                 int lineNum = 0;
@@ -105,9 +105,6 @@ namespace SimpleLLMChatCLI.RAG
 
                 if (lineNum < from)
                     return null;
-
-                if (endLine > to)
-                    sb.AppendLine("    ...");
 
                 string result = sb.ToString().TrimEnd();
                 if (maxSnippet > 0 && result.Length > maxSnippet)

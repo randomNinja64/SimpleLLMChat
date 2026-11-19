@@ -81,6 +81,8 @@ public sealed class FakeOpenAiServer : IDisposable
     public string LastBody { get; private set; }
     public string LastAuthorization { get; private set; }
 
+    public int EmbeddingsRequestCount { get; private set; }
+
     public int SystemOneRequestCount { get; private set; }
     public string SystemOneAuthorization { get; private set; }
     public string SystemOneBody { get; private set; }
@@ -269,6 +271,22 @@ public sealed class FakeOpenAiServer : IDisposable
         if (path.IndexOf("/v1/chat/completions", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             WriteSseChat(ctx);
+            return;
+        }
+
+        if (path.IndexOf("/v1/embeddings", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            EmbeddingsRequestCount++;
+            // Every input gets the same vector, so every chunk matches every query.
+            // A full batch (32) is always returned; the client ignores the surplus.
+            StringBuilder data = new StringBuilder();
+            for (int i = 0; i < 32; i++)
+            {
+                if (i > 0)
+                    data.Append(',');
+                data.Append("{\"object\":\"embedding\",\"index\":" + i + ",\"embedding\":[1.0,0.0]}");
+            }
+            WriteJson(ctx, 200, "{\"object\":\"list\",\"data\":[" + data + "]}");
             return;
         }
 
