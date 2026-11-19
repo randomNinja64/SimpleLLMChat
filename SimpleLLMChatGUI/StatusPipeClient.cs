@@ -18,6 +18,9 @@ public sealed class StatusPipeClient : IDisposable
     public event Action<IndexingStatusEvent> IndexingStatusReceived;
     public event Action ReadyReceived;
     public event Action<string, string, string> ApprovalReceived;
+    public event Action<string> TextReceived;
+    public event Action<ChatBlockKind, string> BlockStarted;
+    public event Action BlockEnded;
 
     public StatusPipeClient(int processId)
     {
@@ -56,6 +59,33 @@ public sealed class StatusPipeClient : IDisposable
                         string line = reader.ReadLine();
                         if (line == null)
                             break;
+
+                        string text;
+                        if (StatusPipe.TryParseTextLine(line, out text))
+                        {
+                            Action<string> handler = TextReceived;
+                            if (handler != null)
+                                handler(text);
+                            continue;
+                        }
+
+                        ChatBlockKind blockKind;
+                        string blockName;
+                        if (StatusPipe.TryParseBlockLine(line, out blockKind, out blockName))
+                        {
+                            Action<ChatBlockKind, string> handler = BlockStarted;
+                            if (handler != null)
+                                handler(blockKind, blockName);
+                            continue;
+                        }
+
+                        if (StatusPipe.TryParseEndBlockLine(line))
+                        {
+                            Action handler = BlockEnded;
+                            if (handler != null)
+                                handler();
+                            continue;
+                        }
 
                         if (StatusPipe.TryParseReadyLine(line))
                         {
@@ -120,6 +150,9 @@ public sealed class StatusPipeClient : IDisposable
         IndexingStatusReceived = null;
         ReadyReceived = null;
         ApprovalReceived = null;
+        TextReceived = null;
+        BlockStarted = null;
+        BlockEnded = null;
 
         NamedPipeClientStream pipe = _pipe;
         _pipe = null;

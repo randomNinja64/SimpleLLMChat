@@ -8,18 +8,11 @@ namespace SimpleLLMChatGUI
 {
     public partial class ChatTurn
     {
-        internal enum CollapsibleBlockKind
-        {
-            Thinking,
-            ToolCall,
-            ToolOutput
-        }
-
         internal sealed class CollapsibleBlockState
         {
             public bool Active;
             public string Name;
-            public CollapsibleBlockKind Kind;
+            public ChatBlockKind Kind;
             public Expander Expander;
             public TextBlock HeaderLabel;
             public TextBlock BodyText;
@@ -34,7 +27,7 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        private void StartCollapsibleBlock(string name, CollapsibleBlockKind kind)
+        private void StartCollapsibleBlock(string name, ChatBlockKind kind)
         {
             if (!_restoring) _source.Clear();
             _blockKind = kind;
@@ -46,9 +39,9 @@ namespace SimpleLLMChatGUI
                 Document.Blocks.Remove(last);
             }
 
-            ChatBlockDisplayMode mode = kind == CollapsibleBlockKind.ToolCall
+            ChatBlockDisplayMode mode = kind == ChatBlockKind.ToolCall
                 ? App.Config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed)
-                : kind == CollapsibleBlockKind.ToolOutput
+                : kind == ChatBlockKind.ToolOutput
                     ? App.Config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown)
                     : App.Config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed);
             mode = _blockMode ?? mode;
@@ -182,7 +175,7 @@ namespace SimpleLLMChatGUI
 
         private static string BuildLabelText(CollapsibleBlockState state)
         {
-            if (state.Kind == CollapsibleBlockKind.ToolCall)
+            if (state.Kind == ChatBlockKind.ToolCall)
             {
                 string baseLabel = "tool call: " + (state.Name ?? "tool");
                 if (state.Collapsed && state.Active)
@@ -190,7 +183,7 @@ namespace SimpleLLMChatGUI
                 return baseLabel;
             }
 
-            if (state.Kind == CollapsibleBlockKind.ToolOutput)
+            if (state.Kind == ChatBlockKind.ToolOutput)
             {
                 if (state.Collapsed && state.Active)
                     return "tool output" + new string('.', state.EllipsisCount);

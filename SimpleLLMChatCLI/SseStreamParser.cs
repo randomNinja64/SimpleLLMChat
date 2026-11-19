@@ -120,7 +120,7 @@ namespace SimpleLLMChatCLI
                     if (!inReasoning)
                     {
                         startBlock?.Invoke();
-                        onReasoningChunk("[thinking]\n");
+                        ChatOutput.BeginBlock(ChatBlockKind.Thinking, null, "[thinking]\n");
                         inReasoning = true;
                     }
                     onReasoningChunk(reasoningChunk);
@@ -247,7 +247,9 @@ namespace SimpleLLMChatCLI
             {
                 // Closing tag on its own line; blank line before the next block
                 // comes from the caller's StartBlock.
-                onReasoningChunk(reasoningEndedWithNewline ? "[/thinking]\n" : "\n[/thinking]\n");
+                if (!reasoningEndedWithNewline)
+                    onReasoningChunk("\n");
+                ChatOutput.EndBlock("[/thinking]\n");
             }
             else
             {

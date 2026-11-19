@@ -249,7 +249,7 @@ public partial class LLMClient
                     {
                         if (!toolCallArgsEndedWithNewline)
                             ChatOutput.WriteLine();
-                        ChatOutput.WriteLine("[/tool call]");
+                        ChatOutput.EndBlock("[/tool call]\n");
                     }
 
                     currentToolCallSuppressed = !IsAutoToolApproval() && approvalSet.Contains(toolCall.Name);
@@ -257,7 +257,8 @@ public partial class LLMClient
                     if (!currentToolCallSuppressed)
                     {
                         startBlock();
-                        ChatOutput.WriteLine("[tool call] " + toolCall.Name);
+                        ChatOutput.BeginBlock(
+                            ChatBlockKind.ToolCall, toolCall.Name, "[tool call] " + toolCall.Name + "\n");
                         toolCallUiOpen = true;
                         toolCallArgsEndedWithNewline = true;
                     }
@@ -276,15 +277,41 @@ public partial class LLMClient
             };
         }
 
+        // Some models inline <think>...</think> in their content. The terminal
+        // shows the tags as sent; pipe clients get a thinking block instead.
+        bool inThink = false;
+        Action<string> writeContent = null;
+        writeContent = (text) =>
+        {
+            string tag = inThink ? "</think>" : "<think>";
+            int at = text.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
+            if (at < 0)
+            {
+                ChatOutput.Write(text);
+                return;
+            }
+
+            ChatOutput.Write(text.Substring(0, at));
+            if (inThink)
+                ChatOutput.EndBlock(text.Substring(at, tag.Length));
+            else
+                ChatOutput.BeginBlock(ChatBlockKind.Thinking, null, text.Substring(at, tag.Length));
+            inThink = !inThink;
+            writeContent(text.Substring(at + tag.Length));
+        };
+
         LLMCompletionResponse response = sendMessages(
-            conversation, enabledTools, ChatOutput.Write, toolCallStreamCallback,
+            conversation, enabledTools, writeContent, toolCallStreamCallback,
             onContentStart, startBlock, outputOnly, contextInjections);
+
+        if (inThink)
+            ChatOutput.EndBlock(null);
 
         if (toolCallUiOpen)
         {
             if (!toolCallArgsEndedWithNewline)
                 ChatOutput.WriteLine();
-            ChatOutput.WriteLine("[/tool call]");
+            ChatOutput.EndBlock("[/tool call]\n");
         }
 
         return response;
@@ -428,7 +455,7 @@ public partial class LLMClient
             if (!outputOnly)
             {
                 startBlock();
-                ChatOutput.WriteLine("[tool output]");
+                ChatOutput.BeginBlock(ChatBlockKind.ToolOutput, null, "[tool output]\n");
                 if (toolOutputDisplay == ChatBlockDisplayMode.Hidden)
                 {
                     ChatOutput.WriteLine("Exit Code: " + exitCode);
@@ -439,7 +466,7 @@ public partial class LLMClient
                     if (string.IsNullOrEmpty(toolContent) || !toolContent.EndsWith("\n"))
                         ChatOutput.WriteLine();
                 }
-                ChatOutput.WriteLine("[/tool output]");
+                ChatOutput.EndBlock("[/tool output]\n");
             }
         }
 

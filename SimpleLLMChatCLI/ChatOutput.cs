@@ -23,13 +23,38 @@ namespace SimpleLLMChatCLI
         private static readonly StringBuilder _pendingIndent = new StringBuilder();
 
         /// <summary>
+        /// Opens a thinking / tool block: the tag on the terminal, an event on the pipe.
+        /// </summary>
+        public static void BeginBlock(ChatBlockKind kind, string name, string consoleTag)
+        {
+            Write(consoleTag, false);
+            Publish(StatusPipe.StartBlockPrefix + kind + " " + StatusPipe.SanitizeToken(name));
+        }
+
+        public static void EndBlock(string consoleTag)
+        {
+            Write(consoleTag, false);
+            Publish(StatusPipe.EndBlockLine);
+        }
+
+        private static void Publish(string line)
+        {
+            StatusPipeServer pipe = Program.StatusPipe;
+            if (pipe != null)
+                pipe.PublishEvent(line);
+        }
+
+        /// <summary>
         /// Writes text to the console, capping consecutive blank lines at one.
         /// Lines containing only whitespace count as blank. This keeps blocks
         /// separated by exactly one blank line even when the model streams
         /// extra trailing newlines, and keeps StartBlock's tracking accurate.
-        /// All chat output must flow through here.
+        /// All chat output must flow through here; it is also streamed to the
+        /// status pipe as text events. Pass toPipe false for terminal-only text
+        /// (input prompts, block tags): pipe clients draw their own prompts and
+        /// receive block events.
         /// </summary>
-        public static void Write(string text)
+        public static void Write(string text, bool toPipe = true)
         {
             if (string.IsNullOrEmpty(text))
                 return;
@@ -84,6 +109,8 @@ namespace SimpleLLMChatCLI
                 // hold several KB — short tool-call markers then arrive as one clump.
                 // Flush so streaming matches NyoCoder's direct UI callback.
                 Console.Out.Flush();
+                if (toPipe)
+                    Publish(StatusPipe.TextPrefix + StatusPipe.EncodePipeArg(sb.ToString()));
             }
         }
 

@@ -33,7 +33,7 @@ public static partial class StatusPipe
         return true;
     }
 
-    private static string EncodePipeArg(string value)
+    internal static string EncodePipeArg(string value)
     {
         if (string.IsNullOrEmpty(value))
             return string.Empty;

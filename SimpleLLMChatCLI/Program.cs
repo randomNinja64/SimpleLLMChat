@@ -229,7 +229,7 @@ namespace SimpleLLMChatCLI
                 // Pad to exactly one blank line before the prompt, regardless of
                 // how the previous turn's output ended.
                 ChatOutput.StartBlock();
-                ChatOutput.WriteConsoleOnly("You: ");
+                ChatOutput.Write("You: ", false);
                 StatusPipe.PublishDiscrete(global::StatusPipe.ReadyLine);
                 string userInput = Console.ReadLine();
                 ChatOutput.EndInputLine();

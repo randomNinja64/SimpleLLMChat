@@ -34,7 +34,8 @@ public partial class LLMClient
         {
             bool showThinking = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed)
                 != ChatBlockDisplayMode.Hidden;
-            onReasoningChunk = showThinking ? outputCallback : null;
+            // Straight to ChatOutput: reasoning text is not scanned for inline <think> tags.
+            onReasoningChunk = showThinking ? (Action<string>)(text => ChatOutput.Write(text)) : null;
             if (!showThinking)
             {
                 onReasoningSummary = s =>
@@ -116,8 +117,7 @@ public partial class LLMClient
 
         while (true)
         {
-            if (Program.ShowUserPrompts)
-                ChatOutput.Write(ToolApproval.ApprovalPrompt);
+            ChatOutput.Write(ToolApproval.ApprovalPrompt, false);
             Console.Out.Flush();
 
             string input = Console.ReadLine();

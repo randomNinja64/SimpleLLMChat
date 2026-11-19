@@ -12,6 +12,10 @@ using System.Globalization;
 ///   STATUS indexing=done files=5
 ///   STATUS indexing=cleared
 ///   STATUS indexing=error message=...
+/// Chat output, in order (what the terminal shows, minus input prompts and block tags):
+///   TEXT escaped-chunk                 (\n, \r and \\ escaped)
+///   STARTBLOCK Thinking|ToolCall|ToolOutput [name]
+///   ENDBLOCK
 /// </summary>
 public static partial class StatusPipe
 {
@@ -42,7 +46,7 @@ public static partial class StatusPipe
         return true;
     }
 
-    private static string SanitizeToken(string value)
+    internal static string SanitizeToken(string value)
     {
         if (value == null)
             return string.Empty;
