@@ -128,7 +128,7 @@ namespace SimpleLLMChatCLI.RAG
                     continue;
 
                 string relative = index.ToDisplayPath(file);
-                foreach (ChunkInfo ci in Chunk(content, chunkLines, overlap))
+                foreach (ChunkInfo ci in Chunk(content, chunkLines, overlap, maxSnippet))
                 {
                     string text = Truncate(ci.Text, maxSnippet);
                     if (string.IsNullOrWhiteSpace(text))
@@ -265,22 +265,32 @@ namespace SimpleLLMChatCLI.RAG
             public string Text;
         }
 
-        private static IEnumerable<ChunkInfo> Chunk(string content, int chunkLines, int overlap)
+        private static IEnumerable<ChunkInfo> Chunk(string content, int chunkLines, int overlap, int maxChars)
         {
             if (string.IsNullOrEmpty(content))
                 yield break;
 
             string[] lines = content.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             if (chunkLines < 1) chunkLines = 60;
-            int step = chunkLines - overlap;
-            if (step < 1) step = chunkLines;
 
-            for (int start = 0; start < lines.Length; start += step)
+            int start = 0;
+            while (start < lines.Length)
             {
-                int end = Math.Min(start + chunkLines, lines.Length);
+                // Close the chunk at chunkLines or at maxChars, whichever comes first, so the
+                // snippet cap never cuts off lines that the next chunk does not cover.
+                // Each line costs 6 extra: the indent and line break added when it is injected.
+                int limit = Math.Min(start + chunkLines, lines.Length);
+                int end = start;
+                int used = 0;
                 StringBuilder sb = new StringBuilder();
-                for (int i = start; i < end; i++)
-                    sb.AppendLine(lines[i]);
+                while (end < limit)
+                {
+                    used += lines[end].Length + 6;
+                    if (maxChars > 0 && used > maxChars && end > start)
+                        break;
+                    sb.AppendLine(lines[end]);
+                    end++;
+                }
                 string text = sb.ToString();
                 if (!string.IsNullOrWhiteSpace(text))
                 {
@@ -293,6 +303,9 @@ namespace SimpleLLMChatCLI.RAG
                 }
                 if (end >= lines.Length)
                     break;
+
+                // Step back by the overlap, unless the chunk was too short to allow it.
+                start = end - overlap > start ? end - overlap : end;
             }
         }
     }
