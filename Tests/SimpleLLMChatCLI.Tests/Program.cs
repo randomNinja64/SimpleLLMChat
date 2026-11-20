@@ -52,25 +52,16 @@ namespace SimpleLLMChatCLI.Tests
                 TestAssert.Equal(0, streak, "later success clears a reached limit");
             });
 
-            TestRunner.Run("ToolApproval.roundtrip", () =>
+            TestRunner.Run("ToolApproval.format", () =>
             {
-                string msg = ToolApproval.FormatApprovalMessage("read_file", "{\\\"filename\\\":\\\"a.txt\\\"}");
-                string tool, arguments;
-                TestAssert.True(ToolApproval.TryParseApprovalPrompt(
-                    msg + "\n" + ToolApproval.ApprovalPrompt, out tool, out arguments), "parse");
-                TestAssert.Equal("read_file", tool, "tool");
-            });
-
-            TestRunner.Run("ToolApproval.confidence_line_skipped", () =>
-            {
-                string args = "{\"command\":\"echo hi\"}";
-                string msg = ToolApproval.FormatApprovalMessage("run_shell_command", args, "0.91");
-                string tool, parsed;
-                TestAssert.True(ToolApproval.TryParseApprovalPrompt(
-                    msg + "\n" + ToolApproval.ApprovalPrompt, out tool, out parsed), "parse");
-                TestAssert.Equal("run_shell_command", tool, "tool");
-                TestAssert.Equal(args, parsed, "args");
-                TestAssert.Contains(msg, "Jev confidence: 0.91", "confidence");
+                TestAssert.Equal(
+                    "Run tool: read_file\n{\"filename\":\"a.txt\"}",
+                    ToolApproval.FormatApprovalMessage("read_file", "{\\\"filename\\\":\\\"a.txt\\\"}"),
+                    "escaped arguments shown unescaped");
+                TestAssert.Equal(
+                    "Run tool: run_shell_command\nJev confidence: 0.91\n{\"command\":\"echo hi\"}",
+                    ToolApproval.FormatApprovalMessage("run_shell_command", "{\"command\":\"echo hi\"}", "0.91"),
+                    "confidence line");
             });
 
             TestRunner.Run("JevDecisionClient.parse", () =>

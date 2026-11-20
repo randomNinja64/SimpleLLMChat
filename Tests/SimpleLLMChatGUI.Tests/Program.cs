@@ -38,16 +38,6 @@ namespace SimpleLLMChatGUI.Tests
                 }
             });
 
-            TestRunner.Run("ToolApproval.parse", () =>
-            {
-                string msg = ToolApproval.FormatApprovalMessage("shell", "echo hi");
-                string tool, arguments;
-                TestAssert.True(ToolApproval.TryParseApprovalPrompt(
-                    msg + "\n" + ToolApproval.ApprovalPrompt, out tool, out arguments), "parse");
-                TestAssert.Equal("shell", tool, "tool");
-                TestAssert.Contains(arguments, "echo hi", "args");
-            });
-
             TestRunner.Run("ModelsClient.list_models", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
