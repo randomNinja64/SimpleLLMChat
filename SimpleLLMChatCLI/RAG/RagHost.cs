@@ -31,7 +31,7 @@ namespace SimpleLLMChatCLI.RAG
 
         public static void OnConfigReloaded(ConfigHandler config)
         {
-            bool enabled = config.GetConfigBool("ragEnabled", false);
+            bool enabled = config.Get(AppSettings.RagEnabled);
             lock (Sync)
             {
                 _config = config;
@@ -52,7 +52,7 @@ namespace SimpleLLMChatCLI.RAG
         {
             ConfigHandler config;
             lock (Sync) { config = _config; }
-            if (config == null || !config.GetConfigBool("ragEnabled", false))
+            if (config == null || !config.Get(AppSettings.RagEnabled))
             {
                 PublishError("RAG is disabled.");
                 return;
@@ -88,7 +88,7 @@ namespace SimpleLLMChatCLI.RAG
 
         public static string GetKnowledgePathHint(ConfigHandler config)
         {
-            if (config == null || !config.GetConfigBool("ragEnabled", false))
+            if (config == null || !config.Get(AppSettings.RagEnabled))
                 return null;
             return "Knowledge for RAG is stored in " + DocumentIndex.ResolveKnowledgePath(config);
         }
@@ -103,7 +103,7 @@ namespace SimpleLLMChatCLI.RAG
             lock (Sync) { config = _config; }
             if (config == null)
                 return;
-            if (work != IndexWork.Clear && !config.GetConfigBool("ragEnabled", false))
+            if (work != IndexWork.Clear && !config.Get(AppSettings.RagEnabled))
                 return;
 
             if (Interlocked.CompareExchange(ref _running, 1, 0) != 0)
@@ -154,7 +154,7 @@ namespace SimpleLLMChatCLI.RAG
 
             ConfigHandler config;
             lock (Sync) { config = _config; }
-            bool enabled = config != null && config.GetConfigBool("ragEnabled", false);
+            bool enabled = config != null && config.Get(AppSettings.RagEnabled);
 
             if (pending && enabled)
             {

@@ -14,7 +14,7 @@ namespace SimpleLLMChatCLI.RAG
 
         public static HashSet<string> GetAllowedExtensions(ConfigHandler config)
         {
-            List<string> fromConfig = config != null ? config.GetConfigList("ragAllowedExtensions") : null;
+            List<string> fromConfig = config != null ? config.GetList(AppSettings.RagAllowedExtensions) : null;
             IEnumerable<string> source = (fromConfig != null && fromConfig.Count > 0)
                 ? (IEnumerable<string>)fromConfig
                 : AppConstants.DefaultRagAllowedExtensions.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);

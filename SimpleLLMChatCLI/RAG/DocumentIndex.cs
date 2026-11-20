@@ -109,7 +109,7 @@ namespace SimpleLLMChatCLI.RAG
 
         public static string ResolveKnowledgePath(ConfigHandler config)
         {
-            string path = config != null ? config.GetConfigValue("ragKnowledgePath") : null;
+            string path = config != null ? config.Get(AppSettings.RagKnowledgePath) : null;
             if (string.IsNullOrEmpty(path))
                 return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "knowledge");
             try
@@ -185,14 +185,14 @@ namespace SimpleLLMChatCLI.RAG
         {
             if (config == null)
                 return true;
-            string model = config.GetConfigValue("embeddingsModel");
+            string model = config.Get(AppSettings.EmbeddingsModel);
             if (!string.Equals(Manifest.EmbeddingsModel ?? string.Empty, model, StringComparison.Ordinal))
                 return true;
-            if (Manifest.IndexChunkLines != config.GetConfigInt("indexChunkLines", 60))
+            if (Manifest.IndexChunkLines != config.Get(AppSettings.IndexChunkLines))
                 return true;
-            if (Manifest.IndexChunkOverlap != config.GetConfigInt("indexChunkOverlap", 10))
+            if (Manifest.IndexChunkOverlap != config.Get(AppSettings.IndexChunkOverlap))
                 return true;
-            if (Manifest.RagMaxSnippetLength != config.GetConfigInt("ragMaxSnippetLength", 2000))
+            if (Manifest.RagMaxSnippetLength != config.Get(AppSettings.RagMaxSnippetLength))
                 return true;
             return false;
         }

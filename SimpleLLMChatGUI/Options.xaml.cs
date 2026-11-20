@@ -163,41 +163,41 @@ namespace SimpleLLMChatGUI
 
         private void LoadSettings(ConfigHandler config)
         {
-            ServerURL = config.GetConfigValue("llmserver");
-            ApiKey = config.GetConfigValue("apikey");
-            Model = config.GetConfigValue("model");
-            SysPrompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt"));
-            ContextWindowSize = config.GetConfigInt("contextWindowSize", 0);
-            AssistantName = config.GetConfigValue("assistantname");
+            ServerURL = config.Get(AppSettings.LlmServer);
+            ApiKey = config.Get(AppSettings.ApiKey);
+            Model = config.Get(AppSettings.Model);
+            SysPrompt = ConfigHandler.DecodeStoredPrompt(config.Get(AppSettings.SysPrompt));
+            ContextWindowSize = config.Get(AppSettings.ContextWindowSize);
+            AssistantName = config.Get(AppSettings.AssistantName);
             if (string.IsNullOrWhiteSpace(AssistantName))
                 AssistantName = AppConstants.DefaultAssistantName;
-            ThinkingDisplayModeText = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed).ToString();
-            ToolCallDisplayModeText = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed).ToString();
-            ToolOutputDisplayModeText = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown).ToString();
-            MarkdownParsing = config.GetConfigBool("markdownparsing", true);
-            CodeFontFamily = config.GetConfigValue("codeblockfontfamily");
-            CustomFontFamily = config.GetConfigValue("customfontfamily");
-            ChatFontSize = config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize);
+            ThinkingDisplayModeText = config.Get(AppSettings.ThinkingDisplay).ToString();
+            ToolCallDisplayModeText = config.Get(AppSettings.ToolCallDisplay).ToString();
+            ToolOutputDisplayModeText = config.Get(AppSettings.ToolOutputDisplay).ToString();
+            MarkdownParsing = config.Get(AppSettings.MarkdownParsing);
+            CodeFontFamily = config.Get(AppSettings.CodeBlockFontFamily);
+            CustomFontFamily = config.Get(AppSettings.CustomFontFamily);
+            ChatFontSize = config.Get(AppSettings.FontSize);
 
-            RagEnabled = config.GetConfigBool("ragEnabled", false);
-            RagKnowledgePath = config.GetConfigValue("ragKnowledgePath");
-            RagMaxResults = config.GetConfigInt("ragMaxResults", 5);
-            IndexChunkLines = config.GetConfigInt("indexChunkLines", 60);
-            IndexChunkOverlap = config.GetConfigInt("indexChunkOverlap", 10);
-            RagMaxSnippetLength = config.GetConfigInt("ragMaxSnippetLength", 2000);
-            RagRetrieveMode = config.GetConfigValue("ragRetrieveMode", "newchat");
-            string allowedExt = config.GetConfigValue("ragAllowedExtensions");
+            RagEnabled = config.Get(AppSettings.RagEnabled);
+            RagKnowledgePath = config.Get(AppSettings.RagKnowledgePath);
+            RagMaxResults = config.Get(AppSettings.RagMaxResults);
+            IndexChunkLines = config.Get(AppSettings.IndexChunkLines);
+            IndexChunkOverlap = config.Get(AppSettings.IndexChunkOverlap);
+            RagMaxSnippetLength = config.Get(AppSettings.RagMaxSnippetLength);
+            RagRetrieveMode = config.Get(AppSettings.RagRetrieveMode);
+            string allowedExt = config.Get(AppSettings.RagAllowedExtensions);
             RagAllowedExtensions = string.IsNullOrEmpty(allowedExt)
                 ? AppConstants.DefaultRagAllowedExtensions
                 : allowedExt;
-            EmbeddingsEndpoint = config.GetConfigValue("embeddingsEndpoint");
-            EmbeddingsModel = config.GetConfigValue("embeddingsModel");
-            EmbeddingsApiKey = config.GetConfigValue("embeddingsApiKey");
-            JevBaseUrl = config.GetConfigValue("jevbaseurl");
-            JevApiKey = config.GetConfigValue("jevapikey");
-            JevModel = config.GetConfigValue("jevmodel");
-            ShowJevConfidence = config.GetConfigBool("showjevconfidence", true);
-            MaxConsecutiveFailedToolCalls = config.GetConfigInt("maxconsecutivefailedtoolcalls", 10);
+            EmbeddingsEndpoint = config.Get(AppSettings.EmbeddingsEndpoint);
+            EmbeddingsModel = config.Get(AppSettings.EmbeddingsModel);
+            EmbeddingsApiKey = config.Get(AppSettings.EmbeddingsApiKey);
+            JevBaseUrl = config.Get(AppSettings.JevBaseUrl);
+            JevApiKey = config.Get(AppSettings.JevApiKey);
+            JevModel = config.Get(AppSettings.JevModel);
+            ShowJevConfidence = config.Get(AppSettings.ShowJevConfidence);
+            MaxConsecutiveFailedToolCalls = config.Get(AppSettings.MaxConsecutiveFailedToolCalls);
 
             ApiKeyPasswordBox.Password = ApiKey;
             EmbeddingsApiKeyPasswordBox.Password = EmbeddingsApiKey;

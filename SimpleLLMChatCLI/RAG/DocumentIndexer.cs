@@ -32,7 +32,7 @@ namespace SimpleLLMChatCLI.RAG
 
         public void Reconcile()
         {
-            if (!_config.GetConfigBool("ragEnabled", false))
+            if (!_config.Get(AppSettings.RagEnabled))
             {
                 Report(new IndexProgress { Phase = "error", Message = "RAG is disabled." });
                 return;
@@ -72,9 +72,9 @@ namespace SimpleLLMChatCLI.RAG
                 knowledgePath, DocumentScanFilter.GetAllowedExtensions(_config)));
             Report(new IndexProgress { Phase = "start", Total = files.Count });
 
-            int chunkLines = _config.GetConfigInt("indexChunkLines", 60);
-            int overlap = _config.GetConfigInt("indexChunkOverlap", 10);
-            int maxSnippet = _config.GetConfigInt("ragMaxSnippetLength", 2000);
+            int chunkLines = _config.Get(AppSettings.IndexChunkLines);
+            int overlap = _config.Get(AppSettings.IndexChunkOverlap);
+            int maxSnippet = _config.Get(AppSettings.RagMaxSnippetLength);
 
             var pendingTexts = new List<string>();
             var pendingChunks = new List<ChunkVector>();
@@ -185,7 +185,7 @@ namespace SimpleLLMChatCLI.RAG
                 }
             }
 
-            index.Manifest.EmbeddingsModel = _config.GetConfigValue("embeddingsModel");
+            index.Manifest.EmbeddingsModel = _config.Get(AppSettings.EmbeddingsModel);
             index.Manifest.IndexChunkLines = chunkLines;
             index.Manifest.IndexChunkOverlap = overlap;
             index.Manifest.RagMaxSnippetLength = maxSnippet;

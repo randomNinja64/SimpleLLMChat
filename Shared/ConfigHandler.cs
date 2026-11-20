@@ -20,6 +20,13 @@ public class ConfigHandler
         configMap = IniFileHandler.LoadIni(filename);
     }
 
+    // Typed access to the core settings declared in AppSettings.
+    public string Get(Setting<string> setting) { return GetConfigValue(setting.Key, setting.Default); }
+    public int Get(Setting<int> setting) { return GetConfigInt(setting.Key, setting.Default); }
+    public bool Get(Setting<bool> setting) { return GetConfigBool(setting.Key, setting.Default); }
+    public ChatBlockDisplayMode Get(Setting<ChatBlockDisplayMode> setting) { return GetChatBlockDisplayMode(setting.Key, setting.Default); }
+    public List<string> GetList(Setting<string> setting) { return GetConfigList(setting.Key); }
+
     public string GetConfigValue(string key, string defaultValue = "")
     {
         return configMap.ContainsKey(key) ? configMap[key] : defaultValue;

@@ -30,7 +30,7 @@ public partial class LLMClient
 
     private string BuildSystemPrompt(List<string> enabledTools, List<string> contextInjections = null)
     {
-        string sysprompt = ConfigHandler.DecodeStoredPrompt(config.GetConfigValue("sysprompt")) ?? "";
+        string sysprompt = ConfigHandler.DecodeStoredPrompt(config.Get(AppSettings.SysPrompt)) ?? "";
 
         if (registry != null)
         {
@@ -54,7 +54,7 @@ public partial class LLMClient
     {
         JObject payload = new JObject
         {
-            ["model"] = config.GetConfigValue("model")
+            ["model"] = config.Get(AppSettings.Model)
         };
 
         string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
@@ -87,7 +87,7 @@ public partial class LLMClient
 
         if (!BaseOverheadChars.HasValue)
         {
-            List<string> configuredTools = config.GetConfigList("tools");
+            List<string> configuredTools = config.GetList(AppSettings.EnabledTools);
             bool summarizationPass = (enabledTools == null || enabledTools.Count == 0)
                 && configuredTools != null && configuredTools.Count > 0;
             if (!summarizationPass)

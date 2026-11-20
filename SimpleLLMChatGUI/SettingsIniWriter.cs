@@ -59,10 +59,10 @@ namespace SimpleLLMChatGUI
         {
             var sections = new List<KeyValuePair<string, List<string>>>
             {
-                new KeyValuePair<string, List<string>>("Appearance", GetDefaultAppearanceSettings()),
-                new KeyValuePair<string, List<string>>("RAG", GetDefaultRagSettings()),
-                new KeyValuePair<string, List<string>>("System", GetSystemSettings(apiKey, llmServer, model, sysPrompt, contextWindowSize)),
-                new KeyValuePair<string, List<string>>("Tools", GetDefaultToolSettings()),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionAppearance, AppSettings.DefaultLines(AppSettings.SectionAppearance)),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionRag, AppSettings.DefaultLines(AppSettings.SectionRag)),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionSystem, GetSystemSettings(apiKey, llmServer, model, sysPrompt, contextWindowSize)),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionTools, AppSettings.DefaultLines(AppSettings.SectionTools)),
             };
             WriteSections(path, sections);
         }
@@ -76,61 +76,13 @@ namespace SimpleLLMChatGUI
         {
             return new List<string>
             {
-                "apikey=" + (apiKey ?? string.Empty),
-                "contextWindowSize=" + contextWindowSize,
-                "llmserver=" + (llmServer ?? string.Empty),
-                "model=" + (model ?? string.Empty),
-                "sysprompt=\"" + EscapePromptForStorage(sysPrompt) + "\"",
+                AppSettings.ApiKey.Line(apiKey ?? string.Empty),
+                AppSettings.ContextWindowSize.Line(contextWindowSize),
+                AppSettings.LlmServer.Line(llmServer ?? string.Empty),
+                AppSettings.Model.Line(model ?? string.Empty),
+                AppSettings.SysPrompt.Line("\"" + EscapePromptForStorage(sysPrompt) + "\""),
             };
         }
 
-        private static List<string> GetDefaultAppearanceSettings()
-        {
-            return new List<string>
-            {
-                "assistantname=" + AppConstants.DefaultAssistantName,
-                "codeblockfontfamily=",
-                "customfontfamily=",
-                "fontsize=" + AppConstants.DefaultChatFontSize,
-                "markdownparsing=1",
-                "thinkingdisplay=collapsed",
-                "toolcalldisplay=collapsed",
-                "tooloutputdisplay=shown",
-            };
-        }
-
-        private static List<string> GetDefaultRagSettings()
-        {
-            string allowedExt = RagExtensionList.FormatForStorage(AppConstants.DefaultRagAllowedExtensions);
-            return new List<string>
-            {
-                "ragenabled=0",
-                "ragallowedextensions=" + allowedExt,
-                "indexchunkoverlap=10",
-                "indexchunklines=60",
-                "embeddingsapikey=",
-                "embeddingsendpoint=",
-                "embeddingsmodel=",
-                "ragknowledgepath=",
-                "ragmaxsnippetlength=2000",
-                "ragmaxresults=5",
-                "ragretrievemode=newchat",
-            };
-        }
-
-        private static List<string> GetDefaultToolSettings()
-        {
-            return new List<string>
-            {
-                "tools=",
-                "toolsrequiringapproval=",
-                "toolapprovalmode=manual",
-                "jevbaseurl=",
-                "jevapikey=",
-                "jevmodel=",
-                "showjevconfidence=1",
-                "maxconsecutivefailedtoolcalls=10",
-            };
-        }
     }
 }

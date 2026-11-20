@@ -13,7 +13,7 @@ namespace SimpleLLMChatGUI
         public static void ApplyFontToWindow(Window window)
         {
             if (window == null) return;
-            window.FontFamily = TryGetFontFamily(App.Config.GetConfigValue("customfontfamily"))
+            window.FontFamily = TryGetFontFamily(App.Config.Get(AppSettings.CustomFontFamily))
                                 ?? SystemFonts.MessageFontFamily;
         }
 
@@ -27,13 +27,13 @@ namespace SimpleLLMChatGUI
                 return;
 
             Application.Current.Resources[CodeBlockFontFamilyKey] =
-                TryGetFontFamily(App.Config.GetConfigValue("codeblockfontfamily"))
+                TryGetFontFamily(App.Config.Get(AppSettings.CodeBlockFontFamily))
                 ?? new FontFamily("Courier New");
         }
 
         public static int GetFontSize()
         {
-            return ClampFontSize(App.Config.GetConfigInt("fontsize", AppConstants.DefaultChatFontSize));
+            return ClampFontSize(App.Config.Get(AppSettings.FontSize));
         }
 
         /// <summary>WPF throws on a font size outside 1..35791.</summary>

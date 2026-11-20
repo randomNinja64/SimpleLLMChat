@@ -32,7 +32,7 @@ namespace SimpleLLMChatCLI.RAG
             if (hits == null || hits.Count == 0)
                 return null;
 
-            int maxSnippet = config != null ? config.GetConfigInt("ragMaxSnippetLength", 2000) : 2000;
+            int maxSnippet = config != null ? config.Get(AppSettings.RagMaxSnippetLength) : 2000;
             var sb = new StringBuilder();
             var files = new List<string>();
             int shown = 0;

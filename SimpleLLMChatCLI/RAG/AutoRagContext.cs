@@ -21,7 +21,7 @@ namespace SimpleLLMChatCLI.RAG
                 MergedPrompt = baseUserPrompt
             };
 
-            if (config == null || !config.GetConfigBool("ragEnabled", false))
+            if (config == null || !config.Get(AppSettings.RagEnabled))
                 return result;
             if (string.IsNullOrWhiteSpace(query))
                 return result;
@@ -31,7 +31,7 @@ namespace SimpleLLMChatCLI.RAG
                 return result;
 
             IndexedHitSet hits = SemanticHitFormatter.Search(
-                index, config, query, config.GetConfigInt("ragMaxResults", 5));
+                index, config, query, config.Get(AppSettings.RagMaxResults));
             if (hits == null || string.IsNullOrWhiteSpace(hits.FormattedText))
                 return result;
 

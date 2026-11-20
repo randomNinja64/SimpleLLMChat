@@ -50,12 +50,12 @@ namespace SimpleLLMChatCLI
             if (config == null)
                 return JevGateDecision.AskUser();
 
-            string baseUrl = config.GetConfigValue("jevbaseurl");
+            string baseUrl = config.Get(AppSettings.JevBaseUrl);
             if (string.IsNullOrWhiteSpace(baseUrl))
                 return JevGateDecision.AskUser();
 
-            string model = config.GetConfigValue("jevmodel");
-            string apiKey = config.GetConfigValue("jevapikey");
+            string model = config.Get(AppSettings.JevModel);
+            string apiKey = config.Get(AppSettings.JevApiKey);
             string body = BuildRequestJson(model, toolName, arguments, toolDescription, recentMessages);
             string url = baseUrl.Trim().TrimEnd('/');
             string json = JsonHttpClient.Post(url, apiKey, body, TimeoutMs, out _);

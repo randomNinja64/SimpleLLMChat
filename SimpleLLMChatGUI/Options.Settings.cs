@@ -11,9 +11,9 @@ namespace SimpleLLMChatGUI
         private string _sysPrompt;
         private int _contextWindowSize;
         private string _assistantName;
-        private string _thinkingDisplayModeText = "Collapsed";
-        private string _toolCallDisplayModeText = "Collapsed";
-        private string _toolOutputDisplayModeText = "Shown";
+        private string _thinkingDisplayModeText;
+        private string _toolCallDisplayModeText;
+        private string _toolOutputDisplayModeText;
         private bool _markdownParsing;
         private string _codeFontFamily;
         private string _customFontFamily;
@@ -33,246 +33,94 @@ namespace SimpleLLMChatGUI
         private string _jevBaseUrl;
         private string _jevApiKey;
         private string _jevModel;
-        private bool _showJevConfidence = true;
-        private int _maxConsecutiveFailedToolCalls = 10;
+        private bool _showJevConfidence;
+        private int _maxConsecutiveFailedToolCalls;
 
         private static readonly List<string> DisplayModeOptionList =
             new List<string> { "Shown", "Collapsed", "Hidden" };
 
-        public List<string> AvailableTools
-        {
-            get { return _availableTools; }
-        }
+        public List<string> AvailableTools { get { return _availableTools; } }
+        public List<string> SystemFonts { get { return _systemFonts; } }
+        public List<string> DisplayModeOptions { get { return DisplayModeOptionList; } }
 
-        public List<string> SystemFonts
-        {
-            get { return _systemFonts; }
-        }
+        public string ServerURL { get => _serverUrl; set => Set(ref _serverUrl, value, nameof(ServerURL)); }
+        public string ApiKey { get => _apiKey; set => Set(ref _apiKey, value, nameof(ApiKey)); }
+        public string Model { get => _model; set => Set(ref _model, value, nameof(Model)); }
+        public string SysPrompt { get => _sysPrompt; set => Set(ref _sysPrompt, value, nameof(SysPrompt)); }
+        public int ContextWindowSize { get => _contextWindowSize; set => Set(ref _contextWindowSize, value, nameof(ContextWindowSize)); }
+        public string AssistantName { get => _assistantName; set => Set(ref _assistantName, value, nameof(AssistantName)); }
+        public string ThinkingDisplayModeText { get => _thinkingDisplayModeText; set => Set(ref _thinkingDisplayModeText, value, nameof(ThinkingDisplayModeText)); }
+        public string ToolCallDisplayModeText { get => _toolCallDisplayModeText; set => Set(ref _toolCallDisplayModeText, value, nameof(ToolCallDisplayModeText)); }
+        public string ToolOutputDisplayModeText { get => _toolOutputDisplayModeText; set => Set(ref _toolOutputDisplayModeText, value, nameof(ToolOutputDisplayModeText)); }
+        public bool MarkdownParsing { get => _markdownParsing; set => Set(ref _markdownParsing, value, nameof(MarkdownParsing)); }
+        public string CodeFontFamily { get => _codeFontFamily; set => Set(ref _codeFontFamily, value, nameof(CodeFontFamily)); }
+        public string CustomFontFamily { get => _customFontFamily; set => Set(ref _customFontFamily, value, nameof(CustomFontFamily)); }
+        public int ChatFontSize { get => _chatFontSize; set => Set(ref _chatFontSize, FontHandler.ClampFontSize(value), nameof(ChatFontSize)); }
 
-        public string ServerURL
-        {
-            get { return _serverUrl; }
-            set { _serverUrl = value; OnPropertyChanged(nameof(ServerURL)); }
-        }
+        public bool RagEnabled { get => _ragEnabled; set => Set(ref _ragEnabled, value, nameof(RagEnabled)); }
+        public string RagKnowledgePath { get => _ragKnowledgePath; set => Set(ref _ragKnowledgePath, value, nameof(RagKnowledgePath)); }
+        public int RagMaxResults { get => _ragMaxResults; set => Set(ref _ragMaxResults, value, nameof(RagMaxResults)); }
+        public int IndexChunkLines { get => _indexChunkLines; set => Set(ref _indexChunkLines, value, nameof(IndexChunkLines)); }
+        public int IndexChunkOverlap { get => _indexChunkOverlap; set => Set(ref _indexChunkOverlap, value, nameof(IndexChunkOverlap)); }
+        public int RagMaxSnippetLength { get => _ragMaxSnippetLength; set => Set(ref _ragMaxSnippetLength, value, nameof(RagMaxSnippetLength)); }
+        public string RagRetrieveMode { get => _ragRetrieveMode; set => Set(ref _ragRetrieveMode, value, nameof(RagRetrieveMode)); }
+        public string RagAllowedExtensions { get => _ragAllowedExtensions; set => Set(ref _ragAllowedExtensions, value, nameof(RagAllowedExtensions)); }
+        public string EmbeddingsEndpoint { get => _embeddingsEndpoint; set => Set(ref _embeddingsEndpoint, value, nameof(EmbeddingsEndpoint)); }
+        public string EmbeddingsModel { get => _embeddingsModel; set => Set(ref _embeddingsModel, value, nameof(EmbeddingsModel)); }
+        public string EmbeddingsApiKey { get => _embeddingsApiKey; set => Set(ref _embeddingsApiKey, value, nameof(EmbeddingsApiKey)); }
+        public string JevBaseUrl { get => _jevBaseUrl; set => Set(ref _jevBaseUrl, value, nameof(JevBaseUrl)); }
+        public string JevApiKey { get => _jevApiKey; set => Set(ref _jevApiKey, value, nameof(JevApiKey)); }
+        public string JevModel { get => _jevModel; set => Set(ref _jevModel, value, nameof(JevModel)); }
+        public bool ShowJevConfidence { get => _showJevConfidence; set => Set(ref _showJevConfidence, value, nameof(ShowJevConfidence)); }
+        public int MaxConsecutiveFailedToolCalls { get => _maxConsecutiveFailedToolCalls; set => Set(ref _maxConsecutiveFailedToolCalls, value < 0 ? 0 : value, nameof(MaxConsecutiveFailedToolCalls)); }
 
-        public string ApiKey
+        private void Set<T>(ref T field, T value, string propertyName)
         {
-            get { return _apiKey; }
-            set { _apiKey = value; OnPropertyChanged(nameof(ApiKey)); }
-        }
-
-        public string Model
-        {
-            get { return _model; }
-            set { _model = value; OnPropertyChanged(nameof(Model)); }
-        }
-
-        public string SysPrompt
-        {
-            get { return _sysPrompt; }
-            set { _sysPrompt = value; OnPropertyChanged(nameof(SysPrompt)); }
-        }
-
-        public int ContextWindowSize
-        {
-            get { return _contextWindowSize; }
-            set { _contextWindowSize = value; OnPropertyChanged(nameof(ContextWindowSize)); }
-        }
-
-        public string AssistantName
-        {
-            get { return _assistantName; }
-            set { _assistantName = value; OnPropertyChanged(nameof(AssistantName)); }
-        }
-
-        public List<string> DisplayModeOptions
-        {
-            get { return DisplayModeOptionList; }
-        }
-
-        public string ThinkingDisplayModeText
-        {
-            get { return _thinkingDisplayModeText; }
-            set { _thinkingDisplayModeText = value; OnPropertyChanged(nameof(ThinkingDisplayModeText)); }
-        }
-
-        public string ToolCallDisplayModeText
-        {
-            get { return _toolCallDisplayModeText; }
-            set { _toolCallDisplayModeText = value; OnPropertyChanged(nameof(ToolCallDisplayModeText)); }
-        }
-
-        public string ToolOutputDisplayModeText
-        {
-            get { return _toolOutputDisplayModeText; }
-            set { _toolOutputDisplayModeText = value; OnPropertyChanged(nameof(ToolOutputDisplayModeText)); }
-        }
-
-        public bool MarkdownParsing
-        {
-            get { return _markdownParsing; }
-            set { _markdownParsing = value; OnPropertyChanged(nameof(MarkdownParsing)); }
-        }
-
-        public string CodeFontFamily
-        {
-            get { return _codeFontFamily; }
-            set { _codeFontFamily = value; OnPropertyChanged(nameof(CodeFontFamily)); }
-        }
-
-        public string CustomFontFamily
-        {
-            get { return _customFontFamily; }
-            set { _customFontFamily = value; OnPropertyChanged(nameof(CustomFontFamily)); }
-        }
-
-        public int ChatFontSize
-        {
-            get { return _chatFontSize; }
-            set { _chatFontSize = FontHandler.ClampFontSize(value); OnPropertyChanged(nameof(ChatFontSize)); }
-        }
-
-        public bool RagEnabled
-        {
-            get { return _ragEnabled; }
-            set { _ragEnabled = value; OnPropertyChanged(nameof(RagEnabled)); }
-        }
-
-        public string RagKnowledgePath
-        {
-            get { return _ragKnowledgePath; }
-            set { _ragKnowledgePath = value; OnPropertyChanged(nameof(RagKnowledgePath)); }
-        }
-
-        public int RagMaxResults
-        {
-            get { return _ragMaxResults; }
-            set { _ragMaxResults = value; OnPropertyChanged(nameof(RagMaxResults)); }
-        }
-
-        public int IndexChunkLines
-        {
-            get { return _indexChunkLines; }
-            set { _indexChunkLines = value; OnPropertyChanged(nameof(IndexChunkLines)); }
-        }
-
-        public int IndexChunkOverlap
-        {
-            get { return _indexChunkOverlap; }
-            set { _indexChunkOverlap = value; OnPropertyChanged(nameof(IndexChunkOverlap)); }
-        }
-
-        public int RagMaxSnippetLength
-        {
-            get { return _ragMaxSnippetLength; }
-            set { _ragMaxSnippetLength = value; OnPropertyChanged(nameof(RagMaxSnippetLength)); }
-        }
-
-        public string RagRetrieveMode
-        {
-            get { return _ragRetrieveMode; }
-            set { _ragRetrieveMode = value; OnPropertyChanged(nameof(RagRetrieveMode)); }
-        }
-
-        public string RagAllowedExtensions
-        {
-            get { return _ragAllowedExtensions; }
-            set { _ragAllowedExtensions = value; OnPropertyChanged(nameof(RagAllowedExtensions)); }
-        }
-
-        public string EmbeddingsEndpoint
-        {
-            get { return _embeddingsEndpoint; }
-            set { _embeddingsEndpoint = value; OnPropertyChanged(nameof(EmbeddingsEndpoint)); }
-        }
-
-        public string EmbeddingsModel
-        {
-            get { return _embeddingsModel; }
-            set { _embeddingsModel = value; OnPropertyChanged(nameof(EmbeddingsModel)); }
-        }
-
-        public string EmbeddingsApiKey
-        {
-            get { return _embeddingsApiKey; }
-            set { _embeddingsApiKey = value; OnPropertyChanged(nameof(EmbeddingsApiKey)); }
-        }
-
-        public string JevBaseUrl
-        {
-            get { return _jevBaseUrl; }
-            set { _jevBaseUrl = value; OnPropertyChanged(nameof(JevBaseUrl)); }
-        }
-
-        public string JevApiKey
-        {
-            get { return _jevApiKey; }
-            set { _jevApiKey = value; OnPropertyChanged(nameof(JevApiKey)); }
-        }
-
-        public string JevModel
-        {
-            get { return _jevModel; }
-            set { _jevModel = value; OnPropertyChanged(nameof(JevModel)); }
-        }
-
-        public bool ShowJevConfidence
-        {
-            get { return _showJevConfidence; }
-            set { _showJevConfidence = value; OnPropertyChanged(nameof(ShowJevConfidence)); }
-        }
-
-        public int MaxConsecutiveFailedToolCalls
-        {
-            get { return _maxConsecutiveFailedToolCalls; }
-            set
-            {
-                _maxConsecutiveFailedToolCalls = value < 0 ? 0 : value;
-                OnPropertyChanged(nameof(MaxConsecutiveFailedToolCalls));
-            }
+            field = value;
+            OnPropertyChanged(propertyName);
         }
 
         private void InitializeDefaults()
         {
-            ServerURL = "";
-            ApiKey = "";
-            Model = "";
-            SysPrompt = "";
-            ContextWindowSize = 0;
-            AssistantName = AppConstants.DefaultAssistantName;
-            ThinkingDisplayModeText = "Collapsed";
-            ToolCallDisplayModeText = "Collapsed";
-            ToolOutputDisplayModeText = "Shown";
-            MarkdownParsing = true;
-            CodeFontFamily = "";
-            CustomFontFamily = "";
-            ChatFontSize = AppConstants.DefaultChatFontSize;
-            RagEnabled = false;
-            RagKnowledgePath = "";
-            RagMaxResults = 5;
-            IndexChunkLines = 60;
-            IndexChunkOverlap = 10;
-            RagMaxSnippetLength = 2000;
-            RagRetrieveMode = "newchat";
-            RagAllowedExtensions = AppConstants.DefaultRagAllowedExtensions;
-            EmbeddingsEndpoint = "";
-            EmbeddingsModel = "";
-            EmbeddingsApiKey = "";
-            JevBaseUrl = "";
-            JevApiKey = "";
-            JevModel = "";
-            ShowJevConfidence = true;
-            MaxConsecutiveFailedToolCalls = 10;
+            ServerURL = AppSettings.LlmServer.Default;
+            ApiKey = AppSettings.ApiKey.Default;
+            Model = AppSettings.Model.Default;
+            SysPrompt = AppSettings.SysPrompt.Default;
+            ContextWindowSize = AppSettings.ContextWindowSize.Default;
+            AssistantName = AppSettings.AssistantName.Default;
+            ThinkingDisplayModeText = AppSettings.ThinkingDisplay.Default.ToString();
+            ToolCallDisplayModeText = AppSettings.ToolCallDisplay.Default.ToString();
+            ToolOutputDisplayModeText = AppSettings.ToolOutputDisplay.Default.ToString();
+            MarkdownParsing = AppSettings.MarkdownParsing.Default;
+            CodeFontFamily = AppSettings.CodeBlockFontFamily.Default;
+            CustomFontFamily = AppSettings.CustomFontFamily.Default;
+            ChatFontSize = AppSettings.FontSize.Default;
+            RagEnabled = AppSettings.RagEnabled.Default;
+            RagKnowledgePath = AppSettings.RagKnowledgePath.Default;
+            RagMaxResults = AppSettings.RagMaxResults.Default;
+            IndexChunkLines = AppSettings.IndexChunkLines.Default;
+            IndexChunkOverlap = AppSettings.IndexChunkOverlap.Default;
+            RagMaxSnippetLength = AppSettings.RagMaxSnippetLength.Default;
+            RagRetrieveMode = AppSettings.RagRetrieveMode.Default;
+            RagAllowedExtensions = AppSettings.RagAllowedExtensions.Default;
+            EmbeddingsEndpoint = AppSettings.EmbeddingsEndpoint.Default;
+            EmbeddingsModel = AppSettings.EmbeddingsModel.Default;
+            EmbeddingsApiKey = AppSettings.EmbeddingsApiKey.Default;
+            JevBaseUrl = AppSettings.JevBaseUrl.Default;
+            JevApiKey = AppSettings.JevApiKey.Default;
+            JevModel = AppSettings.JevModel.Default;
+            ShowJevConfidence = AppSettings.ShowJevConfidence.Default;
+            MaxConsecutiveFailedToolCalls = AppSettings.MaxConsecutiveFailedToolCalls.Default;
         }
 
         private void SaveIni(string path)
         {
             var sections = new List<KeyValuePair<string, List<string>>>
             {
-                new KeyValuePair<string, List<string>>("Appearance", GetAppearanceSettings()),
-                new KeyValuePair<string, List<string>>("RAG", GetRagSettings()),
-                new KeyValuePair<string, List<string>>("System", GetSystemSettings()),
-                new KeyValuePair<string, List<string>>("Tools", GetToolSettings()),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionAppearance, GetAppearanceSettings()),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionRag, GetRagSettings()),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionSystem, GetSystemSettings()),
+                new KeyValuePair<string, List<string>>(AppSettings.SectionTools, GetToolSettings()),
             };
             AddDynamicToolSettings(sections);
             SettingsIniWriter.WriteSections(path, sections);
@@ -282,14 +130,14 @@ namespace SimpleLLMChatGUI
         {
             return new List<string>
             {
-                "assistantname=" + AssistantName,
-                "codeblockfontfamily=" + CodeFontFamily,
-                "customfontfamily=" + CustomFontFamily,
-                "fontsize=" + ChatFontSize,
-                "markdownparsing=" + (MarkdownParsing ? "1" : "0"),
-                "thinkingdisplay=" + (ThinkingDisplayModeText ?? "Collapsed").ToLowerInvariant(),
-                "toolcalldisplay=" + (ToolCallDisplayModeText ?? "Collapsed").ToLowerInvariant(),
-                "tooloutputdisplay=" + (ToolOutputDisplayModeText ?? "Shown").ToLowerInvariant(),
+                AppSettings.AssistantName.Line(AssistantName),
+                AppSettings.CodeBlockFontFamily.Line(CodeFontFamily),
+                AppSettings.CustomFontFamily.Line(CustomFontFamily),
+                AppSettings.FontSize.Line(ChatFontSize),
+                AppSettings.MarkdownParsing.Line(MarkdownParsing ? "1" : "0"),
+                AppSettings.ThinkingDisplay.Line((ThinkingDisplayModeText ?? AppSettings.ThinkingDisplay.DefaultText).ToLowerInvariant()),
+                AppSettings.ToolCallDisplay.Line((ToolCallDisplayModeText ?? AppSettings.ToolCallDisplay.DefaultText).ToLowerInvariant()),
+                AppSettings.ToolOutputDisplay.Line((ToolOutputDisplayModeText ?? AppSettings.ToolOutputDisplay.DefaultText).ToLowerInvariant()),
             };
         }
 
@@ -300,20 +148,19 @@ namespace SimpleLLMChatGUI
 
         private List<string> GetRagSettings()
         {
-            string allowedExt = RagExtensionList.FormatForStorage(RagAllowedExtensions);
             return new List<string>
             {
-                "ragenabled=" + (RagEnabled ? "1" : "0"),
-                "ragallowedextensions=" + allowedExt,
-                "indexchunkoverlap=" + IndexChunkOverlap,
-                "indexchunklines=" + IndexChunkLines,
-                "embeddingsapikey=" + (EmbeddingsApiKey ?? string.Empty),
-                "embeddingsendpoint=" + (EmbeddingsEndpoint ?? string.Empty),
-                "embeddingsmodel=" + (EmbeddingsModel ?? string.Empty),
-                "ragknowledgepath=" + (RagKnowledgePath ?? string.Empty),
-                "ragmaxsnippetlength=" + RagMaxSnippetLength,
-                "ragmaxresults=" + RagMaxResults,
-                "ragretrievemode=" + (RagRetrieveMode ?? "newchat"),
+                AppSettings.RagEnabled.Line(RagEnabled ? "1" : "0"),
+                AppSettings.RagAllowedExtensions.Line(RagExtensionList.FormatForStorage(RagAllowedExtensions)),
+                AppSettings.IndexChunkOverlap.Line(IndexChunkOverlap),
+                AppSettings.IndexChunkLines.Line(IndexChunkLines),
+                AppSettings.EmbeddingsApiKey.Line(EmbeddingsApiKey ?? string.Empty),
+                AppSettings.EmbeddingsEndpoint.Line(EmbeddingsEndpoint ?? string.Empty),
+                AppSettings.EmbeddingsModel.Line(EmbeddingsModel ?? string.Empty),
+                AppSettings.RagKnowledgePath.Line(RagKnowledgePath ?? string.Empty),
+                AppSettings.RagMaxSnippetLength.Line(RagMaxSnippetLength),
+                AppSettings.RagMaxResults.Line(RagMaxResults),
+                AppSettings.RagRetrieveMode.Line(RagRetrieveMode ?? AppSettings.RagRetrieveMode.Default),
             };
         }
     }

@@ -40,10 +40,10 @@ namespace SimpleLLMChatGUI
             }
 
             ChatBlockDisplayMode mode = kind == ChatBlockKind.ToolCall
-                ? App.Config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed)
+                ? App.Config.Get(AppSettings.ToolCallDisplay)
                 : kind == ChatBlockKind.ToolOutput
-                    ? App.Config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown)
-                    : App.Config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed);
+                    ? App.Config.Get(AppSettings.ToolOutputDisplay)
+                    : App.Config.Get(AppSettings.ThinkingDisplay);
             mode = _blockMode ?? mode;
             _blockMode = mode;
             bool expandByDefault = mode != ChatBlockDisplayMode.Collapsed;

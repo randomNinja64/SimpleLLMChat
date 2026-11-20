@@ -28,7 +28,7 @@ namespace SimpleLLMChatGUI
         public void Refresh()
         {
             int contextWindowSize = App.Config != null
-                ? App.Config.GetConfigInt("contextWindowSize", 0)
+                ? App.Config.Get(AppSettings.ContextWindowSize)
                 : 0;
 
             int? max = contextWindowSize > 0 ? (int?)contextWindowSize : null;

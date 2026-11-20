@@ -36,14 +36,14 @@ namespace SimpleLLMChatGUI
         {
             var toolLines = new List<string>
             {
-                "tools=" + string.Join(",", GetSelectedToolsFromListBox(ToolsListBox)),
-                "toolsrequiringapproval=" + string.Join(",", GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox)),
-                "toolapprovalmode=" + (ApprovalAutoRadio.IsChecked == true ? "auto" : "manual"),
-                "jevbaseurl=" + (JevBaseUrl ?? string.Empty),
-                "jevapikey=" + (JevApiKey ?? string.Empty),
-                "jevmodel=" + (JevModel ?? string.Empty),
-                "showjevconfidence=" + (ShowJevConfidence ? "1" : "0"),
-                "maxconsecutivefailedtoolcalls=" + MaxConsecutiveFailedToolCalls,
+                AppSettings.EnabledTools.Line(string.Join(",", GetSelectedToolsFromListBox(ToolsListBox))),
+                AppSettings.ToolsRequiringApproval.Line(string.Join(",", GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox))),
+                AppSettings.ToolApprovalMode.Line(ApprovalAutoRadio.IsChecked == true ? "auto" : "manual"),
+                AppSettings.JevBaseUrl.Line(JevBaseUrl ?? string.Empty),
+                AppSettings.JevApiKey.Line(JevApiKey ?? string.Empty),
+                AppSettings.JevModel.Line(JevModel ?? string.Empty),
+                AppSettings.ShowJevConfidence.Line(ShowJevConfidence ? "1" : "0"),
+                AppSettings.MaxConsecutiveFailedToolCalls.Line(MaxConsecutiveFailedToolCalls),
             };
 
             foreach (var kvp in _toolTimeoutControls)
@@ -227,17 +227,17 @@ namespace SimpleLLMChatGUI
 
         private void LoadToolSelections(ConfigHandler config)
         {
-            ApplyToolSelectionToListBox(ToolsListBox, config.GetConfigList("tools"));
+            ApplyToolSelectionToListBox(ToolsListBox, config.GetList(AppSettings.EnabledTools));
             ApplyToolSelectionToListBox(
                 ToolsRequiringApprovalListBox,
-                config.GetConfigList("toolsrequiringapproval"));
+                config.GetList(AppSettings.ToolsRequiringApproval));
             ApplyApprovalMode(config);
         }
 
         private void ApplyApprovalMode(ConfigHandler config)
         {
             bool auto = string.Equals(
-                config.GetConfigValue("toolapprovalmode"),
+                config.Get(AppSettings.ToolApprovalMode),
                 "auto",
                 StringComparison.OrdinalIgnoreCase);
             ApprovalAutoRadio.IsChecked = auto;

@@ -79,6 +79,9 @@
     <Compile Include="..\..\Shared\ConfigHandler.cs">
       <Link>Shared\ConfigHandler.cs</Link>
     </Compile>
+    <Compile Include="..\..\Shared\AppSettings.cs">
+      <Link>Shared\AppSettings.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\TlsCurlFallback.cs">
       <Link>Shared\TlsCurlFallback.cs</Link>
     </Compile>

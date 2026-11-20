@@ -22,11 +22,11 @@ namespace SimpleLLMChatCLI
 
         public static TurnSettings FromConfig(ConfigHandler config, bool outputOnly)
         {
-            string assistantName = config.GetConfigValue("assistantname");
+            string assistantName = config.Get(AppSettings.AssistantName);
             if (string.IsNullOrWhiteSpace(assistantName))
                 assistantName = AppConstants.DefaultAssistantName;
 
-            List<string> enabledTools = config.GetConfigList("tools");
+            List<string> enabledTools = config.GetList(AppSettings.EnabledTools);
 
             return new TurnSettings
             {
@@ -34,14 +34,14 @@ namespace SimpleLLMChatCLI
                 EnabledTools = enabledTools,
                 EnabledSet = new HashSet<string>(enabledTools, StringComparer.OrdinalIgnoreCase),
                 ApprovalSet = new HashSet<string>(
-                    config.GetConfigList("toolsrequiringapproval"), StringComparer.OrdinalIgnoreCase),
+                    config.GetList(AppSettings.ToolsRequiringApproval), StringComparer.OrdinalIgnoreCase),
                 AutoApproval = string.Equals(
-                    config.GetConfigValue("toolapprovalmode"), "auto", StringComparison.OrdinalIgnoreCase),
-                ShowJevConfidence = config.GetConfigBool("showjevconfidence", true),
-                ThinkingDisplay = config.GetChatBlockDisplayMode("thinkingdisplay", ChatBlockDisplayMode.Collapsed),
-                ToolCallDisplay = config.GetChatBlockDisplayMode("toolcalldisplay", ChatBlockDisplayMode.Collapsed),
-                ToolOutputDisplay = config.GetChatBlockDisplayMode("tooloutputdisplay", ChatBlockDisplayMode.Shown),
-                MaxConsecutiveFailures = Math.Max(0, config.GetConfigInt("maxconsecutivefailedtoolcalls", 10)),
+                    config.Get(AppSettings.ToolApprovalMode), "auto", StringComparison.OrdinalIgnoreCase),
+                ShowJevConfidence = config.Get(AppSettings.ShowJevConfidence),
+                ThinkingDisplay = config.Get(AppSettings.ThinkingDisplay),
+                ToolCallDisplay = config.Get(AppSettings.ToolCallDisplay),
+                ToolOutputDisplay = config.Get(AppSettings.ToolOutputDisplay),
+                MaxConsecutiveFailures = Math.Max(0, config.Get(AppSettings.MaxConsecutiveFailedToolCalls)),
                 OutputOnly = outputOnly
             };
         }

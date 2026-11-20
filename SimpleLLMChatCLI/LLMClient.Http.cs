@@ -24,10 +24,10 @@ public partial class LLMClient
     {
         try
         {
-            var request = (HttpWebRequest)WebRequest.Create(config.GetConfigValue("llmserver").Trim().TrimEnd('/') + "/chat/completions");
+            var request = (HttpWebRequest)WebRequest.Create(config.Get(AppSettings.LlmServer).Trim().TrimEnd('/') + "/chat/completions");
             request.Method = "POST";
             request.ContentType = "application/json";
-            request.Headers.Add("Authorization", "Bearer " + config.GetConfigValue("apikey"));
+            request.Headers.Add("Authorization", "Bearer " + config.Get(AppSettings.ApiKey));
 
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payload.ToString(Formatting.None));
             request.ContentLength = payloadBytes.Length;
@@ -66,9 +66,9 @@ public partial class LLMClient
                 reason = ex.Message;
             }
 
-            string serverUrl = config.GetConfigValue("llmserver") ?? "";
+            string serverUrl = config.Get(AppSettings.LlmServer) ?? "";
             if (TlsCurlFallback.CanAttempt(serverUrl, ex))
-                return CurlClient.SendRequest(serverUrl, config.GetConfigValue("apikey"), payload, sink);
+                return CurlClient.SendRequest(serverUrl, config.Get(AppSettings.ApiKey), payload, sink);
 
             return new LLMCompletionResponse(reason, null, "request_failed");
         }

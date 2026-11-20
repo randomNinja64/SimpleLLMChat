@@ -90,10 +90,10 @@ public partial class LLMClient
         RagHost.WaitIfIndexing();
 
         string contentForLlm = userMessage ?? string.Empty;
-        if (config.GetConfigBool("ragEnabled", false))
+        if (config.Get(AppSettings.RagEnabled))
         {
             bool everyTurn = string.Equals(
-                config.GetConfigValue("ragRetrieveMode", "newchat"),
+                config.Get(AppSettings.RagRetrieveMode),
                 "everyturn",
                 StringComparison.OrdinalIgnoreCase);
             bool isNewChat = conversation == null || conversation.Count == 0;
@@ -320,7 +320,7 @@ public partial class LLMClient
         int statusChars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
         PublishStatusTokens(statusChars);
 
-        if (!TokenEstimator.ShouldSummarize(statusChars, config.GetConfigInt("contextWindowSize", 0)))
+        if (!TokenEstimator.ShouldSummarize(statusChars, config.Get(AppSettings.ContextWindowSize)))
             return;
 
         sink.Notice("[Context usage high - summarizing conversation...]");
@@ -330,7 +330,7 @@ public partial class LLMClient
             return;
         if (string.IsNullOrEmpty(summary))
         {
-            int contextWindow = config.GetConfigInt("contextWindowSize", 0);
+            int contextWindow = config.Get(AppSettings.ContextWindowSize);
             int dropped = DropOldestMessagesUntilFit(conversation, contextWindow);
             int chars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
             PublishStatusTokens(chars);
