@@ -350,12 +350,14 @@ namespace SimpleLLMChatCLI.Tests
                     server.EnqueueContent("seen");
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
 
-                    byte[] blob = new byte[600];
+                    // Big enough that its base64 length would read as far more than the flat estimate.
+                    byte[] blob = new byte[60000];
                     for (int i = 0; i < blob.Length; i++)
                         blob[i] = (byte)(i % 256);
                     string imagePath = Path.Combine(ws.Path, "shot.png");
                     File.WriteAllBytes(imagePath, blob);
-                    int minTokens = TokenEstimator.ApproximateTokens(Convert.ToBase64String(blob).Length);
+                    int minTokens = TokenEstimator.ImageTokenEstimate;
+                    int maxTokens = TokenEstimator.ImageTokenEstimate + 500;
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
@@ -378,6 +380,7 @@ namespace SimpleLLMChatCLI.Tests
                             System.Threading.Thread.Sleep(25);
                         }
                         TestAssert.True(tokens >= minTokens, "image counted tokens=" + tokens + " min=" + minTokens);
+                        TestAssert.True(tokens <= maxTokens, "image not counted by size tokens=" + tokens + " max=" + maxTokens);
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }

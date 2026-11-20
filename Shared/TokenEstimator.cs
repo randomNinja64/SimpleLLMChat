@@ -6,12 +6,23 @@ using System;
 public static class TokenEstimator
 {
     public const double SummarizeThreshold = 0.90;
+    public const int CharsPerToken = 3;
+
+    /// <summary>
+    /// Flat cost of one attached image. Providers bill images by resolution, not by
+    /// file size: a full-size screenshot is about 1,100-1,600 tokens on the standard
+    /// tiers of the major APIs, so the base64 length would overstate it many times over.
+    /// </summary>
+    public const int ImageTokenEstimate = 1500;
+
+    /// <summary>The image estimate in characters, for adding to a character count.</summary>
+    public const int ImageCharEstimate = ImageTokenEstimate * CharsPerToken;
 
     public static int ApproximateTokens(int characterCount)
     {
         if (characterCount <= 0)
             return 0;
-        return characterCount / 3;
+        return characterCount / CharsPerToken;
     }
 
     public static bool ShouldSummarize(int characterCount, int contextWindowSize)
