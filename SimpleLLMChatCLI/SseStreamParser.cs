@@ -33,9 +33,9 @@ namespace SimpleLLMChatCLI
                 catch { if (!Cancel.Requested) throw; break; }
                 if (line == null) break;
 
-                if (!line.StartsWith("data: ")) continue;
+                if (!line.StartsWith("data:")) continue;
 
-                string jsonPart = line.Substring(6);
+                string jsonPart = line.Substring(5).TrimStart(' ');
                 if (jsonPart == "[DONE]") break;
 
                 JObject obj;
