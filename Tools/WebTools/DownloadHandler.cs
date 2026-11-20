@@ -7,150 +7,80 @@ namespace WebTools
 {
     public static class DownloadHandler
     {
-        public static string DownloadVideo(string URL, out int exitCode)
+        /// <summary>Downloads with yt-dlp.exe to the desktop; a failure keeps yt-dlp's exit code.</summary>
+        public static ToolResult DownloadVideo(string URL)
         {
-            try
-            {
-                // Get the user's desktop path
-                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            // An explicit output template in the desktop folder lets yt-dlp handle the file naming.
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string outputTemplate = Path.Combine(desktopPath, "%(title)s.%(ext)s");
+            string arguments = $"--no-progress -o \"{outputTemplate}\" \"{URL}\"";
 
-                // Use an explicit output template in the desktop folder so yt-dlp handles the file naming
-                string outputTemplate = Path.Combine(desktopPath, "%(title)s.%(ext)s");
+            string output = ToolHelper.ExecuteProcess("yt-dlp.exe", arguments, out int exitCode);
 
-                // Build arguments: no progress, output template, then the URL (each argument quoted)
-                string arguments = $"--no-progress -o \"{outputTemplate}\" \"{URL}\"";
+            if (exitCode != 0)
+                return new ToolResult($"yt-dlp exited with code {exitCode}:\n{output}", exitCode);
 
-                string output = ToolHelper.ExecuteProcess("yt-dlp.exe", arguments, out exitCode);
-
-                if (exitCode != 0)
-                    return $"yt-dlp exited with code {exitCode}:\n{output}";
-
-                return $"Video downloaded successfully to desktop\n{output}";
-            }
-            catch (Exception ex)
-            {
-                exitCode = -1;
-                return "Error running yt-dlp.exe: " + ex.Message;
-            }
+            return new ToolResult($"Video downloaded successfully to desktop\n{output}", 0);
         }
 
-        public static string DownloadFile(string filename, string URL, out int exitCode)
+        /// <summary>Downloads with curl.exe; a failure keeps curl's exit code.</summary>
+        public static ToolResult DownloadFile(string filename, string URL)
         {
-            exitCode = 0;
+            filename = Environment.ExpandEnvironmentVariables(filename);
 
-            try
+            // When the extension implies a type, check it against the server's Content-Type first.
+            string[] expectedTypes = GetExpectedMimeTypes(Path.GetExtension(filename));
+            string contentType = expectedTypes != null ? GetContentTypeFromURL(URL) : "";
+
+            // application/octet-stream (generic binary stream) is always accepted.
+            if (!string.IsNullOrEmpty(contentType)
+                && !contentType.ToLower().Contains("application/octet-stream")
+                && !Array.Exists(expectedTypes, t => contentType.ToLower().Contains(t.ToLower())))
             {
-                // Expand environment variables in filename
-                filename = Environment.ExpandEnvironmentVariables(filename);
-
-                // Get expected MIME types based on file extension
-                string fileExtension = Path.GetExtension(filename).ToLower();
-                string[] expectedTypes = GetExpectedMimeTypes(fileExtension);
-
-                string contentType = "";
-
-                // Only perform HEAD request if we have expected MIME types to validate
-                if (expectedTypes != null)
-                {
-                    contentType = GetContentTypeFromURL(URL, out int headExitCode);
-
-                    // If HEAD request succeeds, validate the content type
-                    if (headExitCode == 0 && !string.IsNullOrEmpty(contentType))
-                    {
-                        // Always accept application/octet-stream (generic binary stream)
-                        if (!contentType.ToLower().Contains("application/octet-stream"))
-                        {
-                            // Verify content type matches expected type
-                            bool isValidType = false;
-                            foreach (string expectedType in expectedTypes)
-                            {
-                                if (contentType.ToLower().Contains(expectedType.ToLower()))
-                                {
-                                    isValidType = true;
-                                    break;
-                                }
-                            }
-
-                            if (!isValidType)
-                            {
-                                exitCode = 1;
-                                return $"File type mismatch: Expected {string.Join(" or ", expectedTypes)} but got '{contentType}'. Download cancelled.";
-                            }
-                        }
-                    }
-                    // If HEAD request fails, proceed with download anyway
-                }
-
-                // Ensure directory exists
-                string directory = Path.GetDirectoryName(filename);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    try
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
-                    catch (Exception ex)
-                    {
-                        exitCode = 1;
-                        return $"Failed to create directory '{directory}': {ex.Message}";
-                    }
-                }
-
-                // Build curl arguments
-                string output = CurlHelper.Execute(URL, out exitCode,
-                    extraFlags: "-o \"" + filename + "\"");
-
-                if (exitCode != 0)
-                {
-                    return $"curl exited with code {exitCode}: {output}";
-                }
-
-                string successMessage = $"File downloaded successfully: {filename}";
-                if (!string.IsNullOrEmpty(contentType))
-                {
-                    successMessage += $" (Content-Type: {contentType})";
-                }
-
-                return successMessage;
+                throw new InvalidOperationException(
+                    $"File type mismatch: Expected {string.Join(" or ", expectedTypes)} but got '{contentType}'. Download cancelled.");
             }
-            catch (Exception ex)
+
+            string directory = Path.GetDirectoryName(filename);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                exitCode = -1;
-                return "Error running curl.exe: " + ex.Message;
+                try
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                catch (Exception ex)
+                {
+                    throw new IOException($"Failed to create directory '{directory}': {ex.Message}", ex);
+                }
             }
+
+            string output = CurlHelper.Execute(URL, out int exitCode,
+                extraFlags: "-o \"" + filename + "\"");
+
+            if (exitCode != 0)
+                return new ToolResult($"curl exited with code {exitCode}: {output}", exitCode);
+
+            string successMessage = $"File downloaded successfully: {filename}";
+            if (!string.IsNullOrEmpty(contentType))
+                successMessage += $" (Content-Type: {contentType})";
+
+            return new ToolResult(successMessage, 0);
         }
 
-        private static string GetContentTypeFromURL(string URL, out int exitCode)
+        // Content-Type from a HEAD request, or "" when the request fails or sends none
+        // (the download then proceeds unchecked).
+        private static string GetContentTypeFromURL(string URL)
         {
-            try
-            {
-                // Build curl HEAD request arguments
-                string headers = CurlHelper.Execute(URL, out exitCode,
-                    extraFlags: "-I", combineErrorOutput: false);
-
-                if (exitCode != 0)
-                {
-                    return "";
-                }
-
-                // Extract Content-Type from headers
-                // When following redirects, curl returns multiple sets of headers
-                // Search from the end to get the LAST Content-Type (from the final destination)
-                Regex contentTypeRegex = new Regex(@"content-type:\s*([^\r\n;]+)", RegexOptions.IgnoreCase | RegexOptions.RightToLeft);
-                Match match = contentTypeRegex.Match(headers);
-
-                if (match.Success)
-                {
-                    return match.Groups[1].Value.Trim();
-                }
-
+            string headers = CurlHelper.Execute(URL, out int exitCode,
+                extraFlags: "-I", combineErrorOutput: false);
+            if (exitCode != 0)
                 return "";
-            }
-            catch (Exception)
-            {
-                exitCode = -1;
-                return "";
-            }
+
+            // When following redirects, curl returns several sets of headers; search from
+            // the end to get the Content-Type of the final destination.
+            Regex contentTypeRegex = new Regex(@"content-type:\s*([^\r\n;]+)", RegexOptions.IgnoreCase | RegexOptions.RightToLeft);
+            Match match = contentTypeRegex.Match(headers);
+            return match.Success ? match.Groups[1].Value.Trim() : "";
         }
 
         private static readonly Dictionary<string, string[]> MimeTypeMap = new Dictionary<string, string[]>()

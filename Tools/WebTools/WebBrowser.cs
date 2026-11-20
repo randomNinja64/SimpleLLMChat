@@ -10,65 +10,52 @@ namespace WebTools
 {
     public static class WebBrowser
     {
-        public static string ReadWebsite(string URL, int maxContentLength, int maxLinks,
-            string firecrawlEndpoint, string firecrawlApiKey, out int exitCode)
+        /// <summary>
+        /// Reads a page via Firecrawl when configured, otherwise (or when that fails) via curl.
+        /// A curl failure keeps curl's exit code.
+        /// </summary>
+        public static ToolResult ReadWebsite(string URL, int maxContentLength, int maxLinks,
+            string firecrawlEndpoint, string firecrawlApiKey)
         {
             if (!string.IsNullOrWhiteSpace(firecrawlEndpoint))
             {
                 string firecrawlText;
                 if (TryReadViaFirecrawl(URL, firecrawlEndpoint, firecrawlApiKey,
-                        maxContentLength, maxLinks, out firecrawlText, out exitCode))
-                    return firecrawlText + "\n";
+                        maxContentLength, maxLinks, out firecrawlText))
+                    return new ToolResult(firecrawlText + "\n", 0);
             }
 
-            return ReadWebsiteViaCurl(URL, maxContentLength, maxLinks, out exitCode);
-        }
+            string html = CurlHelper.Execute(URL, out int exitCode, combineErrorOutput: false);
 
-        private static string ReadWebsiteViaCurl(string URL, int maxContentLength, int maxLinks, out int exitCode)
-        {
-            string html = "";
+            if (exitCode != 0 && string.IsNullOrWhiteSpace(html))
+                return new ToolResult("Error fetching URL (curl exit " + exitCode + ").\n", exitCode);
 
+            string text;
             try
             {
-                // Build curl command arguments
-                html = CurlHelper.Execute(URL, out exitCode, combineErrorOutput: false);
-
-                if (exitCode != 0 && string.IsNullOrWhiteSpace(html))
-                    return "Error fetching URL (curl exit " + exitCode + ").\n";
-
-                string text;
-                try
-                {
-                    text = HtmlToReadableText(html, URL, maxLinks, maxContentLength);
-                }
-                catch
-                {
-                    // Conversion failed: fall back to the older HTML stripper so the LLM still gets something.
-                    text = FallbackPlainText(html);
-                    if (maxContentLength > 0 && text.Length > maxContentLength)
-                        text = TruncateBody(text, maxContentLength);
-                }
-
-                if (string.IsNullOrWhiteSpace(text))
-                    return "No readable content found.\n";
-
-                return text + "\n";
+                text = HtmlToReadableText(html, URL, maxLinks, maxContentLength);
             }
-            catch (Exception ex)
+            catch
             {
-                exitCode = -1;
-                return "Error running curl.exe: " + ex.Message;
+                // Conversion failed: fall back to the older HTML stripper so the LLM still gets something.
+                text = FallbackPlainText(html);
+                if (maxContentLength > 0 && text.Length > maxContentLength)
+                    text = TruncateBody(text, maxContentLength);
             }
+
+            if (string.IsNullOrWhiteSpace(text))
+                text = "No readable content found.";
+
+            return new ToolResult(text + "\n", exitCode);
         }
 
         /// <summary>
         /// Scrapes via Firecrawl /v2/scrape. Returns false on any failure so caller can fall back to curl.
         /// </summary>
         private static bool TryReadViaFirecrawl(string pageUrl, string endpoint, string apiKey,
-            int maxContentLength, int maxLinks, out string text, out int exitCode)
+            int maxContentLength, int maxLinks, out string text)
         {
             text = null;
-            exitCode = -1;
 
             try
             {
@@ -81,7 +68,7 @@ namespace WebTools
                 };
 
                 string response = CurlHelper.PostJson(
-                    scrapeUrl, payload.ToString(Formatting.None), out exitCode,
+                    scrapeUrl, payload.ToString(Formatting.None), out int exitCode,
                     combineErrorOutput: false, CurlHelper.FirecrawlAuthHeaders(apiKey));
 
                 if (exitCode != 0 || string.IsNullOrWhiteSpace(response))
@@ -119,13 +106,11 @@ namespace WebTools
                     return false;
 
                 text = AssembleOutput(title, desc, body, links, maxContentLength);
-                exitCode = 0;
                 return !string.IsNullOrWhiteSpace(text);
             }
             catch
             {
                 text = null;
-                exitCode = -1;
                 return false;
             }
         }
@@ -529,37 +514,25 @@ namespace WebTools
         }
 
         public static string RunWebSearch(string query, string searxngInstance,
-            string firecrawlEndpoint, string firecrawlApiKey, int maxSearchResults, out int exitCode)
+            string firecrawlEndpoint, string firecrawlApiKey, int maxSearchResults)
         {
             string output = "";
-            exitCode = 0;
 
             // SearXNG > Firecrawl > DDG > Wiby
             if (!string.IsNullOrWhiteSpace(searxngInstance))
-            {
-                output = SearchHandler.RunSearXNGSearch(query, searxngInstance, maxSearchResults, out exitCode);
-            }
+                output = SearchHandler.RunSearXNGSearch(query, searxngInstance, maxSearchResults);
 
             if (string.IsNullOrWhiteSpace(output) && !string.IsNullOrWhiteSpace(firecrawlEndpoint))
-            {
-                output = SearchHandler.RunFirecrawlSearch(
-                    query, firecrawlEndpoint, firecrawlApiKey, maxSearchResults, out exitCode);
-            }
+                output = SearchHandler.RunFirecrawlSearch(query, firecrawlEndpoint, firecrawlApiKey, maxSearchResults);
 
             if (string.IsNullOrWhiteSpace(output))
-            {
-                output = SearchHandler.RunDDGSearch(query, maxSearchResults, out exitCode);
-            }
+                output = SearchHandler.RunDDGSearch(query, maxSearchResults);
 
             if (string.IsNullOrWhiteSpace(output))
-            {
-                output = SearchHandler.RunWibySearch(query, maxSearchResults, out exitCode);
-            }
+                output = SearchHandler.RunWibySearch(query, maxSearchResults);
 
             if (string.IsNullOrWhiteSpace(output))
-            {
                 output = "No results found.";
-            }
 
             return output;
         }

@@ -13,9 +13,7 @@ namespace PythonTools
                     case "run_python_script":
                         {
                             string scriptContent = ToolHelper.GetRequiredArg(argumentsJson, "script_content");
-                            int exitCode;
-                            string output = PythonRunner.RunPythonScript(scriptContent, out exitCode);
-                            return new ToolResult(output, exitCode);
+                            return PythonRunner.RunPythonScript(scriptContent);
                         }
 
                     default:

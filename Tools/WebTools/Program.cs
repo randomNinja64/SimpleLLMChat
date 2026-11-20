@@ -17,10 +17,8 @@ namespace WebTools
                             int maxLinks = ToolHelper.GetConfigInt("maxlinks", 40);
                             string firecrawlEndpoint = ToolHelper.GetConfigValue("firecrawlendpoint");
                             string firecrawlApiKey = ToolHelper.GetConfigValue("firecrawlapikey");
-                            int exitCode;
-                            string output = WebBrowser.ReadWebsite(
-                                URL, maxContentLength, maxLinks, firecrawlEndpoint, firecrawlApiKey, out exitCode);
-                            return new ToolResult(output, exitCode);
+                            return WebBrowser.ReadWebsite(
+                                URL, maxContentLength, maxLinks, firecrawlEndpoint, firecrawlApiKey);
                         }
 
                     case "run_web_search":
@@ -30,28 +28,21 @@ namespace WebTools
                             string firecrawlEndpoint = ToolHelper.GetConfigValue("firecrawlendpoint");
                             string firecrawlApiKey = ToolHelper.GetConfigValue("firecrawlapikey");
                             int maxSearchResults = ToolHelper.GetConfigInt("maxsearchresults", 20);
-                            int exitCode;
-                            string output = WebBrowser.RunWebSearch(
-                                query, searxngInstance, firecrawlEndpoint, firecrawlApiKey,
-                                maxSearchResults, out exitCode);
-                            return new ToolResult(output, exitCode);
+                            return new ToolResult(WebBrowser.RunWebSearch(
+                                query, searxngInstance, firecrawlEndpoint, firecrawlApiKey, maxSearchResults), 0);
                         }
 
                     case "download_video":
                         {
                             string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            int exitCode;
-                            string output = DownloadHandler.DownloadVideo(URL, out exitCode);
-                            return new ToolResult(output, exitCode);
+                            return DownloadHandler.DownloadVideo(URL);
                         }
 
                     case "download_file":
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
                             string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            int exitCode;
-                            string output = DownloadHandler.DownloadFile(filename, URL, out exitCode);
-                            return new ToolResult(output, exitCode);
+                            return DownloadHandler.DownloadFile(filename, URL);
                         }
 
                     default:

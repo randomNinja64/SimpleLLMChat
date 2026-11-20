@@ -4,324 +4,155 @@ using System.Text;
 
 namespace FileTools
 {
+    /// <summary>
+    /// File operations. Each returns the text for the model and throws on failure;
+    /// ToolHelper.RunToolMain turns the exception into an "error: ..." result.
+    /// </summary>
     public static class FileHandler
     {
-        public static string ReadFile(string filename, int maxContentLength, out int exitCode, int offset = 0)
+        public static string ReadFile(string filename, int maxContentLength, int offset = 0)
         {
-            exitCode = 0;
+            filename = Environment.ExpandEnvironmentVariables(filename);
+            if (!File.Exists(filename))
+                throw new FileNotFoundException($"File not found: {filename}");
 
-            try
-            {
-                // Expand environment variables in filename
-                filename = Environment.ExpandEnvironmentVariables(filename);
+            string content = TextNormalization.ReadDetectingEncoding(filename, out _);
+            int totalLength = content.Length;
 
-                if (!File.Exists(filename))
-                {
-                    exitCode = 1;
-                    return $"error: File not found: {filename}";
-                }
+            if (offset < 0)
+                offset = 0;
+            if (offset >= totalLength)
+                throw new ArgumentException($"File length = {totalLength} characters. Offset {offset} exceeds file length.");
 
-                string content = TextNormalization.ReadDetectingEncoding(filename, out _);
-                int totalLength = content.Length;
+            // Read up to maxContentLength characters (or until EOF)
+            int endPos = Math.Min(offset + maxContentLength, totalLength);
 
-                // Validate offset
-                if (offset < 0)
-                    offset = 0;
-                if (offset >= totalLength)
-                {
-                    exitCode = 1;
-                    return $"error: File length = {totalLength} characters. Offset {offset} exceeds file length.";
-                }
+            StringBuilder result = new StringBuilder();
+            result.AppendLine($"File length = {totalLength} characters, reading chars {offset}-{endPos - 1}");
+            result.AppendLine("---");
+            result.Append(content, offset, endPos - offset);
 
-                // Always read up to MAX_CONTENT_LENGTH characters (or until EOF)
-                int endPos = Math.Min(offset + maxContentLength, totalLength);
-                string excerpt = content.Substring(offset, endPos - offset);
+            if (endPos < totalLength)
+                result.AppendLine("\n...[truncated]");
 
-                // Build result with header
-                StringBuilder result = new StringBuilder();
-                result.AppendLine($"File length = {totalLength} characters, reading chars {offset}-{endPos - 1}");
-                result.AppendLine("---");
-                result.Append(excerpt);
-
-                if (endPos < totalLength)
-                {
-                    result.AppendLine("\n...[truncated]");
-                }
-
-                return result.ToString();
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: reading file: " + ex.Message;
-            }
+            return result.ToString();
         }
 
-        public static string WriteFile(string filename, string content, out int exitCode)
+        public static string WriteFile(string filename, string content)
         {
-            exitCode = 0;
+            filename = Environment.ExpandEnvironmentVariables(filename);
+            EnsureDirectoryExists(Path.GetDirectoryName(filename));
 
-            try
-            {
-                // Expand environment variables in filename
-                filename = Environment.ExpandEnvironmentVariables(filename);
-
-                // Ensure the directory exists
-                string directory = Path.GetDirectoryName(filename);
-                if (!EnsureDirectoryExists(directory, out exitCode, out string errorMessage))
-                {
-                    return errorMessage;
-                }
-
-                // UTF-8 without a BOM (a BOM breaks the first line of .bat/.cmd files), unless
-                // the file being replaced already has one.
-                File.WriteAllText(filename, content, TextNormalization.EncodingForOverwrite(filename));
-                return $"File written successfully: {filename}";
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: writing file: " + ex.Message;
-            }
+            // UTF-8 without a BOM (a BOM breaks the first line of .bat/.cmd files), unless
+            // the file being replaced already has one.
+            File.WriteAllText(filename, content, TextNormalization.EncodingForOverwrite(filename));
+            return $"File written successfully: {filename}";
         }
 
-        public static string MoveFile(string sourcePath, string destinationPath, out int exitCode)
+        public static string MoveFile(string sourcePath, string destinationPath)
         {
-            exitCode = 0;
-
-            try
-            {
-                // Validate paths and prepare for file operation
-                if (!ValidateFileOperationPaths(ref sourcePath, ref destinationPath, out exitCode, out string errorMessage))
-                {
-                    return errorMessage;
-                }
-
-                // Move the file
-                File.Move(sourcePath, destinationPath);
-
-                return $"File moved successfully from '{sourcePath}' to '{destinationPath}'";
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: moving file: " + ex.Message;
-            }
+            PrepareFileOperation(ref sourcePath, ref destinationPath);
+            File.Move(sourcePath, destinationPath);
+            return $"File moved successfully from '{sourcePath}' to '{destinationPath}'";
         }
 
-        public static string CopyFile(string sourcePath, string destinationPath, out int exitCode)
+        public static string CopyFile(string sourcePath, string destinationPath)
         {
-            exitCode = 0;
-
-            try
-            {
-                // Validate paths and prepare for file operation
-                if (!ValidateFileOperationPaths(ref sourcePath, ref destinationPath, out exitCode, out string errorMessage))
-                {
-                    return errorMessage;
-                }
-
-                // Copy the file
-                File.Copy(sourcePath, destinationPath);
-
-                return $"File copied successfully from '{sourcePath}' to '{destinationPath}'";
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: copying file: " + ex.Message;
-            }
+            PrepareFileOperation(ref sourcePath, ref destinationPath);
+            File.Copy(sourcePath, destinationPath);
+            return $"File copied successfully from '{sourcePath}' to '{destinationPath}'";
         }
 
-        // Shared validation for file operations (move, copy, etc.)
-        private static bool ValidateFileOperationPaths(ref string sourcePath, ref string destinationPath, out int exitCode, out string errorMessage)
+        // Shared checks for move and copy: the source must exist, the destination must not.
+        private static void PrepareFileOperation(ref string sourcePath, ref string destinationPath)
         {
-            exitCode = 0;
-            errorMessage = null;
-
-            // Expand environment variables in both paths
             sourcePath = Environment.ExpandEnvironmentVariables(sourcePath);
             destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
 
-            // Check if source file exists
             if (!File.Exists(sourcePath))
-            {
-                exitCode = 1;
-                errorMessage = $"error: Source file not found: {sourcePath}";
-                return false;
-            }
-
-            // Check if destination file already exists
+                throw new FileNotFoundException($"Source file not found: {sourcePath}");
             if (File.Exists(destinationPath))
-            {
-                exitCode = 1;
-                errorMessage = $"error: Destination file already exists: {destinationPath}";
-                return false;
-            }
+                throw new IOException($"Destination file already exists: {destinationPath}");
 
-            // Ensure the destination directory exists
-            string destinationDirectory = Path.GetDirectoryName(destinationPath);
-            if (!EnsureDirectoryExists(destinationDirectory, out exitCode, out errorMessage))
-            {
-                return false;
-            }
-
-            return true;
+            EnsureDirectoryExists(Path.GetDirectoryName(destinationPath));
         }
 
-        public static string DeleteFile(string filePath, out int exitCode)
+        public static string DeleteFile(string filePath)
         {
-            exitCode = 0;
+            filePath = Environment.ExpandEnvironmentVariables(filePath);
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"File not found: {filePath}");
 
-            try
-            {
-                // Expand environment variables in the path
-                filePath = Environment.ExpandEnvironmentVariables(filePath);
-
-                // Check if file exists
-                if (!File.Exists(filePath))
-                {
-                    exitCode = 1;
-                    return $"error: File not found: {filePath}";
-                }
-
-                // Delete the file
-                File.Delete(filePath);
-
-                return $"File deleted successfully: {filePath}";
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: deleting file: " + ex.Message;
-            }
+            File.Delete(filePath);
+            return $"File deleted successfully: {filePath}";
         }
 
-        public static string ListDirectory(string directoryPath, out int exitCode)
+        public static string ListDirectory(string directoryPath)
         {
-            exitCode = 0;
+            directoryPath = Environment.ExpandEnvironmentVariables(directoryPath);
+            if (!Directory.Exists(directoryPath))
+                throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
 
-            try
+            StringBuilder result = new StringBuilder();
+            result.AppendLine($"Contents of: {directoryPath}");
+            result.AppendLine();
+
+            string[] directories = Directory.GetDirectories(directoryPath);
+            if (directories.Length > 0)
             {
-                // Expand environment variables in the path
-                directoryPath = Environment.ExpandEnvironmentVariables(directoryPath);
-
-                // Check if directory exists
-                if (!Directory.Exists(directoryPath))
-                {
-                    exitCode = 1;
-                    return $"error: Directory not found: {directoryPath}";
-                }
-
-                StringBuilder result = new StringBuilder();
-                result.AppendLine($"Contents of: {directoryPath}");
+                result.AppendLine("Directories:");
+                foreach (string dir in directories)
+                    result.AppendLine($"  [DIR]  {Path.GetFileName(dir)}");
                 result.AppendLine();
-
-                // List directories
-                string[] directories = Directory.GetDirectories(directoryPath);
-                if (directories.Length > 0)
-                {
-                    result.AppendLine("Directories:");
-                    foreach (string dir in directories)
-                    {
-                        string dirName = Path.GetFileName(dir);
-                        result.AppendLine($"  [DIR]  {dirName}");
-                    }
-                    result.AppendLine();
-                }
-
-                // List files
-                string[] files = Directory.GetFiles(directoryPath);
-                if (files.Length > 0)
-                {
-                    result.AppendLine("Files:");
-                    foreach (string file in files)
-                    {
-                        string fileName = Path.GetFileName(file);
-                        FileInfo fileInfo = new FileInfo(file);
-                        long fileSizeBytes = fileInfo.Length;
-                        string fileSize = FormatFileSize(fileSizeBytes);
-                        result.AppendLine($"  [FILE] {fileName} ({fileSize})");
-                    }
-                }
-
-                if (directories.Length == 0 && files.Length == 0)
-                {
-                    result.AppendLine("Directory is empty.");
-                }
-
-                return result.ToString();
             }
-            catch (Exception ex)
+
+            string[] files = Directory.GetFiles(directoryPath);
+            if (files.Length > 0)
             {
-                exitCode = 1;
-                return "error: listing directory: " + ex.Message;
+                result.AppendLine("Files:");
+                foreach (string file in files)
+                    result.AppendLine($"  [FILE] {Path.GetFileName(file)} ({FormatFileSize(new FileInfo(file).Length)})");
             }
+
+            if (directories.Length == 0 && files.Length == 0)
+                result.AppendLine("Directory is empty.");
+
+            return result.ToString();
         }
 
-        public static string ExtractFile(string archivePath, string destinationPath, out int exitCode)
+        /// <summary>Extracts with 7za.exe; a failed extraction keeps 7za's exit code.</summary>
+        public static ToolResult ExtractFile(string archivePath, string destinationPath)
         {
-            exitCode = 0;
+            archivePath = Environment.ExpandEnvironmentVariables(archivePath);
+            destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
 
-            try
-            {
-                // Expand environment variables in both paths
-                archivePath = Environment.ExpandEnvironmentVariables(archivePath);
-                destinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
+            if (!File.Exists(archivePath))
+                throw new FileNotFoundException($"Archive not found: {archivePath}");
 
-                // Check if archive exists
-                if (!File.Exists(archivePath))
-                {
-                    exitCode = 1;
-                    return $"error: Archive not found: {archivePath}";
-                }
+            EnsureDirectoryExists(destinationPath);
 
-                // Ensure the destination directory exists
-                if (!EnsureDirectoryExists(destinationPath, out exitCode, out string errorMessage))
-                {
-                    return errorMessage;
-                }
+            // x (extract with full paths) -o (output directory) -y (yes to all prompts)
+            string arguments = $"x \"{archivePath}\" -o\"{destinationPath}\" -y";
+            string output = ToolHelper.ExecuteProcess("7za.exe", arguments, out int exitCode);
 
-                // Build 7za.exe arguments: x (extract with full paths) -o (output directory) -y (yes to all prompts)
-                string arguments = $"x \"{archivePath}\" -o\"{destinationPath}\" -y";
+            if (exitCode != 0)
+                return new ToolResult($"error: 7za exited with code {exitCode}:\n{output}", exitCode);
 
-                string output = ToolHelper.ExecuteProcess("7za.exe", arguments, out exitCode);
-
-                if (exitCode != 0)
-                {
-                    return $"error: 7za exited with code {exitCode}:\n{output}";
-                }
-
-                return $"Archive extracted successfully to: {destinationPath}\n{output}";
-            }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: running 7za.exe: " + ex.Message;
-            }
+            return new ToolResult($"Archive extracted successfully to: {destinationPath}\n{output}", 0);
         }
 
-        // Helper method to ensure a directory exists
-        private static bool EnsureDirectoryExists(string directoryPath, out int exitCode, out string errorMessage)
+        private static void EnsureDirectoryExists(string directoryPath)
         {
-            exitCode = 0;
-            errorMessage = null;
-
             if (string.IsNullOrEmpty(directoryPath) || Directory.Exists(directoryPath))
-            {
-                return true;
-            }
+                return;
 
             try
             {
                 Directory.CreateDirectory(directoryPath);
-                return true;
             }
             catch (Exception ex)
             {
-                exitCode = 1;
-                errorMessage = $"error: Failed to create directory '{directoryPath}': {ex.Message}";
-                return false;
+                throw new IOException($"Failed to create directory '{directoryPath}': {ex.Message}", ex);
             }
         }
 

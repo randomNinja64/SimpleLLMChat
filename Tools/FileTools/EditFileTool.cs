@@ -14,72 +14,45 @@ namespace FileTools
             public string Replace;
         }
 
-        internal static string Apply(string filePath, JArray edits, out int exitCode)
+        /// <summary>Applies the edits and returns a summary with a diff. Throws when an edit fails.</summary>
+        internal static string Apply(string filePath, JArray edits)
         {
-            exitCode = 0;
+            string expandedPath = Environment.ExpandEnvironmentVariables(filePath ?? string.Empty);
+            if (string.IsNullOrEmpty(expandedPath))
+                throw new ArgumentException("File path cannot be empty");
+            if (!File.Exists(expandedPath))
+                throw new FileNotFoundException("File does not exist: " + expandedPath);
 
-            try
+            List<Block> blocks = ParseEdits(edits);
+            if (blocks.Count == 0)
+                throw new ArgumentException("No edits provided. Provide at least one edit with old_string and new_string.");
+
+            // Edits are spliced into the text as read, so everything outside them keeps
+            // its bytes; the encoding is remembered so the file is written back the same way.
+            Encoding encoding;
+            string original = TextNormalization.ReadDetectingEncoding(expandedPath, out encoding);
+
+            List<string> errors;
+            string newContent;
+            int appliedCount = ApplyBlocksInMemory(original, blocks, out newContent, out errors);
+
+            if (errors.Count > 0)
+                throw new InvalidOperationException("edit failed:" + Environment.NewLine + string.Join(Environment.NewLine, errors.ToArray()));
+
+            if (string.Equals(newContent, original, StringComparison.Ordinal))
+                return "No changes were necessary (file already matches).";
+
+            File.WriteAllText(expandedPath, newContent, encoding);
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Applied " + appliedCount + " edit(s).");
+            string diff = BuildUnifiedDiff(original, newContent, 200);
+            if (!string.IsNullOrEmpty(diff))
             {
-                string expandedPath = Environment.ExpandEnvironmentVariables(filePath ?? string.Empty);
-                if (string.IsNullOrEmpty(expandedPath))
-                {
-                    exitCode = 1;
-                    return "error: File path cannot be empty";
-                }
-
-                if (!File.Exists(expandedPath))
-                {
-                    exitCode = 1;
-                    return "error: File does not exist: " + expandedPath;
-                }
-
-                List<Block> blocks = ParseEdits(edits);
-                if (blocks.Count == 0)
-                {
-                    exitCode = 1;
-                    return "error: No edits provided. Provide at least one edit with old_string and new_string.";
-                }
-
-                // Edits are spliced into the text as read, so everything outside them keeps
-                // its bytes; the encoding is remembered so the file is written back the same way.
-                Encoding encoding;
-                string original = TextNormalization.ReadDetectingEncoding(expandedPath, out encoding);
-
-                List<string> errors;
-                string newContent;
-                int appliedCount = ApplyBlocksInMemory(original, blocks, out newContent, out errors);
-
-                if (errors.Count > 0)
-                {
-                    exitCode = 1;
-                    StringBuilder errSb = new StringBuilder();
-                    errSb.AppendLine("error: edit failed:");
-                    foreach (string err in errors) errSb.AppendLine(err);
-                    return errSb.ToString();
-                }
-
-                if (string.Equals(newContent, original, StringComparison.Ordinal))
-                {
-                    return "No changes were necessary (file already matches).";
-                }
-
-                File.WriteAllText(expandedPath, newContent, encoding);
-
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine("Applied " + appliedCount + " edit(s).");
-                string diff = BuildUnifiedDiff(original, newContent, 200);
-                if (!string.IsNullOrEmpty(diff))
-                {
-                    sb.AppendLine();
-                    sb.Append(diff);
-                }
-                return sb.ToString();
+                sb.AppendLine();
+                sb.Append(diff);
             }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: " + ex.Message;
-            }
+            return sb.ToString();
         }
 
         private static int ApplyBlocksInMemory(string originalContent, List<Block> blocks,

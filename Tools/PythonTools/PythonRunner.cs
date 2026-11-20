@@ -6,75 +6,47 @@ namespace PythonTools
 {
     public static class PythonRunner
     {
-        public static string RunPythonScript(string scriptContent, out int exitCode)
+        /// <summary>Runs the script and returns its output with Python's exit code.</summary>
+        public static ToolResult RunPythonScript(string scriptContent)
         {
-            exitCode = 0;
-            string pythonCommand = "";
+            string pythonCommand = FindPython();
+            if (pythonCommand == null)
+                throw new InvalidOperationException("Python runtime not found in system PATH. Please install Python and ensure it's added to your system PATH environment variable.");
 
+            string tempScriptPath = Path.Combine(Path.GetTempPath(), $"temp_script_{Guid.NewGuid()}.py");
             try
             {
-                // Check if Python is installed by trying common commands
-                string[] pythonCommands = { "python", "python3", "py" };
-                bool pythonFound = false;
+                // The BOM is kept on purpose: Python 2 rejects non-ASCII source that has
+                // neither a BOM nor a coding line.
+                File.WriteAllText(tempScriptPath, scriptContent, Encoding.UTF8);
 
-                foreach (string cmd in pythonCommands)
-                {
-                    try
-                    {
-                        string versionOutput = ToolHelper.ExecuteProcess(cmd, "--version", out int versionExitCode, combineErrorOutput: true);
-                        if (versionExitCode == 0)
-                        {
-                            pythonCommand = cmd;
-                            pythonFound = true;
-                            break;
-                        }
-                    }
-                    catch
-                    {
-                        // Continue to next command
-                    }
-                }
+                string output = ToolHelper.ExecuteProcess(pythonCommand, $"\"{tempScriptPath}\"", out int exitCode, combineErrorOutput: true);
+                return new ToolResult(output, exitCode);
+            }
+            finally
+            {
+                try { File.Delete(tempScriptPath); }
+                catch { }
+            }
+        }
 
-                if (!pythonFound)
-                {
-                    exitCode = 1;
-                    return "error: Python runtime not found in system PATH. Please install Python and ensure it's added to your system PATH environment variable.";
-                }
-
-                // Create a temporary Python script file
-                string tempScriptPath = Path.Combine(Path.GetTempPath(), $"temp_script_{Guid.NewGuid()}.py");
-
+        // First of the common launcher names that answers --version, or null.
+        private static string FindPython()
+        {
+            foreach (string cmd in new[] { "python", "python3", "py" })
+            {
                 try
                 {
-                    // Write the script content to the temporary file. The BOM is kept on purpose:
-                    // Python 2 rejects non-ASCII source that has neither a BOM nor a coding line.
-                    File.WriteAllText(tempScriptPath, scriptContent, Encoding.UTF8);
-
-                    // Execute the Python script
-                    string output = ToolHelper.ExecuteProcess(pythonCommand, $"\"{tempScriptPath}\"", out exitCode, combineErrorOutput: true);
-
-                    return output;
+                    ToolHelper.ExecuteProcess(cmd, "--version", out int exitCode, combineErrorOutput: true);
+                    if (exitCode == 0)
+                        return cmd;
                 }
-                finally
+                catch
                 {
-                    // Clean up the temporary file
-                    try
-                    {
-                        if (File.Exists(tempScriptPath))
-                        {
-                            File.Delete(tempScriptPath);
-                        }
-                    }
-                    catch
-                    {
-                    }
+                    // Not installed under this name; try the next.
                 }
             }
-            catch (Exception ex)
-            {
-                exitCode = 1;
-                return "error: executing Python script: " + ex.Message;
-            }
+            return null;
         }
     }
 }
