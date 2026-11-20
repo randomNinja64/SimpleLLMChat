@@ -158,7 +158,7 @@ SimpleLLMChat includes the following 7 tool packages:
     - `read_file`: Reads the contents of a local file
     - `write_file`: Writes contents to a local file
   - Configuration Options
-    - `maxFileContentLength`: Maximum number of characters to read from a file or return from `grep_search` (default: `8000`)
+    - `maxFileContentLength`: Maximum number of characters to read from a file or return from `grep_search` (default: `10000`)
   - Dependencies
     - `7za.exe`: used to extract archives
     - `grep.exe` (+ `libiconv2.dll`, `libintl3.dll`, `pcre3.dll`, `regex2.dll`): used by `grep_search` (GnuWin32 GNU grep)

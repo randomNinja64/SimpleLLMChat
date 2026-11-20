@@ -15,7 +15,7 @@ namespace FileTools
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
                             int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "offset")?.Trim() ?? "", out int offset);
-                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 8000);
+                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 10000);
                             int exitCode;
                             string output = FileHandler.ReadFile(filename, maxContentLength, out exitCode, offset);
                             return new ToolResult(output, exitCode);
@@ -91,7 +91,7 @@ namespace FileTools
                             string directoryPath = ToolHelper.JsonExtractString(argumentsJson, "directory_path");
                             string filePattern = ToolHelper.JsonExtractString(argumentsJson, "file_pattern");
                             string caseInsensitive = ToolHelper.JsonExtractString(argumentsJson, "case_insensitive");
-                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 8000);
+                            int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 10000);
                             int exitCode;
                             string output = GrepSearchTool.Search(pattern, directoryPath, filePattern, caseInsensitive, maxContentLength, out exitCode);
                             return new ToolResult(output, exitCode);
