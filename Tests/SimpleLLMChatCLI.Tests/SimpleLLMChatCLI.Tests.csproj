@@ -11,6 +11,8 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
+    <!-- The linked CLI sources bring their own Main. -->
+    <StartupObject>SimpleLLMChatCLI.Tests.Program</StartupObject>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -40,6 +42,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="StreamingTests.cs" />
+    <Compile Include="ToolRegistryTests.cs" />
+    <Compile Include="RagTests.cs" />
+    <Compile Include="CliHttpTests.cs" />
     <Compile Include="..\TestLog.cs">
       <Link>TestLog.cs</Link>
     </Compile>
@@ -112,20 +118,87 @@
     <Compile Include="..\..\Shared\ChatPipe\ChatPipe.Approval.cs">
       <Link>Shared\ChatPipe\ChatPipe.Approval.cs</Link>
     </Compile>
+    <Compile Include="..\..\Shared\ManifestScanner.cs">
+      <Link>Shared\ManifestScanner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\TlsConfig.cs">
+      <Link>Shared\TlsConfig.cs</Link>
+    </Compile>
+    <!-- Every CLI source, so the tests can drive its classes in-process. -->
+    <Compile Include="..\..\SimpleLLMChatCLI\Cancel.cs">
+      <Link>CLI\Cancel.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ChatOutput.cs">
+      <Link>CLI\ChatOutput.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ChatPipeServer.cs">
+      <Link>CLI\ChatPipeServer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ChatSession.cs">
+      <Link>CLI\ChatSession.cs</Link>
+    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ConsecutiveToolFailures.cs">
       <Link>CLI\ConsecutiveToolFailures.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\CurlClient.cs">
+      <Link>CLI\CurlClient.cs</Link>
     </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ImageEncoder.cs">
       <Link>CLI\ImageEncoder.cs</Link>
     </Compile>
-    <Compile Include="..\..\SimpleLLMChatCLI\ToolResultParser.cs">
-      <Link>CLI\ToolResultParser.cs</Link>
-    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\JevDecisionClient.cs">
       <Link>CLI\JevDecisionClient.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\LLMClient.cs">
+      <Link>CLI\LLMClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\LLMClient.Http.cs">
+      <Link>CLI\LLMClient.Http.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\LLMClient.Request.cs">
+      <Link>CLI\LLMClient.Request.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\Program.cs">
+      <Link>CLI\Program.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\SseStreamParser.cs">
+      <Link>CLI\SseStreamParser.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\StreamSink.cs">
+      <Link>CLI\StreamSink.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ToolRegistry.cs">
+      <Link>CLI\ToolRegistry.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ToolResultParser.cs">
+      <Link>CLI\ToolResultParser.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\TurnSettings.cs">
+      <Link>CLI\TurnSettings.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\AutoRagContext.cs">
+      <Link>CLI\RAG\AutoRagContext.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\DocumentIndex.cs">
+      <Link>CLI\RAG\DocumentIndex.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\DocumentIndexer.cs">
+      <Link>CLI\RAG\DocumentIndexer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\DocumentScanFilter.cs">
+      <Link>CLI\RAG\DocumentScanFilter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\EmbeddingsClient.cs">
+      <Link>CLI\RAG\EmbeddingsClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\RagHost.cs">
+      <Link>CLI\RAG\RagHost.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\SemanticHitFormatter.cs">
+      <Link>CLI\RAG\SemanticHitFormatter.cs</Link>
+    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\RAG\VectorStore.cs">
-      <Link>CLI\VectorStore.cs</Link>
+      <Link>CLI\RAG\VectorStore.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

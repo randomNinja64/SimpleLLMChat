@@ -18,6 +18,11 @@ namespace SimpleLLMChatCLI.Tests
 
         static void Run()
         {
+            // In-process tests of the linked CLI sources.
+            StreamingTests.Run();
+            ToolRegistryTests.Run();
+            RagTests.Run();
+
             TestRunner.Run("TokenEstimator.basic", () =>
             {
                 TestAssert.Equal(0, TokenEstimator.ApproximateTokens(0), "zero");
@@ -1073,9 +1078,12 @@ namespace SimpleLLMChatCLI.Tests
                     }
                 }
             });
+
+            // More black-box tests against the packaged CLI.
+            CliHttpTests.Run();
         }
 
-        static TempWorkspace PackageCliWorkspace()
+        internal static TempWorkspace PackageCliWorkspace()
         {
             TempWorkspace ws = new TempWorkspace("cli-run");
             string srcExe = ToolClient.ProductExe("SimpleLLMChatCLI.exe");
@@ -1102,12 +1110,12 @@ namespace SimpleLLMChatCLI.Tests
                 CopyDirectory(sub, Path.Combine(destDir, Path.GetFileName(sub)));
         }
 
-        static bool ShellToolsPackaged(TempWorkspace ws)
+        internal static bool ShellToolsPackaged(TempWorkspace ws)
         {
             return File.Exists(Path.Combine(ws.Path, "tools", "ShellTools", "ShellTools.exe"));
         }
 
-        static void WriteCliIni(string dir, string llmServer, string tools, string toolsRequiringApproval)
+        internal static void WriteCliIni(string dir, string llmServer, string tools, string toolsRequiringApproval)
         {
             WriteCliIni(dir, llmServer, tools, toolsRequiringApproval, null, null, null, null, null);
         }
@@ -1151,7 +1159,7 @@ namespace SimpleLLMChatCLI.Tests
                 Encoding.UTF8);
         }
 
-        static bool WaitStdoutContains(CliProcess cli, string needle, int timeoutMs)
+        internal static bool WaitStdoutContains(CliProcess cli, string needle, int timeoutMs)
         {
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
             while (DateTime.UtcNow < deadline)

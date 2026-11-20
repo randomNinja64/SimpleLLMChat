@@ -61,6 +61,8 @@ public sealed class FakeOpenAiServer : IDisposable
     {
         public bool IsToolCall;
         public bool IsApiError;
+        public bool IsTruncated;
+        public int HttpStatus;
         public bool IncludeNullError;
         public string Content;
         public string Reasoning;
@@ -82,6 +84,20 @@ public sealed class FakeOpenAiServer : IDisposable
     public string LastAuthorization { get; private set; }
 
     public int EmbeddingsRequestCount { get; private set; }
+
+    /// <summary>Status for /v1/embeddings; anything but 200 fails the request.</summary>
+    public int EmbeddingsStatusCode { get; set; }
+
+    /// <summary>Vectors returned per embeddings request (a full batch by default).</summary>
+    public int EmbeddingsVectorCount { get; set; }
+
+    private readonly List<string> _chatBodies = new List<string>();
+
+    /// <summary>Every chat completion request body received, oldest first.</summary>
+    public List<string> ChatBodies
+    {
+        get { lock (_scriptGate) return new List<string>(_chatBodies); }
+    }
 
     public int SystemOneRequestCount { get; private set; }
     public string SystemOneAuthorization { get; private set; }
@@ -110,6 +126,8 @@ public sealed class FakeOpenAiServer : IDisposable
         StreamDelayMs = 30;
         StreamChunkChars = 16;
         SystemOneStatusCode = 200;
+        EmbeddingsStatusCode = 200;
+        EmbeddingsVectorCount = 32;
         string baseUrl;
         _listener = TestHttpListener.StartLoopback(out baseUrl);
         BaseUrl = baseUrl;
@@ -170,6 +188,32 @@ public sealed class FakeOpenAiServer : IDisposable
             {
                 IsApiError = true,
                 Content = message ?? ""
+            });
+        }
+    }
+
+    /// <summary>Answers the next chat request with a plain HTTP error instead of a stream.</summary>
+    public void EnqueueHttpError(int statusCode, string body)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                HttpStatus = statusCode,
+                Content = body ?? ""
+            });
+        }
+    }
+
+    /// <summary>Streams the content, then drops the connection with no finish or [DONE].</summary>
+    public void EnqueueTruncatedContent(string content)
+    {
+        lock (_scriptGate)
+        {
+            _script.Enqueue(new ScriptedReply
+            {
+                IsTruncated = true,
+                Content = content ?? ""
             });
         }
     }
@@ -270,6 +314,8 @@ public sealed class FakeOpenAiServer : IDisposable
 
         if (path.IndexOf("/v1/chat/completions", StringComparison.OrdinalIgnoreCase) >= 0)
         {
+            lock (_scriptGate)
+                _chatBodies.Add(body);
             WriteSseChat(ctx);
             return;
         }
@@ -277,10 +323,15 @@ public sealed class FakeOpenAiServer : IDisposable
         if (path.IndexOf("/v1/embeddings", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             EmbeddingsRequestCount++;
+            if (EmbeddingsStatusCode != 200)
+            {
+                WriteJson(ctx, EmbeddingsStatusCode, "{\"error\":{\"message\":\"forced\"}}");
+                return;
+            }
             // Every input gets the same vector, so every chunk matches every query.
-            // A full batch (32) is always returned; the client ignores the surplus.
+            // A full batch (32) is returned by default; the client ignores the surplus.
             StringBuilder data = new StringBuilder();
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i < EmbeddingsVectorCount; i++)
             {
                 if (i > 0)
                     data.Append(',');
@@ -303,9 +354,24 @@ public sealed class FakeOpenAiServer : IDisposable
                 scripted = _script.Dequeue();
         }
 
+        if (scripted != null && scripted.HttpStatus != 0)
+        {
+            WriteJson(ctx, scripted.HttpStatus, scripted.Content);
+            return;
+        }
+
         ctx.Response.StatusCode = 200;
         ctx.Response.ContentType = "text/event-stream";
         ctx.Response.SendChunked = true;
+
+        if (scripted != null && scripted.IsTruncated)
+        {
+            WriteContentChunks(ctx.Response.OutputStream, scripted.Content, false);
+            // Let the client read what was sent before the reset discards it.
+            Thread.Sleep(300);
+            ctx.Response.Abort();
+            return;
+        }
 
         using (Stream output = ctx.Response.OutputStream)
         {
@@ -373,6 +439,17 @@ public sealed class FakeOpenAiServer : IDisposable
 
     private void WriteContentSse(Stream output, string content, bool includeNullError)
     {
+        WriteContentChunks(output, content, includeNullError);
+
+        byte[] trail = Encoding.UTF8.GetBytes(
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
+            "data: [DONE]\n\n");
+        output.Write(trail, 0, trail.Length);
+        output.Flush();
+    }
+
+    private void WriteContentChunks(Stream output, string content, bool includeNullError)
+    {
         int delayMs = StreamDelayMs;
         int chunkChars = StreamChunkChars > 0 ? StreamChunkChars : 16;
         if (content == null)
@@ -394,12 +471,6 @@ public sealed class FakeOpenAiServer : IDisposable
             if (delayMs > 0)
                 Thread.Sleep(delayMs);
         }
-
-        byte[] trail = Encoding.UTF8.GetBytes(
-            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n" +
-            "data: [DONE]\n\n");
-        output.Write(trail, 0, trail.Length);
-        output.Flush();
     }
 
     private void WriteToolCallSse(Stream output, ScriptedReply call)
