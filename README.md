@@ -189,7 +189,7 @@ SimpleLLMChat includes the following 7 tool packages:
     - `list_controls`: Lists controls with element indices (`#N`), roles and capture-relative rects (`@x,y` same space as a window screenshot)
     - `navigate`: Pointer/focus — `click`, `double_click`, `scroll`, `focus` (target via `element`, `hwnd`, or `x`/`y`); `drag` with start (`element` or `x`/`y`) and end (`to_element` or `to_x`/`to_y`); optional `modifiers` (`ctrl`/`shift`/`alt`/`win`) on click/drag. `x`/`y` use the same pixel space as `screenshot` for that scope (window image if `hwnd`/`window_title` is set; desktop image if not).
     - `set_control_text`: Sets text in a control (target via `element` or `hwnd`)
-    - `send_keys`: Sends keystrokes to the foreground window
+    - `send_keys`: Sends text or keystrokes to the foreground window
     - `screenshot`: Capture a window or the virtual desktop as JPEG; click with `navigate` using image `x`/`y` and the same scope
   - Configuration Options
     - `maxTreeDepth`: Maximum depth when listing control trees (default: `8`)
