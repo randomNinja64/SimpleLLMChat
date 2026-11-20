@@ -207,6 +207,22 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.llmserver_trailing_slash", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.FixedReply = "slash-reply-ok";
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1/", "", "");
+                    ProcessResult r = ProcessRunner.Run(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "-o --no-banners ping",
+                        ws.Path, null, 20000);
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Stdout, "slash-reply-ok", "reply");
+                }
+            });
+
             TestRunner.Run("cli.sse_error_field", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

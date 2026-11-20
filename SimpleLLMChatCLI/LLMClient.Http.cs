@@ -24,7 +24,7 @@ public partial class LLMClient
     {
         try
         {
-            var request = (HttpWebRequest)WebRequest.Create($"{config.GetConfigValue("llmserver")}/chat/completions");
+            var request = (HttpWebRequest)WebRequest.Create(config.GetConfigValue("llmserver").Trim().TrimEnd('/') + "/chat/completions");
             request.Method = "POST";
             request.ContentType = "application/json";
             request.Headers.Add("Authorization", "Bearer " + config.GetConfigValue("apikey"));
