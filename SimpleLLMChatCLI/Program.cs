@@ -15,50 +15,12 @@ namespace SimpleLLMChatCLI
         // The main loop runs them once the turn ends.
         public static readonly Queue<string> DeferredInput = new Queue<string>();
 
-        // Print interactive CLI instructions
         private static readonly string[] ValidReasoningEfforts =
         {
             "none", "minimal", "low", "medium", "high", "xhigh"
         };
 
-        static void PrintCliInstructions()
-        {
-            ChatOutput.WriteLine("================== SimpleLLMChat ==================");
-            ChatOutput.WriteLine("| Commands:                                       |");
-            ChatOutput.WriteLine("| /buildindex: Reconcile knowledge index          |");
-            ChatOutput.WriteLine("| /clear: Clear chat context                      |");
-            ChatOutput.WriteLine("| /clearindex: Clear knowledge index              |");
-            ChatOutput.WriteLine("| /exit: Exit the application                     |");
-            ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
-            ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
-            ChatOutput.WriteLine("| /reload: Reload configuration                   |");
-            ChatOutput.WriteLine("| /save <path>: Save chat markdown                |");
-            ChatOutput.WriteLine("| Ctrl+C: Stop the response in progress           |");
-            ChatOutput.WriteLine("===================================================");
-        }
-
-        static bool TryParseImageCommand(string input, out string imagePath, out string textPrompt)
-        {
-            imagePath = null;
-            textPrompt = null;
-
-            if (input.Length < 8 || !input.StartsWith("/image "))
-                return false;
-
-            int quoteStart = input.IndexOf('"', 7);
-            int quoteEnd = input.IndexOf('"', quoteStart + 1);
-
-            if (quoteStart == -1 || quoteEnd == -1)
-                return false;
-
-            imagePath = input.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
-            textPrompt = (quoteEnd + 1 < input.Length)
-                ? input.Substring(quoteEnd + 1).TrimStart(' ', '\t')
-                : string.Empty;
-            return true;
-        }
-
-        static bool IsValidReasoningEffort(string effort)
+        internal static bool IsValidReasoningEffort(string effort)
         {
             foreach (string valid in ValidReasoningEfforts)
             {
@@ -111,9 +73,6 @@ namespace SimpleLLMChatCLI
             RagHost.Initialize(Config);
 
             TurnSettings settings = TurnSettings.FromConfig(Config, false);
-
-            // Conversation storage
-            List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
 
             // Token status starts at 0; base overhead is measured on the first real request.
             client.PublishStatusTokens(0);
@@ -203,7 +162,7 @@ namespace SimpleLLMChatCLI
                 if (runNonInteractive)
                 {
                     client.ProcessConversation(
-                        conversation,
+                        new List<LLMClient.ChatMessage>(),
                         textPrompt,
                         base64Image,
                         imageMime,
@@ -212,152 +171,7 @@ namespace SimpleLLMChatCLI
                 }
             }
 
-            if (showBanners)
-            {
-                PrintCliInstructions();
-            }
-
-            while (true)
-            {
-                // Pad to exactly one blank line before the prompt, regardless of
-                // how the previous turn's output ended.
-                ChatOutput.StartBlock();
-                ChatOutput.Write("You: ", false);
-                Pipe.PublishDiscrete(ChatPipe.ReadyLine);
-                string userInput = DeferredInput.Count > 0 ? DeferredInput.Dequeue() : Console.ReadLine();
-                ChatOutput.EndInputLine();
-
-                // Stdin is closed (piped input ended, or the GUI went away): there is
-                // nothing left to read, so exit instead of prompting forever.
-                if (userInput == null)
-                    break;
-
-                userInput = userInput.Replace("<<NEWLINE>>", "\n");
-
-                if (userInput == "/exit")
-                    break;
-
-                if (userInput == "/clear")
-                {
-                    conversation.Clear();
-                    client.PublishStatusTokens(client.GetBaseCharacterOverhead());
-                    if (showBanners)
-                    {
-                        ChatOutput.WriteLine("Context cleared.\n");
-                        PrintCliInstructions();
-                    }
-                    continue;
-                }
-
-                if (userInput == "/reload")
-                {
-                    Config.LoadConfig(Path.Combine(
-                        AppDomain.CurrentDomain.BaseDirectory, "LLMSettings.ini"));
-                    registry.Clear();
-                    registry.LoadToolsFromDirectory(toolsDir);
-                    settings = TurnSettings.FromConfig(Config, false);
-                    RagHost.OnConfigReloaded(Config);
-                    client.RefreshBaseCharacterOverhead(settings.EnabledTools);
-                    client.PublishStatusTokens(
-                        LLMClient.GetConversationCharacterCount(conversation) + client.GetBaseCharacterOverhead());
-
-                    if (showBanners)
-                        ChatOutput.WriteLine("Config reloaded.\n");
-                    else
-                        ChatOutput.MarkSeparated();
-                    continue;
-                }
-
-                if (userInput == "/buildindex")
-                {
-                    RagHost.BuildIndex();
-                    ChatOutput.MarkSeparated();
-                    continue;
-                }
-
-                if (userInput == "/clearindex")
-                {
-                    RagHost.ClearIndex();
-                    ChatOutput.MarkSeparated();
-                    continue;
-                }
-
-                if (userInput.StartsWith("/save "))
-                {
-                    try
-                    {
-                        StringBuilder markdown = new StringBuilder();
-                        for (int i = 0; i < conversation.Count; i++)
-                        {
-                            string content = conversation[i].Content;
-                            if (string.IsNullOrEmpty(content))
-                                continue;
-                            string label = conversation[i].Role;
-                            if (string.Equals(label, "user", StringComparison.OrdinalIgnoreCase))
-                                label = "You";
-                            else if (string.Equals(label, "assistant", StringComparison.OrdinalIgnoreCase))
-                                label = settings.AssistantName;
-                            else if (string.Equals(label, "tool", StringComparison.OrdinalIgnoreCase))
-                                label = "Tool";
-                            if (markdown.Length > 0)
-                                markdown.Append("\n\n");
-                            markdown.Append(label);
-                            markdown.Append(": ");
-                            markdown.Append(content.Replace("\r\n", "\n").Replace("\r", "\n").TrimEnd('\n'));
-                        }
-                        if (markdown.Length > 0)
-                            markdown.Append('\n');
-                        File.WriteAllText(userInput.Substring(6).Trim().Trim('"'), markdown.ToString());
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.Error.WriteLine("Error saving chat: " + ex.Message);
-                    }
-                    ChatOutput.MarkSeparated();
-                    continue;
-                }
-
-                if (userInput == "/reasoning" || userInput.StartsWith("/reasoning "))
-                {
-                    string effort = userInput.Length > 11 ? userInput.Substring(11).Trim() : string.Empty;
-                    if (string.IsNullOrEmpty(effort) || IsValidReasoningEffort(effort))
-                        client.ReasoningEffort = string.IsNullOrEmpty(effort) ? null : effort;
-                    else
-                        Console.Error.WriteLine("Error: Invalid reasoning effort. Valid values: none, minimal, low, medium, high, xhigh.");
-
-                    // Silent command (the GUI sends this programmatically): produce no
-                    // stdout, and don't pad the re-prompt with a separator newline.
-                    ChatOutput.MarkSeparated();
-                    continue;
-                }
-
-                string textPrompt = null;
-                string imageBase64 = null;
-                string imageMime = null;
-
-                string imagePath;
-                if (TryParseImageCommand(userInput, out imagePath, out textPrompt))
-                {
-                    try
-                    {
-                        imageBase64 = ImageEncoder.ImageFileToBase64(imagePath, out imageMime);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.Error.WriteLine("Error processing image: " + e.Message);
-                        continue;
-                    }
-                }
-                else
-                {
-                    // Regular text message
-                    textPrompt = userInput;
-                }
-
-                Cancel.Begin();
-                client.ProcessConversation(conversation, textPrompt, imageBase64, imageMime, settings);
-                Cancel.End();
-            }
+            new ChatSession(client, registry, toolsDir, settings, showBanners).Run();
         }
     }
 }

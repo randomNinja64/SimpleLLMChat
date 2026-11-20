@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="Cancel.cs" />
     <Compile Include="ChatOutput.cs" />
+    <Compile Include="ChatSession.cs" />
     <Compile Include="ConsecutiveToolFailures.cs" />
     <Compile Include="ImageEncoder.cs" />
     <Compile Include="JevDecisionClient.cs" />
