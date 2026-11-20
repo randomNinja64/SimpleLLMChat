@@ -329,23 +329,72 @@ namespace DesktopTools.Tests
 
                 TestRunner.Run("send_keys.edit", () =>
                 {
-                    NavigateOk(new JObject
-                    {
-                        ["action"] = "focus",
-                        ["hwnd"] = FindControlHwnd(nativeTree, "txtEdit")
-                    });
-                    Thread.Sleep(150);
-                    ToolInvokeResult keys = ToolClient.InvokeProduct(Exe, "send_keys",
-                        new JObject { ["keys"] = "{HOME}+{END}from-keys" });
-                    TestAssert.Equal(0, keys.ExitCode, "send_keys exit");
-                    Thread.Sleep(200);
-                    ToolInvokeResult read = ToolClient.InvokeProduct(Exe, "list_controls",
-                        new JObject
-                        {
-                            ["hwnd"] = FindControlHwnd(nativeTree, "txtEdit"),
-                            ["max_depth"] = 0
-                        });
-                    TestAssert.Contains(read.Text, "from-keys", "typed text");
+                    string edit = FocusEdit(nativeTree);
+                    SendKeysOk(new JObject { ["keys"] = "{HOME}+{END}from-keys" });
+                    // Exact: a chord that selected nothing would leave the old text behind.
+                    AssertEditText(edit, "from-keys", "selection replaced");
+                });
+
+                TestRunner.Run("send_keys.text_is_literal", () =>
+                {
+                    string edit = FocusEdit(nativeTree);
+                    SendKeysOk(new JObject { ["keys"] = "{Home}{Shift+End}" });
+                    const string prose = " Wow! 1+1=2 ^_^ {x} C++ ";
+                    SendKeysOk(new JObject { ["text"] = prose });
+                    AssertEditText(edit, prose, "typed exactly as written");
+                });
+
+                TestRunner.Run("send_keys.key_name_and_chord", () =>
+                {
+                    string edit = FocusEdit(nativeTree);
+                    SendKeysOk(new JObject { ["keys"] = "Home" });
+                    SendKeysOk(new JObject { ["keys"] = "shift+end" });
+                    SendKeysOk(new JObject { ["text"] = "bare" });
+                    AssertEditText(edit, "bare", "whole-string key name and chord");
+                });
+
+                TestRunner.Run("send_keys.sequence_and_escapes", () =>
+                {
+                    string edit = FocusEdit(nativeTree);
+                    SendKeysOk(new JObject { ["keys"] = "{Home}{Shift+End}x{!}{+}{^}{{}{}} Wow! C++" });
+                    AssertEditText(edit, "x!+^{} Wow! C++", "escapes and trailing punctuation");
+                });
+
+                TestRunner.Run("send_keys.text_then_keys", () =>
+                {
+                    string edit = FocusEdit(nativeTree);
+                    SendKeysOk(new JObject { ["keys"] = "{Home}{Shift+End}{Delete}" });
+                    SendKeysOk(new JObject { ["text"] = "tail", ["keys"] = "{Home}Z" });
+                    AssertEditText(edit, "Ztail", "text first, then keys");
+                });
+
+                TestRunner.Run("send_keys.bad_input_types_nothing", () =>
+                {
+                    string edit = FocusEdit(nativeTree);
+                    ToolClient.AssertToolError(
+                        ToolClient.InvokeProduct(Exe, "send_keys", new JObject { ["keys"] = "junk{Bogus}" }),
+                        "unknown key token");
+                    ToolClient.AssertToolError(
+                        ToolClient.InvokeProduct(Exe, "send_keys", new JObject { ["text"] = "more", ["keys"] = "ctrl+bogus" }),
+                        "unknown key in chord");
+                    ToolClient.AssertToolError(
+                        ToolClient.InvokeProduct(Exe, "send_keys", new JObject { ["keys"] = "{Home" }),
+                        "unclosed");
+                    ToolClient.AssertToolError(
+                        ToolClient.InvokeProduct(Exe, "send_keys", new JObject()),
+                        "provide 'text'");
+                    AssertEditText(edit, "Ztail", "nothing typed before the error");
+                });
+
+                TestRunner.Run("send_keys.held_key_released", () =>
+                {
+                    string edit = FocusEdit(nativeTree);
+                    // Shift is never released by the sequence itself.
+                    SendKeysOk(new JObject { ["keys"] = "{Home}{Shift down}" });
+                    // With Shift still down, End would select everything and Q replace it.
+                    SendKeysOk(new JObject { ["keys"] = "End" });
+                    SendKeysOk(new JObject { ["text"] = "Q" });
+                    AssertEditText(edit, "ZtailQ", "appended, so Shift was released");
                 });
 
                 TestRunner.Run("navigate.click.right", () =>
@@ -475,6 +524,39 @@ namespace DesktopTools.Tests
                 if (start >= 0) return line.Substring(start + 5).Trim();
             }
             throw new TestFailureException("No direct HWND for " + marker);
+        }
+
+        /// <summary>Gives the fixture's edit box keyboard focus and returns its handle.</summary>
+        static string FocusEdit(string nativeTree)
+        {
+            string edit = FindControlHwnd(nativeTree, "txtEdit");
+            NavigateOk(new JObject { ["action"] = "focus", ["hwnd"] = edit });
+            Thread.Sleep(150);
+            return edit;
+        }
+
+        static void SendKeysOk(JObject args)
+        {
+            ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "send_keys", args);
+            TestAssert.True(!r.Text.StartsWith("error:", StringComparison.OrdinalIgnoreCase), r.Text);
+            TestAssert.Equal(0, r.ExitCode, "send_keys exit");
+        }
+
+        /// <summary>Waits for the edit box to hold exactly the expected text.</summary>
+        static void AssertEditText(string editHwnd, string expected, string message)
+        {
+            string wanted = "\"txtEdit\" = \"" + expected + "\" @";
+            string seen = "";
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                seen = ToolClient.InvokeProduct(Exe, "list_controls",
+                    new JObject { ["hwnd"] = editHwnd, ["max_depth"] = 0 }).Text ?? "";
+                if (seen.IndexOf(wanted, StringComparison.Ordinal) >= 0)
+                    return;
+                Thread.Sleep(100);
+            }
+            throw new TestFailureException(
+                message + "\n  expected: " + expected + "\n  listing:  " + seen);
         }
 
         static ToolInvokeResult ListControls(string hwnd)

@@ -46,8 +46,10 @@ namespace DesktopTools
 
           case "send_keys":
             {
-              string keys = ToolHelper.GetRequiredArg(argumentsJson, "keys");
-              string output = SendKeysHelper.Send(keys);
+              // Not trimmed: leading and trailing spaces in text are typed.
+              string text = ToolHelper.JsonExtractString(argumentsJson, "text");
+              string keys = ToolHelper.JsonExtractString(argumentsJson, "keys");
+              string output = SendKeysHelper.Send(text, keys);
               return new ToolResult(output, ExitFor(output));
             }
 

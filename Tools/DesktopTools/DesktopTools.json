@@ -193,13 +193,19 @@
         },
         {
             "name": "send_keys",
-            "description": "Send keystrokes to the foreground window. Syntax: plain text, {Enter}, {Tab}, ^c (Ctrl+C), +a (Shift+A), !f (Alt+F). Use navigate(action=focus) first when possible.",
+            "description": "Type text and/or press keys in the foreground window (text first). Use navigate(action=focus) first when possible.",
             "parameters": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "description": "Typed exactly as written.",
+                    "required": false
+                },
                 {
                     "name": "keys",
                     "type": "string",
-                    "description": "Key sequence to send.",
-                    "required": true
+                    "description": "Key (Enter), chord (ctrl+s) or sequence ({Ctrl+A}{Delete}).",
+                    "required": false
                 }
             ]
         },
