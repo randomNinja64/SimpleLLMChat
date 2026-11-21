@@ -136,10 +136,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="OnboardingWizardWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="ColorsForm.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -163,9 +159,6 @@
     </Compile>
     <Compile Include="Options.ToolsUi.cs">
       <DependentUpon>Options.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="OnboardingWizardWindow.xaml.cs">
-      <DependentUpon>OnboardingWizardWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="ColorsForm.xaml.cs">
       <DependentUpon>ColorsForm.xaml</DependentUpon>

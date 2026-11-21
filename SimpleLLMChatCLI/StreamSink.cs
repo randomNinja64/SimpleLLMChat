@@ -206,7 +206,7 @@ namespace SimpleLLMChatCLI
         public override void ToolCallStarted(string name)
         {
             CloseToolCall();
-            _toolCallSuppressed = !_settings.AutoApproval && _settings.ApprovalSet.Contains(name);
+            _toolCallSuppressed = !_settings.AutoApprovalSet.Contains(name) && _settings.ApprovalSet.Contains(name);
             if (_toolCallSuppressed)
                 return;
 

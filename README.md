@@ -29,7 +29,7 @@ SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs access
 
 To use the application, download and extract the appropriate build for your system from the Releases page (builds ending in -XP are recommended for Windows XP systems).
 
-On first launch of `SimpleLLMChatGUI.exe`, if `LLMSettings.ini` does not exist next to the executable, a setup wizard walks through System settings. Settings can also be changed later via Options.
+On first launch of `SimpleLLMChatGUI.exe`, if `LLMSettings.ini` does not exist next to the executable, a setup wizard walks through all available settings. Settings can also be changed later via Options.
 
 Once configured, the software can be used via the `SimpleLLMChatCLI.exe` or `SimpleLLMChatGUI.exe` executables.
 
@@ -58,7 +58,7 @@ run-tests.bat
 
 ## Configuration
 
-On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates it from System settings. Appearance, RAG, Tools, and other options can be changed later via Options or by editing the INI manually. The options available within the INI file are as follows:
+On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates it. Settings can be changed later via Options or by editing the INI manually. The options available within the INI file are as follows:
 
 **Appearance**
 - `assistantname`: Display name for assistant responses (default `LLM`)
@@ -96,12 +96,12 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `maxconsecutivefailedtoolcalls`: Maximum number of tool calls that can fail in a row before a session is halted (default `10`; `0` = off)
 
 **Tool Approvals**
-- `toolapprovalmode`: `manual` (default) or `auto`. Manual mode prompts for approval for tools set to require it. Auto mode uses a Jev-compatible endpoint to determine whether or not a tool should run.
+- `autoapprovaltools`: Comma-separated list of tools that request approval from a Jev-compatible endpoint before running
 - `jevbaseurl`: Full URL for a Jev-compatible server (e.g. `http://127.0.0.1:8080/v1/systemone` if you're using llama.cpp)
 - `jevapikey`: API key if required for your Jev-compatible server
 - `jevmodel`: Model to use (if supported by your endpoint)
 - `showjevconfidence`: Show/Hide automatic tool approval confidence level (`1` or `0`, default `1`)
-- `toolsrequiringapproval`: Comma-separated list of tools that require approval for the AI to use in manual mode.
+- `toolsrequiringapproval`: Comma-separated list of tools that require manual approval for the AI to use.
 
 **Tool Timeouts**
 - `tooltimeout.<toolname>`: Timeout for that tool call, in seconds; `0` means no timeout.

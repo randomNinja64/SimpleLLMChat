@@ -93,7 +93,8 @@ namespace SimpleLLMChatGUI
             onRendered = (s, args) =>
             {
                 ContentRendered -= onRendered;
-                OnboardingWizardWindow.ShowIfNeeded(this);
+                if (Options.ShowSetupIfNeeded(this))
+                    ApplySavedSettings();
                 StartLLMProcess();
             };
             ContentRendered += onRendered;
@@ -594,19 +595,25 @@ namespace SimpleLLMChatGUI
 
             if (optionsDialog.ShowDialog() == true)
             {
-                App.LoadSettings(); // Reload settings after options dialog saves
-                FontHandler.ApplyFontToWindow(this);
-                FontHandler.ApplyCodeBlockFontFamily();
-                LoadAndApplyFontSize();
-                LoadAndApplyColors();
-                if (tokenTracker != null)
-                    tokenTracker.Refresh();
+                ApplySavedSettings();
 
                 if (processHandler != null && processHandler.IsProcessRunning)
                     processHandler.SendReload();
                 else
                     ClearChatAndRestart();
             }
+        }
+
+        /// <summary>Reloads LLMSettings.ini after Options or setup saved it and re-applies appearance.</summary>
+        private void ApplySavedSettings()
+        {
+            App.LoadSettings();
+            FontHandler.ApplyFontToWindow(this);
+            FontHandler.ApplyCodeBlockFontFamily();
+            LoadAndApplyFontSize();
+            LoadAndApplyColors();
+            if (tokenTracker != null)
+                tokenTracker.Refresh();
         }
     }
 }

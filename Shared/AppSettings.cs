@@ -80,7 +80,7 @@ public static class AppSettings
 
     public static readonly Setting<string> EnabledTools = Def(SectionTools, "tools", "");
     public static readonly Setting<string> ToolsRequiringApproval = Def(SectionTools, "toolsrequiringapproval", "");
-    public static readonly Setting<string> ToolApprovalMode = Def(SectionTools, "toolapprovalmode", "manual");
+    public static readonly Setting<string> AutoApprovalTools = Def(SectionTools, "autoapprovaltools", "");
     public static readonly Setting<string> JevBaseUrl = Def(SectionTools, "jevbaseurl", "");
     public static readonly Setting<string> JevApiKey = Def(SectionTools, "jevapikey", "");
     public static readonly Setting<string> JevModel = Def(SectionTools, "jevmodel", "");

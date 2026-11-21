@@ -10,6 +10,7 @@
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -18,23 +19,42 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Category ListBox -->
+        <!-- Setup mode only: step header -->
+        <Border x:Name="SetupHeader"
+                Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                Margin="0,0,0,10"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{x:Static SystemColors.ControlDarkBrush}"
+                Visibility="Collapsed">
+            <StackPanel Margin="4,0,4,8">
+                <TextBlock x:Name="SetupStepTitle"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource LabelTextColorBrush}"/>
+                <TextBlock Text="Defaults are selected. You can change these later in Options."
+                           Margin="0,2,0,0"
+                           TextWrapping="Wrap"
+                           Opacity="0.75"
+                           Foreground="{DynamicResource LabelTextColorBrush}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Category ListBox; each item's Tag is the page it shows (set in code) -->
         <ListBox x:Name="CategoryListBox"
-                 Grid.Row="0" Grid.Column="0"
+                 Grid.Row="1" Grid.Column="0"
                  Margin="0,0,8,10"
                  SelectedIndex="0"
                  Foreground="{x:Static SystemColors.ControlTextBrush}"
                  SelectionChanged="CategoryListBox_SelectionChanged">
-            <ListBoxItem Content="Appearance"/>
-            <ListBoxItem Content="RAG"/>
-            <ListBoxItem Content="System"/>
-            <ListBoxItem Content="Tools"/>
-            <ListBoxItem Content="Tool Approvals"/>
-            <ListBoxItem Content="Tool Timeouts"/>
+            <ListBoxItem x:Name="AppearanceItem" Content="Appearance"/>
+            <ListBoxItem x:Name="RagItem" Content="RAG"/>
+            <ListBoxItem x:Name="SystemItem" Content="System"/>
+            <ListBoxItem x:Name="ToolsItem" Content="Tools"/>
+            <ListBoxItem x:Name="ToolApprovalsItem" Content="Tool Approvals"/>
+            <ListBoxItem x:Name="ToolTimeoutsItem" Content="Tool Timeouts"/>
         </ListBox>
 
         <!-- Right side: page panels stacked in same cell, shown by category selection -->
-        <Grid x:Name="ContentGrid" Grid.Row="0" Grid.Column="1">
+        <Grid x:Name="ContentGrid" Grid.Row="1" Grid.Column="1">
 
             <!-- Appearance page -->
             <ScrollViewer x:Name="AppearancePage" Margin="0,0,0,10" VerticalScrollBarVisibility="Auto">
@@ -177,7 +197,13 @@
                     <TextBox x:Name="MaxConsecutiveFailedToolCallsTextBox"
                              Text="{Binding MaxConsecutiveFailedToolCalls, UpdateSourceTrigger=PropertyChanged}"
                              Height="23"/>
-                    <Label Content="Enabled Tools:" Margin="0,8,0,0"/>
+                    <Label Content="Enabled Tools:"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <Button Content="All" Width="75" Height="23" Margin="0,0,6,0"
+                                Tag="{Binding ElementName=ToolsListBox}" Click="SelectAllTools_Click"/>
+                        <Button Content="None" Width="75" Height="23"
+                                Tag="{Binding ElementName=ToolsListBox}" Click="SelectNoTools_Click"/>
+                    </StackPanel>
                 </StackPanel>
                 <ListBox x:Name="ToolsListBox"
                          Grid.Row="2"
@@ -188,45 +214,23 @@
                          Foreground="{x:Static SystemColors.ControlTextBrush}"/>
             </Grid>
 
-            <!-- Tool Approvals page -->
-            <Grid x:Name="ToolApprovalsPage" Margin="0,0,0,10" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <StackPanel Grid.Row="0" Margin="8,0,8,0">
+            <!-- Tool Approvals page: Jev settings, then Auto / Manual / None per tool (rows built in code) -->
+            <ScrollViewer x:Name="ToolApprovalsPage" Margin="0,0,0,10" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                <StackPanel Margin="8,0,8,0">
                     <Label Content="Tool Approvals" FontWeight="Bold" FontSize="14" Margin="0,0,0,0"/>
 
-                    <Label Content="Mode:"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
-                        <RadioButton x:Name="ApprovalAutoRadio"
-                                     Content="Auto"
-                                     GroupName="ToolApprovalMode"
-                                     Margin="0,0,16,0"/>
-                        <RadioButton x:Name="ApprovalManualRadio"
-                                     Content="Manual"
-                                     GroupName="ToolApprovalMode"
-                                     IsChecked="True"/>
-                    </StackPanel>
-
-                    <Label Content="Confidence:"/>
                     <CheckBox x:Name="ShowJevConfidenceCheckBox"
                               Content="Show confidence level for automatic approvals"
                               IsChecked="{Binding ShowJevConfidence, UpdateSourceTrigger=PropertyChanged}"
-                              IsEnabled="{Binding IsChecked, ElementName=ApprovalAutoRadio}"
                               Margin="0,4,0,4"/>
 
                     <Label Content="Jev-Compatible URL:"/>
                     <TextBox x:Name="JevBaseUrlTextBox"
                              Text="{Binding JevBaseUrl, UpdateSourceTrigger=PropertyChanged}"
-                             Height="23"
-                             IsEnabled="{Binding IsChecked, ElementName=ApprovalAutoRadio}"/>
+                             Height="23"/>
 
                     <Label Content="Jev-Compatible API Key:"/>
-                    <PasswordBox x:Name="JevApiKeyPasswordBox"
-                                 Height="23"
-                                 IsEnabled="{Binding IsChecked, ElementName=ApprovalAutoRadio}"/>
+                    <PasswordBox x:Name="JevApiKeyPasswordBox" Height="23"/>
 
                     <Label Content="Model:"/>
                     <Grid>
@@ -238,27 +242,28 @@
                                  Grid.Column="0"
                                  Text="{Binding JevModel, UpdateSourceTrigger=PropertyChanged}"
                                  Height="23"
-                                 Margin="0,0,6,0"
-                                 IsEnabled="{Binding IsChecked, ElementName=ApprovalAutoRadio}"/>
+                                 Margin="0,0,6,0"/>
                         <Button Grid.Column="1"
                                 Content="Model List"
                                 Width="80"
                                 Height="23"
-                                IsEnabled="{Binding IsChecked, ElementName=ApprovalAutoRadio}"
                                 Click="JevModelListButton_Click"/>
                     </Grid>
 
-                    <Label Content="Tools Requiring Approval:"/>
+                    <Label Content="Approval:"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <Button Content="All auto" Width="75" Height="23" Margin="0,0,6,0"
+                                Tag="auto" Click="SetAllApprovalModes_Click"/>
+                        <Button Content="All manual" Width="75" Height="23" Margin="0,0,6,0"
+                                Tag="manual" Click="SetAllApprovalModes_Click"/>
+                        <Button Content="All none" Width="75" Height="23"
+                                Tag="none" Click="SetAllApprovalModes_Click"/>
+                    </StackPanel>
+                    <Border BorderThickness="1" BorderBrush="{x:Static SystemColors.ControlDarkBrush}">
+                        <StackPanel x:Name="ToolApprovalRowsStack" Margin="4,2,4,2"/>
+                    </Border>
                 </StackPanel>
-                <ListBox x:Name="ToolsRequiringApprovalListBox"
-                         Grid.Row="1"
-                         Margin="8,0,8,0"
-                         IsEnabled="{Binding IsChecked, ElementName=ApprovalManualRadio}"
-                         ItemsSource="{Binding AvailableTools}"
-                         ItemTemplate="{StaticResource MultiSelectListBoxItemTemplate}"
-                         SelectionMode="Multiple"
-                         Foreground="{x:Static SystemColors.ControlTextBrush}"/>
-            </Grid>
+            </ScrollViewer>
 
             <!-- Tool Timeouts page -->
             <ScrollViewer x:Name="ToolTimeoutsPage" Margin="0,0,0,10" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
@@ -345,6 +350,7 @@
                         <ComboBoxItem Content="Every Turn"/>
                     </ComboBox>
 
+                    <StackPanel x:Name="RagIndexPanel">
                     <Label Content="Status:" FontWeight="Bold" Margin="0,14,0,4"/>
                     <TextBlock x:Name="IndexingStatusBrief"
                                FontWeight="Bold"
@@ -363,6 +369,7 @@
                         <Button x:Name="ClearIndexButton" Content="Clear Index" Width="90" Height="23"
                                 Click="ClearIndexButton_Click"/>
                     </StackPanel>
+                    </StackPanel>
 
                 </StackPanel>
             </ScrollViewer>
@@ -370,7 +377,11 @@
         </Grid>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="BackButton" Content="&lt; Back" Width="75" Height="23"
+                        Margin="0,0,2,0" Click="BackButton_Click" Visibility="Collapsed"/>
+            <Button x:Name="NextButton" Content="Next &gt;" Width="75" Height="23"
+                        Margin="0,0,8,0" Click="NextButton_Click" Visibility="Collapsed"/>
             <Button x:Name="SaveButton" Content="OK" Width="75" Height="23"
                         Margin="0,0,8,0" Click="SaveButton_Click" IsDefault="True"/>
             <Button x:Name="CancelButton" Content="Cancel" Width="75" Height="23"

@@ -14,6 +14,30 @@ namespace SimpleLLMChatGUI
         private readonly Dictionary<string, FrameworkElement> _toolOptionControls = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
         private List<ScrollViewer> _toolGroupPages = new List<ScrollViewer>();
         private readonly Dictionary<string, TextBox> _toolTimeoutControls = new Dictionary<string, TextBox>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<ToolApprovalRow> _toolApprovalRows = new List<ToolApprovalRow>();
+
+        private enum ApprovalChoice
+        {
+            Auto,
+            Manual,
+            None
+        }
+
+        /// <summary>One tool's Auto / Manual / None choice on the Tool Approvals page.</summary>
+        private sealed class ToolApprovalRow
+        {
+            public string ToolName;
+            public RadioButton Auto;
+            public RadioButton Manual;
+            public RadioButton None;
+
+            public void Select(ApprovalChoice choice)
+            {
+                Auto.IsChecked = choice == ApprovalChoice.Auto;
+                Manual.IsChecked = choice == ApprovalChoice.Manual;
+                None.IsChecked = choice == ApprovalChoice.None;
+            }
+        }
 
         private List<string> GetSelectedToolsFromListBox(ListBox listBox)
         {
@@ -22,6 +46,20 @@ namespace SimpleLLMChatGUI
                 .Select(GetBareToolName)
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .ToList();
+        }
+
+        private void SelectAllTools_Click(object sender, RoutedEventArgs e)
+        {
+            var listBox = ((FrameworkElement)sender).Tag as ListBox;
+            if (listBox != null)
+                listBox.SelectAll();
+        }
+
+        private void SelectNoTools_Click(object sender, RoutedEventArgs e)
+        {
+            var listBox = ((FrameworkElement)sender).Tag as ListBox;
+            if (listBox != null)
+                listBox.UnselectAll();
         }
 
         private static string GetBareToolName(string displayOrName)
@@ -37,8 +75,8 @@ namespace SimpleLLMChatGUI
             var toolLines = new List<string>
             {
                 AppSettings.EnabledTools.Line(string.Join(",", GetSelectedToolsFromListBox(ToolsListBox))),
-                AppSettings.ToolsRequiringApproval.Line(string.Join(",", GetSelectedToolsFromListBox(ToolsRequiringApprovalListBox))),
-                AppSettings.ToolApprovalMode.Line(ApprovalAutoRadio.IsChecked == true ? "auto" : "manual"),
+                AppSettings.ToolsRequiringApproval.Line(string.Join(",", GetApprovalTools(ApprovalChoice.Manual))),
+                AppSettings.AutoApprovalTools.Line(string.Join(",", GetApprovalTools(ApprovalChoice.Auto))),
                 AppSettings.JevBaseUrl.Line(JevBaseUrl ?? string.Empty),
                 AppSettings.JevApiKey.Line(JevApiKey ?? string.Empty),
                 AppSettings.JevModel.Line(JevModel ?? string.Empty),
@@ -88,12 +126,6 @@ namespace SimpleLLMChatGUI
 
             foreach (var group in GetToolOptionGroups())
             {
-                var listBoxItem = new ListBoxItem
-                {
-                    Content = group.Key
-                };
-                CategoryListBox.Items.Add(listBoxItem);
-
                 var stackPanel = new StackPanel { Margin = new Thickness(8, 0, 8, 0) };
 
                 var heading = new Label
@@ -148,6 +180,11 @@ namespace SimpleLLMChatGUI
 
                 ContentGrid.Children.Add(scrollViewer);
                 _toolGroupPages.Add(scrollViewer);
+                CategoryListBox.Items.Add(new ListBoxItem
+                {
+                    Content = group.Key,
+                    Tag = scrollViewer
+                });
             }
         }
 
@@ -228,20 +265,104 @@ namespace SimpleLLMChatGUI
         private void LoadToolSelections(ConfigHandler config)
         {
             ApplyToolSelectionToListBox(ToolsListBox, config.GetList(AppSettings.EnabledTools));
-            ApplyToolSelectionToListBox(
-                ToolsRequiringApprovalListBox,
-                config.GetList(AppSettings.ToolsRequiringApproval));
-            ApplyApprovalMode(config);
         }
 
-        private void ApplyApprovalMode(ConfigHandler config)
+        /// <summary>
+        /// Builds a row per tool with Auto / Manual / None and loads each from config.
+        /// A tool on both lists loads as Auto.
+        /// </summary>
+        private void BuildToolApprovalsUI(ConfigHandler config)
         {
-            bool auto = string.Equals(
-                config.Get(AppSettings.ToolApprovalMode),
-                "auto",
-                StringComparison.OrdinalIgnoreCase);
-            ApprovalAutoRadio.IsChecked = auto;
-            ApprovalManualRadio.IsChecked = !auto;
+            _toolApprovalRows.Clear();
+            ToolApprovalRowsStack.Children.Clear();
+
+            if (_availableTools.Count == 0)
+            {
+                var empty = new TextBlock { Text = "No tools installed.", Margin = new Thickness(2, 4, 2, 4) };
+                empty.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
+                ToolApprovalRowsStack.Children.Add(empty);
+                return;
+            }
+
+            var autoTools = new HashSet<string>(config.GetList(AppSettings.AutoApprovalTools), StringComparer.OrdinalIgnoreCase);
+            var manualTools = new HashSet<string>(config.GetList(AppSettings.ToolsRequiringApproval), StringComparer.OrdinalIgnoreCase);
+
+            foreach (string displayName in _availableTools)
+            {
+                string toolName = GetBareToolName(displayName);
+                string group = "approval_" + _toolApprovalRows.Count;
+
+                var line = new Grid { Margin = new Thickness(0, 1, 0, 1) };
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var name = new TextBlock
+                {
+                    Text = displayName,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    ToolTip = displayName,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(2, 0, 8, 0)
+                };
+                name.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
+                line.Children.Add(name);
+
+                var row = new ToolApprovalRow
+                {
+                    ToolName = toolName,
+                    Auto = MakeApprovalChoice("Auto", group, line, 1),
+                    Manual = MakeApprovalChoice("Manual", group, line, 2),
+                    None = MakeApprovalChoice("None", group, line, 3)
+                };
+
+                if (autoTools.Contains(toolName))
+                    row.Select(ApprovalChoice.Auto);
+                else if (manualTools.Contains(toolName))
+                    row.Select(ApprovalChoice.Manual);
+                else
+                    row.Select(ApprovalChoice.None);
+
+                ToolApprovalRowsStack.Children.Add(line);
+                _toolApprovalRows.Add(row);
+            }
+        }
+
+        private static RadioButton MakeApprovalChoice(string text, string group, Grid line, int column)
+        {
+            var choice = new RadioButton
+            {
+                Content = text,
+                GroupName = group,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            Grid.SetColumn(choice, column);
+            line.Children.Add(choice);
+            return choice;
+        }
+
+        private void SetAllApprovalModes_Click(object sender, RoutedEventArgs e)
+        {
+            string tag = ((FrameworkElement)sender).Tag as string;
+            ApprovalChoice choice = tag == "auto" ? ApprovalChoice.Auto
+                : tag == "manual" ? ApprovalChoice.Manual
+                : ApprovalChoice.None;
+            foreach (ToolApprovalRow row in _toolApprovalRows)
+                row.Select(choice);
+        }
+
+        private List<string> GetApprovalTools(ApprovalChoice choice)
+        {
+            var tools = new List<string>();
+            foreach (ToolApprovalRow row in _toolApprovalRows)
+            {
+                RadioButton button = choice == ApprovalChoice.Auto ? row.Auto : row.Manual;
+                if (button.IsChecked == true)
+                    tools.Add(row.ToolName);
+            }
+            return tools;
         }
 
         private void ApplyToolSelectionToListBox(ListBox listBox, List<string> tools)

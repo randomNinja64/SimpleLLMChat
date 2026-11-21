@@ -341,6 +341,7 @@ namespace SimpleLLMChatCLI.Tests
                 EnabledTools = new List<string>(),
                 EnabledSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 ApprovalSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                AutoApprovalSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                 ThinkingDisplay = ChatBlockDisplayMode.Shown,
                 ToolCallDisplay = ChatBlockDisplayMode.Shown,
                 ToolOutputDisplay = ChatBlockDisplayMode.Shown
@@ -444,7 +445,7 @@ namespace SimpleLLMChatCLI.Tests
 
                 TurnSettings auto = Settings();
                 auto.ApprovalSet.Add("read_file");
-                auto.AutoApproval = true;
+                auto.AutoApprovalSet.Add("read_file");
                 string streamed = Capture(() =>
                 {
                     StreamSink sink = StreamSink.For(auto);

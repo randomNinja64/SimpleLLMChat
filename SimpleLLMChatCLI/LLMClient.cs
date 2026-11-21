@@ -217,7 +217,7 @@ public partial class LLMClient
                     exitCode
                 );
             }
-            else if (settings.AutoApproval)
+            else if (settings.AutoApprovalSet.Contains(call.Name))
             {
                 JevGateDecision decision = JevDecisionClient.Decide(
                     config,

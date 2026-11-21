@@ -13,6 +13,7 @@ namespace SimpleLLMChatGUI
     {
         private readonly ProcessHandler _processHandler;
         private readonly string _toolsDir;
+        private readonly bool _setupMode;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -22,10 +23,27 @@ namespace SimpleLLMChatGUI
         }
 
         public Options(ProcessHandler processHandler)
+            : this(processHandler, false)
+        {
+        }
+
+        /// <param name="setupMode">
+        /// First-run setup: pages are stepped through with Back/Next, System comes first,
+        /// and tool pages are left out when no tools are installed.
+        /// </param>
+        private Options(ProcessHandler processHandler, bool setupMode)
         {
             _processHandler = processHandler;
+            _setupMode = setupMode;
             InitializeComponent();
             DataContext = this;
+
+            AppearanceItem.Tag = AppearancePage;
+            RagItem.Tag = RagPage;
+            SystemItem.Tag = SystemPage;
+            ToolsItem.Tag = ToolsPage;
+            ToolApprovalsItem.Tag = ToolApprovalsPage;
+            ToolTimeoutsItem.Tag = ToolTimeoutsPage;
 
             _toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
             _availableTools = ToolOptionsRegistry.LoadToolDisplayNames(_toolsDir);
@@ -112,37 +130,19 @@ namespace SimpleLLMChatGUI
 
         private void CategoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (AppearancePage == null) return;
+            // Fires during InitializeComponent, before the pages exist.
+            if (ContentGrid == null) return;
 
-            AppearancePage.Visibility = Visibility.Collapsed;
-            SystemPage.Visibility = Visibility.Collapsed;
-            ToolsPage.Visibility = Visibility.Collapsed;
-            ToolApprovalsPage.Visibility = Visibility.Collapsed;
-            ToolTimeoutsPage.Visibility = Visibility.Collapsed;
-            if (RagPage != null)
-                RagPage.Visibility = Visibility.Collapsed;
-            foreach (var page in _toolGroupPages)
+            foreach (UIElement page in ContentGrid.Children)
                 page.Visibility = Visibility.Collapsed;
 
-            // Static pages occupy 0–5. Per-tool option pages are appended after them.
-            const int toolGroupStart = 6;
-            switch (CategoryListBox.SelectedIndex)
-            {
-                case 0: AppearancePage.Visibility = Visibility.Visible; break;
-                case 1:
-                    if (RagPage != null)
-                        RagPage.Visibility = Visibility.Visible;
-                    break;
-                case 2: SystemPage.Visibility = Visibility.Visible; break;
-                case 3: ToolsPage.Visibility = Visibility.Visible; break;
-                case 4: ToolApprovalsPage.Visibility = Visibility.Visible; break;
-                case 5: ToolTimeoutsPage.Visibility = Visibility.Visible; break;
-                default:
-                    int toolIdx = CategoryListBox.SelectedIndex - toolGroupStart;
-                    if (toolIdx >= 0 && toolIdx < _toolGroupPages.Count)
-                        _toolGroupPages[toolIdx].Visibility = Visibility.Visible;
-                    break;
-            }
+            var item = CategoryListBox.SelectedItem as ListBoxItem;
+            var selectedPage = item != null ? item.Tag as UIElement : null;
+            if (selectedPage != null)
+                selectedPage.Visibility = Visibility.Visible;
+
+            if (_setupMode)
+                UpdateSetupButtons();
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -154,11 +154,121 @@ namespace SimpleLLMChatGUI
             LoadToolSelections(config);
             BuildToolOptionsUI(config);
             BuildToolTimeoutsUI(config);
+            BuildToolApprovalsUI(config);
             RestrictToDigits(MaxConsecutiveFailedToolCallsTextBox);
+
+            if (_setupMode)
+                EnterSetupMode();
 
             IndexingStatusHub.Updated += OnIndexingStatusUpdated;
             RefreshIndexingStatusUi();
             Closed += Options_Closed;
+        }
+
+        /// <summary>
+        /// Shows Options as the first-run setup wizard when LLMSettings.ini does not exist.
+        /// Returns true when the user finished setup and the settings were written.
+        /// </summary>
+        public static bool ShowSetupIfNeeded(Window owner)
+        {
+            if (!App.NeedsOnboarding)
+                return false;
+
+            var setup = new Options(null, true);
+            if (owner != null)
+                setup.Owner = owner;
+            return setup.ShowDialog() == true;
+        }
+
+        private void EnterSetupMode()
+        {
+            Title = "SimpleLLMChat Setup";
+            SetupHeader.Visibility = Visibility.Visible;
+
+            // Step-by-step: the category list stays as the step model but is not shown,
+            // and pages take the full width.
+            CategoryListBox.Visibility = Visibility.Collapsed;
+            Grid.SetColumn(ContentGrid, 0);
+            Grid.SetColumnSpan(ContentGrid, 2);
+
+            // The header shows the step title, so drop each page's own heading.
+            foreach (object page in ContentGrid.Children)
+            {
+                Label heading = FindPageHeading(page as DependencyObject);
+                if (heading != null)
+                    heading.Visibility = Visibility.Collapsed;
+            }
+
+            // The connection settings are the only ones needed to chat, so they come first.
+            CategoryListBox.Items.Remove(SystemItem);
+            CategoryListBox.Items.Insert(0, SystemItem);
+
+            // Nothing in tools\ means nothing to enable, approve, or time out.
+            if (_availableTools.Count == 0)
+            {
+                CategoryListBox.Items.Remove(ToolsItem);
+                CategoryListBox.Items.Remove(ToolApprovalsItem);
+                CategoryListBox.Items.Remove(ToolTimeoutsItem);
+            }
+
+            // Indexing needs a running CLI, which setup does not have yet.
+            RagIndexPanel.Visibility = Visibility.Collapsed;
+
+            // Back / Next / Cancel; Next becomes Finish on the last step.
+            BackButton.Visibility = Visibility.Visible;
+            NextButton.Visibility = Visibility.Visible;
+            NextButton.IsDefault = true;
+            SaveButton.Visibility = Visibility.Collapsed;
+            SaveButton.IsDefault = false;
+
+            CategoryListBox.SelectedIndex = 0;
+            UpdateSetupButtons();
+        }
+
+        /// <summary>A page's bold section heading: the first size-14 Label in it.</summary>
+        private static Label FindPageHeading(DependencyObject node)
+        {
+            if (node == null)
+                return null;
+            var label = node as Label;
+            if (label != null && label.FontSize == 14)
+                return label;
+            foreach (object child in LogicalTreeHelper.GetChildren(node))
+            {
+                Label found = FindPageHeading(child as DependencyObject);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        private bool IsLastSetupStep
+        {
+            get { return CategoryListBox.SelectedIndex >= CategoryListBox.Items.Count - 1; }
+        }
+
+        private void UpdateSetupButtons()
+        {
+            int index = CategoryListBox.SelectedIndex;
+            var item = CategoryListBox.SelectedItem as ListBoxItem;
+            SetupStepTitle.Text = string.Format("{0} ({1} of {2})",
+                item != null ? item.Content : string.Empty, index + 1, CategoryListBox.Items.Count);
+            BackButton.IsEnabled = index > 0;
+            NextButton.Content = IsLastSetupStep ? "Finish" : "Next >";
+        }
+
+        private void BackButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (CategoryListBox.SelectedIndex > 0)
+                CategoryListBox.SelectedIndex--;
+        }
+
+        private void NextButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsLastSetupStep)
+                SaveButton_Click(sender, e);
+            else
+                CategoryListBox.SelectedIndex++;
         }
 
         private void LoadSettings(ConfigHandler config)

@@ -696,6 +696,58 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("config.per_tool_auto_approval", () =>
+            {
+                using (TempWorkspace ws = new TempWorkspace("approval-ini"))
+                {
+                    string path = ws.Combine("LLMSettings.ini");
+
+                    File.WriteAllText(path, "[Tools]\r\nautoapprovaltools=read_file\r\ntoolsrequiringapproval=run_shell_command\r\n");
+                    TurnSettings perTool = TurnSettings.FromConfig(new ConfigHandler(path), false);
+                    TestAssert.True(perTool.AutoApprovalSet.Contains("READ_FILE"), "listed tool is auto");
+                    TestAssert.True(!perTool.AutoApprovalSet.Contains("run_shell_command"), "unlisted tool is not auto");
+                }
+            });
+
+            TestRunner.Run("cli.per_tool_auto_approval_allow", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    if (!ShellToolsPackaged(ws))
+                        TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
+
+                    server.StreamDelayMs = 0;
+                    server.SystemOneChoice = "allow";
+                    server.SystemOneConfidence = 0.91;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_per_tool_auto",
+                        "{\"command\":\"echo PER_TOOL_AUTO_OK\"}");
+                    server.EnqueueContent("per-tool-auto-final");
+                    // Also on the manual list: the per-tool Auto choice wins.
+                    WriteCliIni(
+                        ws.Path,
+                        server.BaseUrl + "/v1",
+                        "run_shell_command",
+                        "run_shell_command",
+                        "run_shell_command",
+                        server.BaseUrl + "/v1/systemone",
+                        "jev-secret",
+                        "");
+
+                    ProcessResult r = ProcessRunner.Run(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners please run the command",
+                        ws.Path, null, 30000);
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Stdout, "[run_shell_command auto allowed, confidence 0.91]", "auto line");
+                    TestAssert.ContainsIgnoreCase(r.Stdout, "PER_TOOL_AUTO_OK", "echo");
+                    TestAssert.True(r.Stdout.IndexOf("Approve? (Y/N):", StringComparison.Ordinal) < 0, "no prompt");
+                    TestAssert.True(server.SystemOneRequestCount >= 1, "systemone called");
+                }
+            });
+
             TestRunner.Run("cli.auto_approval_allow", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
@@ -717,7 +769,7 @@ namespace SimpleLLMChatCLI.Tests
                         server.BaseUrl + "/v1",
                         "run_shell_command",
                         "",
-                        "auto",
+                        "run_shell_command",
                         server.BaseUrl + "/v1/systemone",
                         "jev-secret",
                         "");
@@ -760,7 +812,7 @@ namespace SimpleLLMChatCLI.Tests
                         server.BaseUrl + "/v1",
                         "run_shell_command",
                         "",
-                        "auto",
+                        "run_shell_command",
                         server.BaseUrl + "/v1/systemone",
                         "jev-secret",
                         "",
@@ -796,7 +848,7 @@ namespace SimpleLLMChatCLI.Tests
                         server.BaseUrl + "/v1",
                         "run_shell_command",
                         "",
-                        "auto",
+                        "run_shell_command",
                         server.BaseUrl + "/v1/systemone",
                         "jev-secret",
                         "jev-latest");
@@ -842,7 +894,7 @@ namespace SimpleLLMChatCLI.Tests
                         server.BaseUrl + "/v1",
                         "run_shell_command",
                         "",
-                        "auto",
+                        "run_shell_command",
                         server.BaseUrl + "/v1/systemone",
                         "jev-secret",
                         "jev-latest",
@@ -890,7 +942,7 @@ namespace SimpleLLMChatCLI.Tests
                         server.BaseUrl + "/v1",
                         "run_shell_command",
                         "",
-                        "auto",
+                        "run_shell_command",
                         server.BaseUrl + "/v1/systemone",
                         "jev-secret",
                         "");
@@ -1125,7 +1177,7 @@ namespace SimpleLLMChatCLI.Tests
             string llmServer,
             string tools,
             string toolsRequiringApproval,
-            string toolApprovalMode,
+            string autoApprovalTools,
             string jevBaseUrl,
             string jevApiKey,
             string jevModel,
@@ -1146,7 +1198,7 @@ namespace SimpleLLMChatCLI.Tests
                 "[Tools]\r\n" +
                 "tools=" + (tools ?? "") + "\r\n" +
                 "toolsrequiringapproval=" + (toolsRequiringApproval ?? "") + "\r\n" +
-                "toolapprovalmode=" + (toolApprovalMode ?? "manual") + "\r\n" +
+                "autoapprovaltools=" + (autoApprovalTools ?? "") + "\r\n" +
                 "jevbaseurl=" + (jevBaseUrl ?? "") + "\r\n" +
                 "jevapikey=" + (jevApiKey ?? "") + "\r\n" +
                 "jevmodel=" + (jevModel ?? "") + "\r\n" +

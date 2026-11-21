@@ -5,7 +5,7 @@ using System.IO;
 namespace SimpleLLMChatGUI
 {
     /// <summary>
-    /// Shared LLMSettings.ini writer for Options and the first-run onboarding wizard.
+    /// Shared LLMSettings.ini writer for Options (including first-run setup mode).
     /// </summary>
     public static class SettingsIniWriter
     {
@@ -46,7 +46,7 @@ namespace SimpleLLMChatGUI
         }
 
         /// <summary>
-        /// Writes a complete LLMSettings.ini with System values from onboarding
+        /// Writes a complete LLMSettings.ini with the given System values
         /// and defaults for Appearance, RAG, and Tools.
         /// </summary>
         public static void WriteInitialConfig(
