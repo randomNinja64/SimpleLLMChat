@@ -87,6 +87,10 @@
             <Setter Property="Foreground" Value="{DynamicResource LabelTextColorBrush}"/>
         </Style>
 
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource LabelTextColorBrush}"/>
+        </Style>
+
         <!-- Labels -->
         <Style TargetType="Label">
             <Setter Property="Foreground" Value="{DynamicResource LabelTextColorBrush}"/>
