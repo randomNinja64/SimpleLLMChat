@@ -120,7 +120,7 @@ namespace FileTools.Tests
                 TestRunner.Run("read_file.line_offset_last_page", () =>
                 {
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
-                        new JObject { ["filename"] = tenLines, ["offset"] = "8" },
+                        new JObject { ["filename"] = tenLines, ["offset"] = 8 }, // integer, as the schema declares
                         new JObject { ["maxReadLines"] = "3" });
                     TestAssert.Equal(0, r.ExitCode, "exit");
                     TestAssert.Contains(r.Text, "reading lines 8-9", "header");

@@ -11,7 +11,7 @@
             "description": "Read the contents of a local file and return it as a string. Always reads up to {config.maxReadLines} lines. Use the offset parameter to read different parts of large files.",
             "parameters": [
                 { "name": "filename", "type": "string", "description": "The full path of the file to read. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": true },
-                { "name": "offset", "type": "string", "description": "Line number to start reading from (0-indexed, default: 0). Use this to read different parts of large files. For example, offset {config.maxReadLines} reads the next {config.maxReadLines} lines.", "required": false }
+                { "name": "offset", "type": "integer", "description": "Line number to start reading from (0-indexed, default: 0). Use this to read different parts of large files. For example, offset {config.maxReadLines} reads the next {config.maxReadLines} lines.", "required": false }
             ]
         },
         {
