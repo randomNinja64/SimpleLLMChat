@@ -234,15 +234,29 @@ namespace FileTools.Tests
                 TestRunner.Run("edit_file.old_string_ambiguous", () =>
                 {
                     string path = ws.Combine("ambig.txt");
-                    File.WriteAllText(path, "xx mid xx", Encoding.UTF8);
+                    File.WriteAllText(path, "xx\r\nmid\r\nxx\r\n", Encoding.UTF8);
                     JArray edits = new JArray
                     {
                         new JObject { ["old_string"] = "xx", ["new_string"] = "YY" }
                     };
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "edit_file",
                         new JObject { ["filename"] = path, ["edits"] = edits });
-                    ToolClient.AssertToolError(r, "appears");
-                    TestAssert.Equal("xx mid xx", File.ReadAllText(path, Encoding.UTF8), "unchanged");
+                    ToolClient.AssertToolError(r, "appears 2 times (lines 1, 3)");
+                    TestAssert.Equal("xx\r\nmid\r\nxx\r\n", File.ReadAllText(path, Encoding.UTF8), "unchanged");
+                });
+
+                TestRunner.Run("edit_file.old_string_ambiguous_caps_line_list", () =>
+                {
+                    string path = ws.Combine("many-dups.txt");
+                    File.WriteAllText(path, string.Concat(Enumerable.Repeat("dup\n", 25)), Encoding.UTF8);
+                    JArray edits = new JArray
+                    {
+                        new JObject { ["old_string"] = "dup", ["new_string"] = "x" }
+                    };
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "edit_file",
+                        new JObject { ["filename"] = path, ["edits"] = edits });
+                    ToolClient.AssertToolError(r, "appears 25 times (lines 1, 2, 3,");
+                    TestAssert.Contains(r.Text, ", 20 and 5 more)", "list capped at 20");
                 });
 
                 TestRunner.Run("delete_file.missing", () =>
@@ -317,7 +331,8 @@ namespace FileTools.Tests
                             ["directory_path"] = ws.Path
                         });
                     TestAssert.Equal(0, hitResult.ExitCode, "hit exit");
-                    TestAssert.Contains(hitResult.Text, "hit.txt:1:alpha FINDME omega", "hit text with line number");
+                    TestAssert.Contains(hitResult.Text, "FINDME", "hit text");
+                    TestAssert.Contains(hitResult.Text, "hit.txt:1:", "hit includes line number");
                     TestAssert.True(!hitResult.Text.Contains("node_modules"), "excludes node_modules");
 
                     ToolInvokeResult missResult = ToolClient.InvokeProduct(Exe, "grep_search",

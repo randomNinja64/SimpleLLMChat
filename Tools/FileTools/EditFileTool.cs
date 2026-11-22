@@ -80,7 +80,7 @@ namespace FileTools
                 if (occurrences != 1)
                 {
                     errors.Add(
-                        "Edit " + blockNum + " failed: old_string appears " + occurrences + " times.\n" +
+                        "Edit " + blockNum + " failed: old_string appears " + occurrences + " times (" + MatchLineNumbers(normalized, block.Search) + ").\n" +
                         "old_string must match EXACTLY once. Add more surrounding context to make it unique.");
                     continue;
                 }
@@ -147,6 +147,28 @@ namespace FileTools
                 index += search.Length;
             }
             return count;
+        }
+
+        /// <summary>
+        /// 1-based line numbers where each match of search starts, e.g. "lines 4, 19, 33",
+        /// listing at most 20 so a short old_string cannot flood the error.
+        /// </summary>
+        private static string MatchLineNumbers(string text, string search)
+        {
+            const int MaxListed = 20;
+            List<string> lines = new List<string>();
+            int total = 0, line = 1, scanned = 0, index = 0;
+            while ((index = text.IndexOf(search, index, StringComparison.Ordinal)) >= 0)
+            {
+                for (; scanned < index; scanned++)
+                    if (text[scanned] == '\n') line++;
+                if (lines.Count < MaxListed)
+                    lines.Add(line.ToString());
+                total++;
+                index += search.Length;
+            }
+            string list = "lines " + string.Join(", ", lines.ToArray());
+            return total > MaxListed ? list + " and " + (total - MaxListed) + " more" : list;
         }
 
         private static string BuildNotFoundError(string searchText, int blockNum)
