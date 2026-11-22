@@ -1,6 +1,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace FileTools.Tests
@@ -101,26 +102,100 @@ namespace FileTools.Tests
                     TestAssert.Equal(1, r.ExitCode, "exit 1");
                 });
 
-                TestRunner.Run("read_file.offset_and_truncate", () =>
+                string tenLines = ws.Combine("ten.txt");
+                File.WriteAllText(tenLines, "L0\r\nL1\r\nL2\r\nL3\r\nL4\r\nL5\r\nL6\r\nL7\r\nL8\r\nL9\r\n", Encoding.UTF8);
+
+                TestRunner.Run("read_file.line_page_reports_true_total", () =>
                 {
-                    string path = ws.Combine("long.txt");
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = tenLines },
+                        new JObject { ["maxReadLines"] = "3" });
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Text, "File has 10 lines, reading lines 0-2", "header counts the whole file");
+                    TestAssert.Contains(r.Text, "L0\nL1\nL2", "body");
+                    TestAssert.Contains(r.Text, "...[truncated: line limit (3)]", "trunc reason");
+                    TestAssert.True(r.Text.IndexOf("L3", StringComparison.Ordinal) < 0, "no next page");
+                });
+
+                TestRunner.Run("read_file.line_offset_last_page", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = tenLines, ["offset"] = "8" },
+                        new JObject { ["maxReadLines"] = "3" });
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Text, "reading lines 8-9", "header");
+                    TestAssert.Contains(r.Text, "L8\nL9", "body");
+                    TestAssert.True(r.Text.IndexOf("[truncated", StringComparison.Ordinal) < 0, "not truncated at EOF");
+                });
+
+                TestRunner.Run("read_file.char_cap_cuts_line_that_does_not_fit", () =>
+                {
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = tenLines },
+                        new JObject { ["maxReadLines"] = "500", ["maxFileContentLength"] = "7" });
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Text, "reading lines 0-2", "header includes the cut line");
+                    TestAssert.Contains(r.Text, "L0\nL1\nL...[line truncated]", "third line cut at the limit");
+                    TestAssert.Contains(r.Text, "...[truncated: character limit (7)]", "trunc reason");
+                });
+
+                TestRunner.Run("read_file.char_cap_long_first_line", () =>
+                {
+                    string path = ws.Combine("wide.txt");
                     File.WriteAllText(path, "0123456789ABCDEF", Encoding.UTF8);
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
-                        new JObject { ["filename"] = path, ["offset"] = "0" },
+                        new JObject { ["filename"] = path },
                         new JObject { ["maxFileContentLength"] = "10" });
                     TestAssert.Equal(0, r.ExitCode, "exit");
-                    TestAssert.Contains(r.Text, "reading chars 0-9", "header");
-                    TestAssert.Contains(r.Text, "...[truncated]", "trunc");
-                    TestAssert.Contains(r.Text, "0123456789", "body");
+                    TestAssert.Contains(r.Text, "File has 1 lines, reading lines 0-0", "header");
+                    TestAssert.Contains(r.Text, "0123456789...[line truncated]", "partial first line");
+                    TestAssert.Contains(r.Text, "...[truncated: character limit (10)]", "reason given even when the cut line is the last line");
                     TestAssert.True(r.Text.IndexOf("ABCDEF", StringComparison.Ordinal) < 0, "no tail");
+                });
+
+                TestRunner.Run("read_file.ansi_fallback", () =>
+                {
+                    string path = ws.Combine("ansi.txt");
+                    File.WriteAllText(path, "café", Encoding.Default);
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = path });
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Text, "café", "decoded with the ANSI code page");
+                });
+
+                TestRunner.Run("edit_file.keeps_bom_encoding", () =>
+                {
+                    foreach (Encoding enc in new Encoding[] { Encoding.UTF8, Encoding.Unicode })
+                    {
+                        string path = ws.Combine("bom-" + enc.WebName + ".txt");
+                        File.WriteAllText(path, "café one", enc); // both write a BOM
+                        ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "edit_file", new JObject
+                        {
+                            ["filename"] = path,
+                            ["edits"] = new JArray { new JObject { ["old_string"] = "one", ["new_string"] = "two" } }
+                        });
+                        TestAssert.Equal(0, r.ExitCode, enc.WebName + " exit");
+                        byte[] expected = enc.GetPreamble().Concat(enc.GetBytes("café two")).ToArray();
+                        TestAssert.True(File.ReadAllBytes(path).SequenceEqual(expected), enc.WebName + " bytes keep BOM and encoding");
+                    }
+                });
+
+                TestRunner.Run("read_file.empty", () =>
+                {
+                    string path = ws.Combine("empty.txt");
+                    File.WriteAllText(path, "");
+                    ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
+                        new JObject { ["filename"] = path });
+                    TestAssert.Equal(0, r.ExitCode, "exit");
+                    TestAssert.Contains(r.Text, "File is empty", "message");
                 });
 
                 TestRunner.Run("read_file.offset_past_eof", () =>
                 {
                     string path = ws.Combine("short.txt");
-                    File.WriteAllText(path, "abc", Encoding.UTF8);
+                    File.WriteAllText(path, "abc\n", Encoding.UTF8);
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
-                        new JObject { ["filename"] = path, ["offset"] = "3" });
+                        new JObject { ["filename"] = path, ["offset"] = "1" });
                     ToolClient.AssertToolError(r, "exceeds file length");
                     TestAssert.Equal(1, r.ExitCode, "exit 1");
                 });

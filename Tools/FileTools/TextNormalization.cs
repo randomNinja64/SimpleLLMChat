@@ -21,21 +21,48 @@ namespace FileTools
         /// </summary>
         internal static string ReadDetectingEncoding(string path, out Encoding encoding)
         {
+            byte[] bytes = File.ReadAllBytes(path);
+
+            // UTF-32 LE comes before UTF-16 LE, whose BOM is its first two bytes.
+            foreach (Encoding withBom in BomEncodings)
+            {
+                byte[] bom = withBom.GetPreamble();
+                if (StartsWith(bytes, bom))
+                {
+                    encoding = withBom;
+                    return withBom.GetString(bytes, bom.Length, bytes.Length - bom.Length);
+                }
+            }
+
             try
             {
-                // Strict UTF-8, so a file that is not UTF-8 throws instead of decoding to U+FFFD.
-                using (StreamReader reader = new StreamReader(path, new UTF8Encoding(false, true), true))
-                {
-                    string text = reader.ReadToEnd();
-                    encoding = reader.CurrentEncoding;
-                    return text;
-                }
+                // Strict UTF-8 over the whole file in one call, so any invalid bytes, including an
+                // incomplete sequence at the end, throw instead of decoding to U+FFFD.
+                encoding = new UTF8Encoding(false, true);
+                return encoding.GetString(bytes);
             }
             catch (DecoderFallbackException)
             {
                 encoding = Encoding.Default;
-                return File.ReadAllText(path, encoding);
+                return encoding.GetString(bytes);
             }
+        }
+
+        private static readonly Encoding[] BomEncodings =
+        {
+            Encoding.UTF32, Encoding.UTF8, Encoding.Unicode, Encoding.BigEndianUnicode, new UTF32Encoding(true, true)
+        };
+
+        private static bool StartsWith(byte[] bytes, byte[] prefix)
+        {
+            if (bytes.Length < prefix.Length)
+                return false;
+            for (int i = 0; i < prefix.Length; i++)
+            {
+                if (bytes[i] != prefix[i])
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>

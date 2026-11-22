@@ -14,9 +14,10 @@ namespace FileTools
                     case "read_file":
                         {
                             string filename = ToolHelper.GetRequiredArg(argumentsJson, "filename");
-                            int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "offset")?.Trim() ?? "", out int offset);
+                            int.TryParse(ToolHelper.JsonExtractString(argumentsJson, "offset")?.Trim() ?? "", out int lineOffset);
+                            int maxReadLines = ToolHelper.GetConfigInt("maxreadlines", 500);
                             int maxContentLength = ToolHelper.GetConfigInt("maxfilecontentlength", 10000);
-                            return new ToolResult(FileHandler.ReadFile(filename, maxContentLength, offset), 0);
+                            return new ToolResult(FileHandler.ReadFile(filename, maxReadLines, maxContentLength, lineOffset), 0);
                         }
 
                     case "write_file":

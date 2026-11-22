@@ -10,30 +10,76 @@ namespace FileTools
     /// </summary>
     public static class FileHandler
     {
-        public static string ReadFile(string filename, int maxContentLength, int offset = 0)
+        /// <summary>
+        /// Reads up to maxLines lines starting at a 0-indexed line offset. maxContentLength
+        /// (characters, 0 = no limit) also caps the page: the line that crosses it is cut there.
+        /// </summary>
+        public static string ReadFile(string filename, int maxLines, int maxContentLength, int lineOffset = 0)
         {
             filename = Environment.ExpandEnvironmentVariables(filename);
             if (!File.Exists(filename))
                 throw new FileNotFoundException($"File not found: {filename}");
 
-            string content = TextNormalization.ReadDetectingEncoding(filename, out _);
-            int totalLength = content.Length;
+            // The whole file is split so the reported total is the real line count.
+            string content = TextNormalization.NormalizeLineEndings(
+                TextNormalization.ReadDetectingEncoding(filename, out _));
+            if (content.Length == 0)
+                return "File is empty (0 lines).";
 
-            if (offset < 0)
-                offset = 0;
-            if (offset >= totalLength)
-                throw new ArgumentException($"File length = {totalLength} characters. Offset {offset} exceeds file length.");
+            string[] lines = content.Split('\n');
+            int totalLines = lines.Length;
+            if (content.EndsWith("\n"))
+                totalLines--; // a trailing newline ends the last line rather than starting a new one
 
-            // Read up to maxContentLength characters (or until EOF)
-            int endPos = Math.Min(offset + maxContentLength, totalLength);
+            if (maxLines < 1)
+                maxLines = 1;
+            if (lineOffset < 0)
+                lineOffset = 0;
+            if (lineOffset >= totalLines)
+                throw new ArgumentException($"File has {totalLines} lines (0-indexed). Line offset {lineOffset} exceeds file length.");
+
+            StringBuilder body = new StringBuilder();
+            int end = lineOffset; // exclusive
+            string truncatedBy = null;
+            string charLimit = $"character limit ({maxContentLength})";
+            while (end < totalLines)
+            {
+                if (end - lineOffset >= maxLines)
+                {
+                    truncatedBy = $"line limit ({maxLines})";
+                    break;
+                }
+
+                string line = lines[end];
+                if (body.Length > 0)
+                {
+                    if (maxContentLength > 0 && body.Length >= maxContentLength)
+                    {
+                        truncatedBy = charLimit;
+                        break;
+                    }
+                    body.Append('\n');
+                }
+                end++;
+
+                // A line that does not fit is cut at the character limit, which ends the page.
+                int room = maxContentLength > 0 ? maxContentLength - body.Length : int.MaxValue;
+                if (line.Length > room)
+                {
+                    body.Append(line, 0, Math.Max(room, 0)).Append("...[line truncated]");
+                    truncatedBy = charLimit;
+                    break;
+                }
+                body.Append(line);
+            }
 
             StringBuilder result = new StringBuilder();
-            result.AppendLine($"File length = {totalLength} characters, reading chars {offset}-{endPos - 1}");
+            result.AppendLine($"File has {totalLines} lines, reading lines {lineOffset}-{end - 1}");
             result.AppendLine("---");
-            result.Append(content, offset, endPos - offset);
+            result.Append(body.ToString());
 
-            if (endPos < totalLength)
-                result.AppendLine("\n...[truncated]");
+            if (truncatedBy != null)
+                result.AppendLine($"\n...[truncated: {truncatedBy}]");
 
             return result.ToString();
         }

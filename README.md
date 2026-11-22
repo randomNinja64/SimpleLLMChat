@@ -158,6 +158,7 @@ SimpleLLMChat includes the following 7 tool packages:
     - `read_file`: Reads the contents of a local file
     - `write_file`: Writes contents to a local file
   - Configuration Options
+    - `maxReadLines`: Max number of lines that the AI can read from a file at a time (default: `500`)
     - `maxFileContentLength`: Maximum number of characters to read from a file or return from `grep_search` (default: `10000`)
   - Dependencies
     - `7za.exe`: used to extract archives

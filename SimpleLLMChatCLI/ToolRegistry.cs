@@ -101,6 +101,8 @@ namespace SimpleLLMChatCLI
                 string key = match.Groups[1].Value;
                 string value = config.GetConfigValue(key);
                 if (string.IsNullOrEmpty(value))
+                    optionDefaults.TryGetValue(key, out value); // option not in the INI yet
+                if (string.IsNullOrEmpty(value))
                     return match.Value; // Leave unresolved placeholders as-is
 
                 if (match.Groups[2].Success)
