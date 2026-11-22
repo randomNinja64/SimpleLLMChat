@@ -22,7 +22,7 @@ namespace FileTools
                 throw new DirectoryNotFoundException("Directory not found: " + searchPath);
 
             StringBuilder args = new StringBuilder();
-            args.Append("-r ");
+            args.Append("-rn ");
 
             if (!string.IsNullOrEmpty(caseInsensitive) &&
                 caseInsensitive.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))

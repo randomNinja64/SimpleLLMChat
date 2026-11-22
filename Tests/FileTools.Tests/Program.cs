@@ -317,7 +317,7 @@ namespace FileTools.Tests
                             ["directory_path"] = ws.Path
                         });
                     TestAssert.Equal(0, hitResult.ExitCode, "hit exit");
-                    TestAssert.Contains(hitResult.Text, "FINDME", "hit text");
+                    TestAssert.Contains(hitResult.Text, "hit.txt:1:alpha FINDME omega", "hit text with line number");
                     TestAssert.True(!hitResult.Text.Contains("node_modules"), "excludes node_modules");
 
                     ToolInvokeResult missResult = ToolClient.InvokeProduct(Exe, "grep_search",
