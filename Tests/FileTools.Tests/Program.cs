@@ -111,7 +111,7 @@ namespace FileTools.Tests
                         new JObject { ["filename"] = tenLines },
                         new JObject { ["maxReadLines"] = "3" });
                     TestAssert.Equal(0, r.ExitCode, "exit");
-                    TestAssert.Contains(r.Text, "File has 10 lines, reading lines 0-2", "header counts the whole file");
+                    TestAssert.Contains(r.Text, "File has 10 lines, reading lines 1-3", "header counts the whole file");
                     TestAssert.Contains(r.Text, "L0\nL1\nL2", "body");
                     TestAssert.Contains(r.Text, "...[truncated: line limit (3)]", "trunc reason");
                     TestAssert.True(r.Text.IndexOf("L3", StringComparison.Ordinal) < 0, "no next page");
@@ -120,10 +120,10 @@ namespace FileTools.Tests
                 TestRunner.Run("read_file.line_offset_last_page", () =>
                 {
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
-                        new JObject { ["filename"] = tenLines, ["offset"] = 8 }, // integer, as the schema declares
+                        new JObject { ["filename"] = tenLines, ["offset"] = 9 }, // integer, as the schema declares
                         new JObject { ["maxReadLines"] = "3" });
                     TestAssert.Equal(0, r.ExitCode, "exit");
-                    TestAssert.Contains(r.Text, "reading lines 8-9", "header");
+                    TestAssert.Contains(r.Text, "reading lines 9-10", "header");
                     TestAssert.Contains(r.Text, "L8\nL9", "body");
                     TestAssert.True(r.Text.IndexOf("[truncated", StringComparison.Ordinal) < 0, "not truncated at EOF");
                 });
@@ -134,7 +134,7 @@ namespace FileTools.Tests
                         new JObject { ["filename"] = tenLines },
                         new JObject { ["maxReadLines"] = "500", ["maxFileContentLength"] = "7" });
                     TestAssert.Equal(0, r.ExitCode, "exit");
-                    TestAssert.Contains(r.Text, "reading lines 0-2", "header includes the cut line");
+                    TestAssert.Contains(r.Text, "reading lines 1-3", "header includes the cut line");
                     TestAssert.Contains(r.Text, "L0\nL1\nL...[line truncated]", "third line cut at the limit");
                     TestAssert.Contains(r.Text, "...[truncated: character limit (7)]", "trunc reason");
                 });
@@ -147,7 +147,7 @@ namespace FileTools.Tests
                         new JObject { ["filename"] = path },
                         new JObject { ["maxFileContentLength"] = "10" });
                     TestAssert.Equal(0, r.ExitCode, "exit");
-                    TestAssert.Contains(r.Text, "File has 1 lines, reading lines 0-0", "header");
+                    TestAssert.Contains(r.Text, "File has 1 lines, reading lines 1-1", "header");
                     TestAssert.Contains(r.Text, "0123456789...[line truncated]", "partial first line");
                     TestAssert.Contains(r.Text, "...[truncated: character limit (10)]", "reason given even when the cut line is the last line");
                     TestAssert.True(r.Text.IndexOf("ABCDEF", StringComparison.Ordinal) < 0, "no tail");
@@ -195,7 +195,7 @@ namespace FileTools.Tests
                     string path = ws.Combine("short.txt");
                     File.WriteAllText(path, "abc\n", Encoding.UTF8);
                     ToolInvokeResult r = ToolClient.InvokeProduct(Exe, "read_file",
-                        new JObject { ["filename"] = path, ["offset"] = "1" });
+                        new JObject { ["filename"] = path, ["offset"] = "2" });
                     ToolClient.AssertToolError(r, "exceeds file length");
                     TestAssert.Equal(1, r.ExitCode, "exit 1");
                 });

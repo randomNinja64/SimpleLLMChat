@@ -11,10 +11,10 @@ namespace FileTools
     public static class FileHandler
     {
         /// <summary>
-        /// Reads up to maxLines lines starting at a 0-indexed line offset. maxContentLength
+        /// Reads up to maxLines lines starting at a 1-indexed line offset. maxContentLength
         /// (characters, 0 = no limit) also caps the page: the line that crosses it is cut there.
         /// </summary>
-        public static string ReadFile(string filename, int maxLines, int maxContentLength, int lineOffset = 0)
+        public static string ReadFile(string filename, int maxLines, int maxContentLength, int lineOffset = 1)
         {
             filename = Environment.ExpandEnvironmentVariables(filename);
             if (!File.Exists(filename))
@@ -33,18 +33,19 @@ namespace FileTools
 
             if (maxLines < 1)
                 maxLines = 1;
-            if (lineOffset < 0)
-                lineOffset = 0;
-            if (lineOffset >= totalLines)
-                throw new ArgumentException($"File has {totalLines} lines (0-indexed). Line offset {lineOffset} exceeds file length.");
+            if (lineOffset < 1)
+                lineOffset = 1;
+            if (lineOffset > totalLines)
+                throw new ArgumentException($"File has {totalLines} lines. Line offset {lineOffset} exceeds file length.");
 
+            int start = lineOffset - 1; // 0-based index of the first line
             StringBuilder body = new StringBuilder();
-            int end = lineOffset; // exclusive
+            int end = start; // exclusive
             string truncatedBy = null;
             string charLimit = $"character limit ({maxContentLength})";
             while (end < totalLines)
             {
-                if (end - lineOffset >= maxLines)
+                if (end - start >= maxLines)
                 {
                     truncatedBy = $"line limit ({maxLines})";
                     break;
@@ -74,7 +75,7 @@ namespace FileTools
             }
 
             StringBuilder result = new StringBuilder();
-            result.AppendLine($"File has {totalLines} lines, reading lines {lineOffset}-{end - 1}");
+            result.AppendLine($"File has {totalLines} lines, reading lines {lineOffset}-{end}");
             result.AppendLine("---");
             result.Append(body.ToString());
 
