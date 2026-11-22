@@ -27,9 +27,10 @@
         },
         {
             "name": "download_video",
-            "description": "Download an online video using YT-DLP to the user's desktop, returning YT-DLP's output.",
+            "description": "Download an online video using YT-DLP, returning YT-DLP's output.",
             "parameters": [
-                { "name": "URL", "type": "string", "description": "The URL of the video to download.", "required": true }
+                { "name": "URL", "type": "string", "description": "The URL of the video to download.", "required": true },
+                { "name": "directory", "type": "string", "description": "Folder to save the video in (created if missing). Supports environment variables like %USERPROFILE%. Defaults to the user's desktop.", "required": false }
             ]
         },
         {

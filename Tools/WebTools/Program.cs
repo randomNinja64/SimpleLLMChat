@@ -35,7 +35,8 @@ namespace WebTools
                     case "download_video":
                         {
                             string URL = ToolHelper.GetRequiredArg(argumentsJson, "URL");
-                            return DownloadHandler.DownloadVideo(URL);
+                            string directory = ToolHelper.JsonExtractString(argumentsJson, "directory");
+                            return DownloadHandler.DownloadVideo(URL, directory);
                         }
 
                     case "download_file":

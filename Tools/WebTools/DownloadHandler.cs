@@ -7,12 +7,31 @@ namespace WebTools
 {
     public static class DownloadHandler
     {
-        /// <summary>Downloads with yt-dlp.exe to the desktop; a failure keeps yt-dlp's exit code.</summary>
-        public static ToolResult DownloadVideo(string URL)
+        /// <summary>
+        /// Downloads with yt-dlp.exe to <paramref name="directory"/> (the desktop when empty);
+        /// a failure keeps yt-dlp's exit code.
+        /// </summary>
+        public static ToolResult DownloadVideo(string URL, string directory = null)
         {
-            // An explicit output template in the desktop folder lets yt-dlp handle the file naming.
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string outputTemplate = Path.Combine(desktopPath, "%(title)s.%(ext)s");
+            string targetDir = string.IsNullOrWhiteSpace(directory)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                : Path.GetFullPath(Environment.ExpandEnvironmentVariables(directory.Trim()));
+
+            if (!Directory.Exists(targetDir))
+            {
+                try
+                {
+                    Directory.CreateDirectory(targetDir);
+                }
+                catch (Exception ex)
+                {
+                    throw new IOException($"Failed to create directory '{targetDir}': {ex.Message}", ex);
+                }
+            }
+
+            // An explicit output template in the target folder lets yt-dlp handle the file naming.
+            // A trailing backslash would escape the closing quote, so the template always ends in a file name.
+            string outputTemplate = Path.Combine(targetDir, "%(title)s.%(ext)s");
             string arguments = $"--no-progress -o \"{outputTemplate}\" \"{URL}\"";
 
             string output = ToolHelper.ExecuteProcess("yt-dlp.exe", arguments, out int exitCode);
@@ -20,7 +39,7 @@ namespace WebTools
             if (exitCode != 0)
                 return new ToolResult($"yt-dlp exited with code {exitCode}:\n{output}", exitCode);
 
-            return new ToolResult($"Video downloaded successfully to desktop\n{output}", 0);
+            return new ToolResult($"Video downloaded successfully to {targetDir}\n{output}", 0);
         }
 
         /// <summary>Downloads with curl.exe; a failure keeps curl's exit code.</summary>

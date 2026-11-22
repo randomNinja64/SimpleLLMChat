@@ -212,7 +212,7 @@ SimpleLLMChat includes the following 7 tool packages:
 - Web Tools
   - Tools
     - `download_file`: Downloads a file using cURL
-    - `download_video`: Downloads an online video using YT-DLP and saves it to the user's desktop
+    - `download_video`: Downloads an online video using YT-DLP and saves it to an optional `directory` (defaults to the user's desktop)
     - `read_website`: Reads a webpage as Title/Description, body text (image alt+src kept), and a Links section with a configurable cap
     - `run_web_search`: Searches the web using SearXNG, with Firecrawl, DDG, and Wiby as fallbacks
   - Configuration Options
