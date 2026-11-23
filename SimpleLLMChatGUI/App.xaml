@@ -6,18 +6,6 @@
     <Application.Resources>
 
         <!-- ===================== -->
-        <!-- SHARED DATA TEMPLATES -->
-        <!-- ===================== -->
-
-        <!-- Multi-select ListBox ItemTemplate with CheckBoxes -->
-        <DataTemplate x:Key="MultiSelectListBoxItemTemplate">
-            <CheckBox IsChecked="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected, Mode=TwoWay}"
-                     Foreground="{x:Static SystemColors.ControlTextBrush}">
-                <TextBlock Text="{Binding}"/>
-            </CheckBox>
-        </DataTemplate>
-
-        <!-- ===================== -->
         <!-- DYNAMIC COLOR BRUSHES -->
         <!-- ===================== -->
 

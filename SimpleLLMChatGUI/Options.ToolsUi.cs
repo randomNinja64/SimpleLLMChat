@@ -14,52 +14,58 @@ namespace SimpleLLMChatGUI
         private readonly Dictionary<string, FrameworkElement> _toolOptionControls = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
         private List<ScrollViewer> _toolGroupPages = new List<ScrollViewer>();
         private readonly Dictionary<string, TextBox> _toolTimeoutControls = new Dictionary<string, TextBox>(StringComparer.OrdinalIgnoreCase);
-        private readonly List<ToolApprovalRow> _toolApprovalRows = new List<ToolApprovalRow>();
+        private readonly List<ToolModeRow> _toolModeRows = new List<ToolModeRow>();
 
-        private enum ApprovalChoice
+        /// <summary>Per-tool setting: whether the tool is enabled and, if so, how calls are approved.</summary>
+        private enum ToolModeChoice
         {
+            AlwaysRun,
             Auto,
             Manual,
-            None
+            Off
         }
 
-        /// <summary>One tool's Auto / Manual / None choice on the Tool Approvals page.</summary>
-        private sealed class ToolApprovalRow
+        /// <summary>One tool's Always Run / Auto / Manual / Off choice on the Tools page.</summary>
+        private sealed class ToolModeRow
         {
             public string ToolName;
+            public RadioButton AlwaysRun;
             public RadioButton Auto;
             public RadioButton Manual;
-            public RadioButton None;
+            public RadioButton Off;
 
-            public void Select(ApprovalChoice choice)
+            // Approval mode from config, kept for tools set to Off so re-enabling
+            // a tool later does not silently drop its approval requirement.
+            public ToolModeChoice StoredApproval;
+
+            public ToolModeChoice Selected
             {
-                Auto.IsChecked = choice == ApprovalChoice.Auto;
-                Manual.IsChecked = choice == ApprovalChoice.Manual;
-                None.IsChecked = choice == ApprovalChoice.None;
+                get
+                {
+                    if (Off.IsChecked == true) return ToolModeChoice.Off;
+                    if (Auto.IsChecked == true) return ToolModeChoice.Auto;
+                    if (Manual.IsChecked == true) return ToolModeChoice.Manual;
+                    return ToolModeChoice.AlwaysRun;
+                }
             }
-        }
 
-        private List<string> GetSelectedToolsFromListBox(ListBox listBox)
-        {
-            return listBox.SelectedItems
-                .OfType<string>()
-                .Select(GetBareToolName)
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .ToList();
-        }
+            /// <summary>Approval mode to save: the selected one, or the stored one when Off.</summary>
+            public ToolModeChoice ApprovalToSave
+            {
+                get
+                {
+                    ToolModeChoice mode = Selected;
+                    return mode == ToolModeChoice.Off ? StoredApproval : mode;
+                }
+            }
 
-        private void SelectAllTools_Click(object sender, RoutedEventArgs e)
-        {
-            var listBox = ((FrameworkElement)sender).Tag as ListBox;
-            if (listBox != null)
-                listBox.SelectAll();
-        }
-
-        private void SelectNoTools_Click(object sender, RoutedEventArgs e)
-        {
-            var listBox = ((FrameworkElement)sender).Tag as ListBox;
-            if (listBox != null)
-                listBox.UnselectAll();
+            public void Select(ToolModeChoice choice)
+            {
+                AlwaysRun.IsChecked = choice == ToolModeChoice.AlwaysRun;
+                Auto.IsChecked = choice == ToolModeChoice.Auto;
+                Manual.IsChecked = choice == ToolModeChoice.Manual;
+                Off.IsChecked = choice == ToolModeChoice.Off;
+            }
         }
 
         private static string GetBareToolName(string displayOrName)
@@ -74,9 +80,9 @@ namespace SimpleLLMChatGUI
         {
             var toolLines = new List<string>
             {
-                AppSettings.EnabledTools.Line(string.Join(",", GetSelectedToolsFromListBox(ToolsListBox))),
-                AppSettings.ToolsRequiringApproval.Line(string.Join(",", GetApprovalTools(ApprovalChoice.Manual))),
-                AppSettings.AutoApprovalTools.Line(string.Join(",", GetApprovalTools(ApprovalChoice.Auto))),
+                AppSettings.EnabledTools.Line(string.Join(",", _toolModeRows.Where(r => r.Selected != ToolModeChoice.Off).Select(r => r.ToolName))),
+                AppSettings.ToolsRequiringApproval.Line(string.Join(",", _toolModeRows.Where(r => r.ApprovalToSave == ToolModeChoice.Manual).Select(r => r.ToolName))),
+                AppSettings.AutoApprovalTools.Line(string.Join(",", _toolModeRows.Where(r => r.ApprovalToSave == ToolModeChoice.Auto).Select(r => r.ToolName))),
                 AppSettings.JevBaseUrl.Line(JevBaseUrl ?? string.Empty),
                 AppSettings.JevApiKey.Line(JevApiKey ?? string.Empty),
                 AppSettings.JevModel.Line(JevModel ?? string.Empty),
@@ -188,59 +194,6 @@ namespace SimpleLLMChatGUI
             }
         }
 
-        private void BuildToolTimeoutsUI(ConfigHandler config)
-        {
-            _toolTimeoutControls.Clear();
-
-            if (_availableTools.Count == 0)
-                return;
-
-            var stack = ToolTimeoutsStack;
-            if (stack == null)
-                return;
-
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
-
-            foreach (string displayName in _availableTools)
-            {
-                string toolName = GetBareToolName(displayName);
-                int rowIdx = grid.RowDefinitions.Count;
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                var label = new TextBlock
-                {
-                    Text = displayName,
-                    Padding = new Thickness(0, 2, 4, 2),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                label.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
-                Grid.SetRow(label, rowIdx);
-                Grid.SetColumn(label, 0);
-
-                string configVal = config.GetConfigValue("tooltimeout." + toolName.ToLowerInvariant());
-                if (string.IsNullOrEmpty(configVal))
-                    configVal = "0";
-                var textBox = new TextBox
-                {
-                    Text = configVal,
-                    Height = 23,
-                    Margin = new Thickness(0, 2, 0, 2),
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                RestrictToDigits(textBox);
-                Grid.SetRow(textBox, rowIdx);
-                Grid.SetColumn(textBox, 1);
-
-                grid.Children.Add(label);
-                grid.Children.Add(textBox);
-                _toolTimeoutControls[toolName] = textBox;
-            }
-
-            stack.Children.Add(grid);
-        }
-
         private static void RestrictToDigits(TextBox textBox)
         {
             textBox.PreviewTextInput += (s, e) => { e.Handled = !e.Text.All(char.IsDigit); };
@@ -262,41 +215,37 @@ namespace SimpleLLMChatGUI
                 .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
         }
 
-        private void LoadToolSelections(ConfigHandler config)
-        {
-            ApplyToolSelectionToListBox(ToolsListBox, config.GetList(AppSettings.EnabledTools));
-        }
-
         /// <summary>
-        /// Builds a row per tool with Auto / Manual / None and loads each from config.
-        /// A tool on both lists loads as Auto.
+        /// Builds a row per tool with Always Run / Auto / Ask Me / Off and a timeout box,
+        /// and loads each from config. A tool on both approval lists loads as Auto.
         /// </summary>
-        private void BuildToolApprovalsUI(ConfigHandler config)
+        private void BuildToolModesUI(ConfigHandler config)
         {
-            _toolApprovalRows.Clear();
-            ToolApprovalRowsStack.Children.Clear();
+            _toolModeRows.Clear();
+            _toolTimeoutControls.Clear();
+            ToolModeRowsStack.Children.Clear();
 
             if (_availableTools.Count == 0)
             {
                 var empty = new TextBlock { Text = "No tools installed.", Margin = new Thickness(2, 4, 2, 4) };
                 empty.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
-                ToolApprovalRowsStack.Children.Add(empty);
+                ToolModeRowsStack.Children.Add(empty);
                 return;
             }
 
+            var enabledTools = new HashSet<string>(config.GetList(AppSettings.EnabledTools), StringComparer.OrdinalIgnoreCase);
             var autoTools = new HashSet<string>(config.GetList(AppSettings.AutoApprovalTools), StringComparer.OrdinalIgnoreCase);
             var manualTools = new HashSet<string>(config.GetList(AppSettings.ToolsRequiringApproval), StringComparer.OrdinalIgnoreCase);
 
             foreach (string displayName in _availableTools)
             {
                 string toolName = GetBareToolName(displayName);
-                string group = "approval_" + _toolApprovalRows.Count;
+                string group = "toolmode_" + _toolModeRows.Count;
 
                 var line = new Grid { Margin = new Thickness(0, 1, 0, 1) };
                 line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                for (int i = 0; i < 6; i++)
+                    line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 var name = new TextBlock
                 {
@@ -309,27 +258,59 @@ namespace SimpleLLMChatGUI
                 name.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
                 line.Children.Add(name);
 
-                var row = new ToolApprovalRow
+                var row = new ToolModeRow
                 {
                     ToolName = toolName,
-                    Auto = MakeApprovalChoice("Auto", group, line, 1),
-                    Manual = MakeApprovalChoice("Manual", group, line, 2),
-                    None = MakeApprovalChoice("None", group, line, 3)
+                    AlwaysRun = MakeToolModeChoice("Always Run", group, line, 1),
+                    Auto = MakeToolModeChoice("Auto", group, line, 2),
+                    Manual = MakeToolModeChoice("Ask Me", group, line, 3),
+                    Off = MakeToolModeChoice("Off", group, line, 4)
                 };
 
                 if (autoTools.Contains(toolName))
-                    row.Select(ApprovalChoice.Auto);
+                    row.StoredApproval = ToolModeChoice.Auto;
                 else if (manualTools.Contains(toolName))
-                    row.Select(ApprovalChoice.Manual);
+                    row.StoredApproval = ToolModeChoice.Manual;
                 else
-                    row.Select(ApprovalChoice.None);
+                    row.StoredApproval = ToolModeChoice.AlwaysRun;
 
-                ToolApprovalRowsStack.Children.Add(line);
-                _toolApprovalRows.Add(row);
+                bool enabled = enabledTools.Contains(toolName) || enabledTools.Contains(displayName);
+                row.Select(enabled ? row.StoredApproval : ToolModeChoice.Off);
+
+                string timeout = config.GetConfigValue("tooltimeout." + toolName.ToLowerInvariant());
+                var timeoutLabel = new TextBlock
+                {
+                    Text = "Timeout (s):",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(14, 0, 4, 0),
+                    ToolTip = TimeoutToolTip
+                };
+                timeoutLabel.SetResourceReference(TextBlock.ForegroundProperty, "LabelTextColorBrush");
+                Grid.SetColumn(timeoutLabel, 5);
+                line.Children.Add(timeoutLabel);
+
+                var timeoutBox = new TextBox
+                {
+                    Text = string.IsNullOrEmpty(timeout) ? "0" : timeout,
+                    Width = 40,
+                    Height = 21,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalContentAlignment = HorizontalAlignment.Right,
+                    ToolTip = TimeoutToolTip
+                };
+                RestrictToDigits(timeoutBox);
+                Grid.SetColumn(timeoutBox, 6);
+                line.Children.Add(timeoutBox);
+                _toolTimeoutControls[toolName] = timeoutBox;
+
+                ToolModeRowsStack.Children.Add(line);
+                _toolModeRows.Add(row);
             }
         }
 
-        private static RadioButton MakeApprovalChoice(string text, string group, Grid line, int column)
+        private const string TimeoutToolTip = "Timeout in seconds; 0 or blank = no timeout";
+
+        private static RadioButton MakeToolModeChoice(string text, string group, Grid line, int column)
         {
             var choice = new RadioButton
             {
@@ -343,42 +324,15 @@ namespace SimpleLLMChatGUI
             return choice;
         }
 
-        private void SetAllApprovalModes_Click(object sender, RoutedEventArgs e)
+        private void SetAllToolModes_Click(object sender, RoutedEventArgs e)
         {
             string tag = ((FrameworkElement)sender).Tag as string;
-            ApprovalChoice choice = tag == "auto" ? ApprovalChoice.Auto
-                : tag == "manual" ? ApprovalChoice.Manual
-                : ApprovalChoice.None;
-            foreach (ToolApprovalRow row in _toolApprovalRows)
+            ToolModeChoice choice = tag == "auto" ? ToolModeChoice.Auto
+                : tag == "manual" ? ToolModeChoice.Manual
+                : tag == "off" ? ToolModeChoice.Off
+                : ToolModeChoice.AlwaysRun;
+            foreach (ToolModeRow row in _toolModeRows)
                 row.Select(choice);
-        }
-
-        private List<string> GetApprovalTools(ApprovalChoice choice)
-        {
-            var tools = new List<string>();
-            foreach (ToolApprovalRow row in _toolApprovalRows)
-            {
-                RadioButton button = choice == ApprovalChoice.Auto ? row.Auto : row.Manual;
-                if (button.IsChecked == true)
-                    tools.Add(row.ToolName);
-            }
-            return tools;
-        }
-
-        private void ApplyToolSelectionToListBox(ListBox listBox, List<string> tools)
-        {
-            if (listBox == null || tools == null)
-                return;
-
-            var selectedTools = new HashSet<string>(tools, StringComparer.OrdinalIgnoreCase);
-            foreach (var item in listBox.Items)
-            {
-                var displayName = item as string;
-                if (displayName == null)
-                    continue;
-                if (selectedTools.Contains(displayName) || selectedTools.Contains(GetBareToolName(displayName)))
-                    listBox.SelectedItems.Add(item);
-            }
         }
     }
 }

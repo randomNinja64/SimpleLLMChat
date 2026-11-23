@@ -66,6 +66,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `customfontfamily`: Font used for all non-code block text in the GUI
 - `fontsize`: Font size for chat and input text
 - `markdownparsing`: Enables/disables Markdown rendering in the GUI (`1` or `0`)
+- `showjevconfidence`: Show/Hide automatic tool approval confidence level (`1` or `0`, default `1`)
 - `thinkingdisplay`: Model reasoning appearance (`shown`, `collapsed`, or `hidden`; default `collapsed`). Hidden shows a short `[thought for N seconds]` stub instead of the full reasoning.
 - `toolcalldisplay`: Model tool call appearance (`shown`, `collapsed`, or `hidden`; default `collapsed`). Hidden shows an expanded tool-call header with the tool name only (no arguments).
 - `tooloutputdisplay`: Tool result appearance (`shown`, `collapsed`, or `hidden`; default `shown`). Hidden shows `[tool output]` with the exit code only.
@@ -92,18 +93,13 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `contextWindowSize`: If known, can be set here to enable automatic context summarization when context fills
 
 **Tools**
-- `tools`: Comma-separated list of tools the AI is allowed to use
-- `maxconsecutivefailedtoolcalls`: Maximum number of tool calls that can fail in a row before a session is halted (default `10`; `0` = off)
-
-**Tool Approvals**
 - `autoapprovaltools`: Comma-separated list of tools that request approval from a Jev-compatible endpoint before running
-- `jevbaseurl`: Full URL for a Jev-compatible server (e.g. `http://127.0.0.1:8080/v1/systemone` if you're using llama.cpp)
 - `jevapikey`: API key if required for your Jev-compatible server
+- `jevbaseurl`: Full URL for a Jev-compatible server (e.g. `http://127.0.0.1:8080/v1/systemone` if you're using llama.cpp)
 - `jevmodel`: Model to use (if supported by your endpoint)
-- `showjevconfidence`: Show/Hide automatic tool approval confidence level (`1` or `0`, default `1`)
+- `maxconsecutivefailedtoolcalls`: Maximum number of tool calls that can fail in a row before a session is halted (default `10`; `0` = off)
+- `tools`: Comma-separated list of tools the AI is allowed to use
 - `toolsrequiringapproval`: Comma-separated list of tools that require manual approval for the AI to use.
-
-**Tool Timeouts**
 - `tooltimeout.<toolname>`: Timeout for that tool call, in seconds; `0` means no timeout.
 
 Tool-specific configuration options for the included tools are available in the [Tools](#tools) section.

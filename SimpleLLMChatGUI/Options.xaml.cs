@@ -38,12 +38,19 @@ namespace SimpleLLMChatGUI
             InitializeComponent();
             DataContext = this;
 
+            // Setup hides the category list, so it does not need the extra width.
+            // Set before the window is shown so it is centered at this size.
+            if (setupMode)
+            {
+                MinWidth = 620;
+                MaxWidth = 660;
+                Width = 620;
+            }
+
             AppearanceItem.Tag = AppearancePage;
             RagItem.Tag = RagPage;
             SystemItem.Tag = SystemPage;
             ToolsItem.Tag = ToolsPage;
-            ToolApprovalsItem.Tag = ToolApprovalsPage;
-            ToolTimeoutsItem.Tag = ToolTimeoutsPage;
 
             _toolsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
             _availableTools = ToolOptionsRegistry.LoadToolDisplayNames(_toolsDir);
@@ -151,10 +158,8 @@ namespace SimpleLLMChatGUI
 
             var config = App.Config;
             LoadSettings(config);
-            LoadToolSelections(config);
             BuildToolOptionsUI(config);
-            BuildToolTimeoutsUI(config);
-            BuildToolApprovalsUI(config);
+            BuildToolModesUI(config);
             RestrictToDigits(MaxConsecutiveFailedToolCallsTextBox);
 
             if (_setupMode)
@@ -205,11 +210,7 @@ namespace SimpleLLMChatGUI
 
             // Nothing in tools\ means nothing to enable, approve, or time out.
             if (_availableTools.Count == 0)
-            {
                 CategoryListBox.Items.Remove(ToolsItem);
-                CategoryListBox.Items.Remove(ToolApprovalsItem);
-                CategoryListBox.Items.Remove(ToolTimeoutsItem);
-            }
 
             // Indexing needs a running CLI, which setup does not have yet.
             RagIndexPanel.Visibility = Visibility.Collapsed;

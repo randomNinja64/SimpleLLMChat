@@ -39,7 +39,6 @@ namespace SimpleLLMChatGUI
         private static readonly List<string> DisplayModeOptionList =
             new List<string> { "Shown", "Collapsed", "Hidden" };
 
-        public List<string> AvailableTools { get { return _availableTools; } }
         public List<string> SystemFonts { get { return _systemFonts; } }
         public List<string> DisplayModeOptions { get { return DisplayModeOptionList; } }
 
