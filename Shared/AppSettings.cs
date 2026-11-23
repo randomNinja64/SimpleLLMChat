@@ -77,6 +77,7 @@ public static class AppSettings
     public static readonly Setting<string> LlmServer = Def(SectionSystem, "llmserver", "");
     public static readonly Setting<string> Model = Def(SectionSystem, "model", "");
     public static readonly Setting<string> SysPrompt = Def(SectionSystem, "sysprompt", "");
+    public static readonly Setting<string> WorkingDirectory = Def(SectionSystem, "workingdirectory", "");
 
     public static readonly Setting<string> EnabledTools = Def(SectionTools, "tools", "");
     public static readonly Setting<string> ToolsRequiringApproval = Def(SectionTools, "toolsrequiringapproval", "");

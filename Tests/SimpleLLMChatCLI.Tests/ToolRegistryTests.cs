@@ -40,7 +40,11 @@ namespace SimpleLLMChatCLI.Tests
                 "if \"%~1\"==\"fix_hang\" goto do_spin",
                 "if \"%~1\"==\"fix_spin\" goto do_spin",
                 "if \"%~1\"==\"inject\" goto do_inject",
+                "if \"%~1\"==\"fix_cwd\" goto do_cwd",
                 "exit 9",
+                ":do_cwd",
+                "cd",
+                "exit 0",
                 ":do_echo",
                 "echo {\"text\":\"echo-ok\"}",
                 "exit 0",
@@ -81,7 +85,7 @@ namespace SimpleLLMChatCLI.Tests
                     },
                     new JObject { ["name"] = "untyped" })
             });
-            foreach (string name in new[] { "fix_fail", "fix_stdin", "fix_hang", "fix_spin" })
+            foreach (string name in new[] { "fix_fail", "fix_stdin", "fix_hang", "fix_spin", "fix_cwd" })
                 tools.Add(new JObject { ["name"] = name, ["description"] = name });
             tools.Add(new JObject { ["description"] = "no name, ignored" });
 
@@ -256,6 +260,53 @@ namespace SimpleLLMChatCLI.Tests
                     TestAssert.Equal(-1, exitCode, "exit");
                     TestAssert.Contains(content, "timed out after 1 second(s)", "message");
                     TestAssert.True(sw.ElapsedMilliseconds < 6000, "returned promptly ms=" + sw.ElapsedMilliseconds);
+                }
+            });
+
+            TestRunner.Run("registry.working_directory", () =>
+            {
+                using (TempWorkspace ws = new TempWorkspace("cli-registry"))
+                {
+                    string toolsDir = WriteFixturePackage(ws);
+                    string work = ws.Combine("work");
+                    Directory.CreateDirectory(work);
+                    string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    string startDir = ToolRegistry.DefaultWorkingDirectory(
+                        Environment.CurrentDirectory, AppDomain.CurrentDomain.BaseDirectory, profile);
+                    string ini = ws.Combine("LLMSettings.ini");
+
+                    // Started in the app folder (Explorer, default shortcut): the profile folder.
+                    TestAssert.Equal(profile, ToolRegistry.DefaultWorkingDirectory(ws.Path, ws.Path + "\\", profile), "app folder -> profile");
+                    TestAssert.Equal(work, ToolRegistry.DefaultWorkingDirectory(work, ws.Path, profile), "other folder kept");
+                    TestAssert.Equal(ws.Path, ToolRegistry.DefaultWorkingDirectory(ws.Path, ws.Path, ws.Combine("no-profile")), "missing profile -> start folder");
+
+                    Func<string, string> runIn = setting =>
+                    {
+                        File.WriteAllText(ini, "[System]\r\nworkingdirectory=" + setting + "\r\n", Encoding.UTF8);
+                        ToolRegistry registry = new ToolRegistry(new ConfigHandler(ini));
+                        registry.LoadToolsFromDirectory(toolsDir);
+                        string content;
+                        int exitCode;
+                        registry.ExecuteToolCall("fix_cwd", "{}", out content, out exitCode);
+                        TestAssert.Equal(0, exitCode, "exit for '" + setting + "'");
+                        return content.Substring(content.IndexOf("Output:\n", StringComparison.Ordinal) + 8).Trim();
+                    };
+
+                    TestAssert.Equal(work, runIn(work), "configured folder");
+                    TestAssert.Equal(startDir, runIn(""), "empty: the folder the host started in");
+
+                    TextWriter originalError = Console.Error;
+                    StringWriter error = new StringWriter();
+                    Console.SetError(error);
+                    try
+                    {
+                        TestAssert.Equal(startDir, runIn(ws.Combine("no-such-dir")), "missing folder falls back");
+                    }
+                    finally
+                    {
+                        Console.SetError(originalError);
+                    }
+                    TestAssert.Contains(error.ToString(), "no-such-dir", "missing folder reported");
                 }
             });
 

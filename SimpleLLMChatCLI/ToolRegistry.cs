@@ -53,6 +53,41 @@ namespace SimpleLLMChatCLI
         // Config values to pass to tool executables
         private readonly ConfigHandler config;
 
+        // Where tools run when no working directory is configured: the folder this process
+        // was started in (the shell's folder, or a shortcut's "Start in"), or the user's
+        // profile folder when that is just the app folder.
+        private static readonly string StartDirectory = DefaultWorkingDirectory(
+            Environment.CurrentDirectory,
+            AppDomain.CurrentDomain.BaseDirectory,
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+        /// <summary>
+        /// <paramref name="startDirectory"/>, unless it is <paramref name="appDirectory"/>
+        /// (what launching from Explorer or a default shortcut gives), where tools would work
+        /// among the app's own files; then <paramref name="profileDirectory"/>.
+        /// </summary>
+        public static string DefaultWorkingDirectory(string startDirectory, string appDirectory, string profileDirectory)
+        {
+            string start = TrimDirectory(startDirectory);
+            bool isAppFolder = string.Equals(start, TrimDirectory(appDirectory), StringComparison.OrdinalIgnoreCase);
+            if (isAppFolder && !string.IsNullOrEmpty(profileDirectory) && Directory.Exists(profileDirectory))
+                return TrimDirectory(profileDirectory);
+            return start;
+        }
+
+        // Full path without a trailing separator (a drive root keeps its own).
+        private static string TrimDirectory(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return path;
+            string full = Path.GetFullPath(path);
+            string root = Path.GetPathRoot(full);
+            return full.Length > root.Length ? full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) : full;
+        }
+
+        // The last unusable workingdirectory value reported, so it is reported once.
+        private string reportedBadWorkingDirectory;
+
         public ToolRegistry(ConfigHandler config)
         {
             this.config = config;
@@ -322,6 +357,38 @@ namespace SimpleLLMChatCLI
             return stdinPayload.ToString(Newtonsoft.Json.Formatting.None);
         }
 
+        /// <summary>
+        /// The folder tools run in: the workingdirectory setting (environment variables
+        /// expanded; a relative path is taken from the app folder, like the other folder
+        /// settings), or the default (see <see cref="DefaultWorkingDirectory"/>) when the
+        /// setting is empty or names a folder that does not exist.
+        /// </summary>
+        public string ResolveWorkingDirectory()
+        {
+            string configured = config != null ? (config.Get(AppSettings.WorkingDirectory) ?? "").Trim() : "";
+            if (string.IsNullOrEmpty(configured))
+                return StartDirectory;
+
+            try
+            {
+                string path = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    Environment.ExpandEnvironmentVariables(configured)));
+                if (Directory.Exists(path))
+                    return path;
+            }
+            catch
+            {
+                // Not a valid path: reported below like a missing folder.
+            }
+
+            if (!string.Equals(reportedBadWorkingDirectory, configured, StringComparison.OrdinalIgnoreCase))
+            {
+                reportedBadWorkingDirectory = configured;
+                Console.Error.WriteLine("Working directory '" + configured + "' not found; using " + StartDirectory);
+            }
+            return StartDirectory;
+        }
+
         private class ToolProcessResult
         {
             public string Stdout;
@@ -331,18 +398,18 @@ namespace SimpleLLMChatCLI
         }
 
         /// <summary>
-        /// Spawns a tool executable with JSON on stdin. Always drains stdout and
-        /// stderr so a chatty tool cannot deadlock the host. timeoutMs of 0 waits
-        /// indefinitely.
+        /// Spawns a tool executable in the working directory with JSON on stdin. Always
+        /// drains stdout and stderr so a chatty tool cannot deadlock the host. timeoutMs
+        /// of 0 waits indefinitely.
         /// </summary>
-        private static ToolProcessResult RunToolProcess(
+        private ToolProcessResult RunToolProcess(
             string executablePath, string arguments, string stdinData, int timeoutMs)
         {
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = executablePath,
                 Arguments = arguments ?? "",
-                WorkingDirectory = Path.GetDirectoryName(executablePath),
+                WorkingDirectory = ResolveWorkingDirectory(),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 RedirectStandardInput = true,

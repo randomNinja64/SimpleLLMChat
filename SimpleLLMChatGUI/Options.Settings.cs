@@ -10,6 +10,7 @@ namespace SimpleLLMChatGUI
         private string _model;
         private string _sysPrompt;
         private int _contextWindowSize;
+        private string _workingDirectory;
         private string _assistantName;
         private string _thinkingDisplayModeText;
         private string _toolCallDisplayModeText;
@@ -47,6 +48,7 @@ namespace SimpleLLMChatGUI
         public string Model { get => _model; set => Set(ref _model, value, nameof(Model)); }
         public string SysPrompt { get => _sysPrompt; set => Set(ref _sysPrompt, value, nameof(SysPrompt)); }
         public int ContextWindowSize { get => _contextWindowSize; set => Set(ref _contextWindowSize, value, nameof(ContextWindowSize)); }
+        public string WorkingDirectory { get => _workingDirectory; set => Set(ref _workingDirectory, value, nameof(WorkingDirectory)); }
         public string AssistantName { get => _assistantName; set => Set(ref _assistantName, value, nameof(AssistantName)); }
         public string ThinkingDisplayModeText { get => _thinkingDisplayModeText; set => Set(ref _thinkingDisplayModeText, value, nameof(ThinkingDisplayModeText)); }
         public string ToolCallDisplayModeText { get => _toolCallDisplayModeText; set => Set(ref _toolCallDisplayModeText, value, nameof(ToolCallDisplayModeText)); }
@@ -86,6 +88,7 @@ namespace SimpleLLMChatGUI
             Model = AppSettings.Model.Default;
             SysPrompt = AppSettings.SysPrompt.Default;
             ContextWindowSize = AppSettings.ContextWindowSize.Default;
+            WorkingDirectory = AppSettings.WorkingDirectory.Default;
             AssistantName = AppSettings.AssistantName.Default;
             ThinkingDisplayModeText = AppSettings.ThinkingDisplay.Default.ToString();
             ToolCallDisplayModeText = AppSettings.ToolCallDisplay.Default.ToString();
@@ -142,7 +145,7 @@ namespace SimpleLLMChatGUI
 
         private List<string> GetSystemSettings()
         {
-            return SettingsIniWriter.GetSystemSettings(ApiKey, ServerURL, Model, SysPrompt, ContextWindowSize);
+            return SettingsIniWriter.GetSystemSettings(ApiKey, ServerURL, Model, SysPrompt, ContextWindowSize, WorkingDirectory);
         }
 
         private List<string> GetRagSettings()

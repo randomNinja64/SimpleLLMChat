@@ -100,7 +100,7 @@ namespace SimpleLLMChatGUI
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            SaveColors(App.ColorsFileName);
+            SaveColors(App.ColorsFilePath);
             
             // Update all global color brush resources immediately
             foreach (var setting in _colorSettings)
@@ -126,7 +126,7 @@ namespace SimpleLLMChatGUI
             // Apply custom font to this window
             FontHandler.ApplyFontToWindow(this);
 
-            LoadColors(App.ColorsFileName);
+            LoadColors(App.ColorsFilePath);
         }
 
         private void LoadColors(string path)

@@ -91,7 +91,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `model`: Model name to use for text generation (if supported by the endpoint)
 - `sysprompt`: System prompt for the LLM
 - `contextWindowSize`: If known, can be set here to enable automatic context summarization when context fills
-
+- `workingdirectory`: Current working directory for the application. Tool calls start in this folder. Environment variables are supported as well. This can be set either in the config or by changing the directory the application starts in; if neither is set, `%USERPROFILE%` is used.
 **Tools**
 - `autoapprovaltools`: Comma-separated list of tools that request approval from a Jev-compatible endpoint before running
 - `jevapikey`: API key if required for your Jev-compatible server

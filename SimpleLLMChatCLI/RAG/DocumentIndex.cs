@@ -114,7 +114,9 @@ namespace SimpleLLMChatCLI.RAG
                 return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "knowledge");
             try
             {
-                return Path.GetFullPath(Environment.ExpandEnvironmentVariables(path.Trim()));
+                // Relative paths are taken from the app folder, not the working directory.
+                return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    Environment.ExpandEnvironmentVariables(path.Trim())));
             }
             catch
             {

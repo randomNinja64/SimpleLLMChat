@@ -72,7 +72,8 @@ namespace SimpleLLMChatGUI
             string llmServer,
             string model,
             string sysPrompt,
-            int contextWindowSize)
+            int contextWindowSize,
+            string workingDirectory = "")
         {
             return new List<string>
             {
@@ -81,6 +82,7 @@ namespace SimpleLLMChatGUI
                 AppSettings.LlmServer.Line(llmServer ?? string.Empty),
                 AppSettings.Model.Line(model ?? string.Empty),
                 AppSettings.SysPrompt.Line("\"" + EscapePromptForStorage(sysPrompt) + "\""),
+                AppSettings.WorkingDirectory.Line(workingDirectory ?? string.Empty),
             };
         }
 

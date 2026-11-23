@@ -165,14 +165,17 @@ public static class ToolHelper
 
     /// <summary>
     /// Resolves a data directory from config, or <paramref name="defaultFolderName"/>
-    /// next to the tool EXE when the key is empty.
+    /// next to the tool EXE when the key is empty. A relative configured path is also
+    /// taken from the tool EXE's folder, not the working directory, so it stays put
+    /// whichever folder the chat was started in.
     /// </summary>
     public static string GetConfiguredDirectory(string configKey, string defaultFolderName)
     {
         string configured = GetConfigValue(configKey).Trim();
-        if (!string.IsNullOrEmpty(configured))
-            return Path.GetFullPath(Environment.ExpandEnvironmentVariables(configured));
-        return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, defaultFolderName));
+        string path = string.IsNullOrEmpty(configured)
+            ? defaultFolderName
+            : Environment.ExpandEnvironmentVariables(configured);
+        return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path));
     }
 
     public static string GetRequiredArg(string arguments, string argName)

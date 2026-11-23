@@ -420,11 +420,11 @@ namespace SimpleLLMChatGUI
 
         private void LoadAndApplyColors()
         {
-            if (File.Exists(App.ColorsFileName))
+            if (File.Exists(App.ColorsFilePath))
             {
                 try
                 {
-                    var colorSettings = IniFileHandler.LoadIni(App.ColorsFileName);
+                    var colorSettings = IniFileHandler.LoadIni(App.ColorsFilePath);
                     ColorHelper.LoadAndApplyColors(colorSettings);
                 }
                 catch

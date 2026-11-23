@@ -279,6 +279,7 @@ namespace SimpleLLMChatGUI
             Model = config.Get(AppSettings.Model);
             SysPrompt = ConfigHandler.DecodeStoredPrompt(config.Get(AppSettings.SysPrompt));
             ContextWindowSize = config.Get(AppSettings.ContextWindowSize);
+            WorkingDirectory = config.Get(AppSettings.WorkingDirectory);
             AssistantName = config.Get(AppSettings.AssistantName);
             if (string.IsNullOrWhiteSpace(AssistantName))
                 AssistantName = AppConstants.DefaultAssistantName;

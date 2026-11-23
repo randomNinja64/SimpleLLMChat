@@ -39,9 +39,9 @@ namespace SimpleLLMChatGUI
 
                 llmProcess = new Process();
                 llmProcess.StartInfo.FileName = executablePath;
-                string workingDirectory = Path.GetDirectoryName(executablePath);
-                if (!string.IsNullOrEmpty(workingDirectory))
-                    llmProcess.StartInfo.WorkingDirectory = workingDirectory;
+                // The CLI finds its own files from its EXE folder; its current directory is
+                // where tools run when no working directory is configured.
+                llmProcess.StartInfo.WorkingDirectory = App.StartDirectory;
                 llmProcess.StartInfo.UseShellExecute = false;
                 llmProcess.StartInfo.RedirectStandardOutput = true;
                 llmProcess.StartInfo.RedirectStandardError = true;

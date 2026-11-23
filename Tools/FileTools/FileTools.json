@@ -86,7 +86,7 @@
             "description": "Recursively search for a regular expression pattern in files. Use for exact string or regex matches. Output is truncated to {config.maxFileContentLength} characters.",
             "parameters": [
                 { "name": "pattern", "type": "string", "description": "The regular expression pattern to search for.", "required": true },
-                { "name": "directory_path", "type": "string", "description": "The directory to search in. Defaults to current directory if not specified. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": false },
+                { "name": "directory_path", "type": "string", "description": "The directory to search in. Defaults to the working directory if not specified. Supports environment variables like %USERPROFILE%, %APPDATA%, %TEMP%, etc.", "required": false },
                 { "name": "file_pattern", "type": "string", "description": "File pattern to filter (e.g., '*.cs', '*.py'). Searches all files if not specified.", "required": false },
                 { "name": "case_insensitive", "type": "string", "description": "Set to 'true' for case-insensitive search. Default is case-sensitive.", "required": false }
             ]

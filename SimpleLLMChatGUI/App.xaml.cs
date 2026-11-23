@@ -19,6 +19,19 @@ namespace SimpleLLMChatGUI
             get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName); }
         }
 
+        /// <summary>Absolute path to colors.ini next to the executable.</summary>
+        public static string ColorsFilePath
+        {
+            get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ColorsFileName); }
+        }
+
+        /// <summary>
+        /// The folder the app was started in (a shortcut's "Start in", or the shell's folder),
+        /// captured at startup because file dialogs can change the current directory later.
+        /// The CLI is started here, so tools use it when no working directory is configured.
+        /// </summary>
+        public static readonly string StartDirectory = Environment.CurrentDirectory;
+
         /// <summary>True when LLMSettings.ini does not exist yet (first-run setup needed).</summary>
         public static bool NeedsOnboarding { get; private set; }
 
