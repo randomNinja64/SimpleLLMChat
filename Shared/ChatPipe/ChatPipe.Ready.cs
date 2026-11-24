@@ -2,8 +2,7 @@ using System;
 
 public static partial class ChatPipe
 {
-    public const string ReadyLine = "STATUS ready";
-    private const string WorkspaceArg = " workspace=";
+    public const string ReadyPrefix = "STATUS ready workspace=";
 
     /// <summary>
     /// The ready line, naming the workspace tools run in. It carries the workspace
@@ -11,7 +10,7 @@ public static partial class ChatPipe
     /// </summary>
     public static string FormatReady(string workspace)
     {
-        return string.IsNullOrEmpty(workspace) ? ReadyLine : ReadyLine + WorkspaceArg + EncodePipeArg(workspace);
+        return ReadyPrefix + EncodePipeArg(workspace);
     }
 
     public static bool TryParseReadyLine(string line)
@@ -20,20 +19,13 @@ public static partial class ChatPipe
         return TryParseReadyLine(line, out workspace);
     }
 
-    /// <summary>Workspace is null when the line doesn't name one.</summary>
     public static bool TryParseReadyLine(string line, out string workspace)
     {
         workspace = null;
-        if (string.IsNullOrEmpty(line))
+        if (line == null || !line.StartsWith(ReadyPrefix, StringComparison.Ordinal))
             return false;
 
-        line = line.Trim();
-        if (string.Equals(line, ReadyLine, StringComparison.Ordinal))
-            return true;
-        if (!line.StartsWith(ReadyLine + WorkspaceArg, StringComparison.Ordinal))
-            return false;
-
-        workspace = DecodePipeArg(line.Substring(ReadyLine.Length + WorkspaceArg.Length));
+        workspace = DecodePipeArg(line.Substring(ReadyPrefix.Length).TrimEnd());
         return true;
     }
 }

@@ -110,6 +110,33 @@ namespace SimpleLLMChatCLI.Tests
 
     internal static class RagTests
     {
+        /// <summary>
+        /// Saves a chat as auto-save does: question (with retrieved context when
+        /// <paramref name="questionContext"/> is set), (a tool call and its output when
+        /// <paramref name="toolOutput"/> is set), answer, then an optional second exchange.
+        /// </summary>
+        internal static void WriteChat(string path, string title, string workingDirectory,
+            string question, string toolOutput, string answer, string followUp, string followUpAnswer,
+            string questionContext = null)
+        {
+            var conversation = new List<SimpleLLMChatCLI.LLMClient.ChatMessage>();
+            conversation.Add(new SimpleLLMChatCLI.LLMClient.ChatMessage("user", question) { Context = questionContext });
+            if (toolOutput != null)
+            {
+                var call = new SimpleLLMChatCLI.LLMClient.ChatMessage("assistant", "");
+                call.ToolCalls.Add(new SimpleLLMChatCLI.ToolRegistry.ToolCall { Id = "c1", Name = "run_shell_command", Arguments = "{}" });
+                conversation.Add(call);
+                conversation.Add(new SimpleLLMChatCLI.LLMClient.ChatMessage("tool", toolOutput) { ToolCallId = "c1" });
+            }
+            conversation.Add(new SimpleLLMChatCLI.LLMClient.ChatMessage("assistant", answer));
+            if (followUp != null)
+            {
+                conversation.Add(new SimpleLLMChatCLI.LLMClient.ChatMessage("user", followUp));
+                conversation.Add(new SimpleLLMChatCLI.LLMClient.ChatMessage("assistant", followUpAnswer));
+            }
+            SimpleLLMChatCLI.ChatTranscript.Save(path, title, workingDirectory, conversation);
+        }
+
         public static void Run()
         {
             VectorStoreTests();
@@ -490,42 +517,130 @@ namespace SimpleLLMChatCLI.Tests
                     TestAssert.Equal("done", rag.Reconcile(), "indexed");
                     ConfigHandler config = rag.Config();
 
-                    AutoRagResult plain = AutoRagContext.TryRetrieve(config, "my question", "my question");
+                    AutoRagResult plain = AutoRagContext.TryRetrieve(config, "my question");
                     TestAssert.Equal("[reading notes.txt]", plain.UserStatusLine, "status line");
                     TestAssert.True(
-                        plain.MergedPrompt.StartsWith("---Retrieved Context---\n", StringComparison.Ordinal),
-                        "context first");
-                    TestAssert.True(
-                        plain.MergedPrompt.EndsWith("\n---End Retrieved Context---\n\n---\n\nmy question", StringComparison.Ordinal),
-                        "question last");
-                    TestAssert.Contains(plain.MergedPrompt, "LINE-010", "chunk text");
+                        plain.Context.StartsWith("---Retrieved Context---\n", StringComparison.Ordinal),
+                        "block start");
+                    TestAssert.True(plain.Context.EndsWith("\n---End Retrieved Context---", StringComparison.Ordinal), "block end");
+                    TestAssert.Contains(plain.Context, "LINE-010", "chunk text");
 
+                    // What the model reads: the context, then the question.
+                    TestAssert.Equal(plain.Context + "\n\n---\n\nmy question",
+                        AutoRagContext.MergeIntoPrompt(plain.Context, "my question"), "question last");
                     // A prompt that already has a separator gets the context ahead of it.
-                    AutoRagResult split = AutoRagContext.TryRetrieve(config, "q", "preamble\n\n---\n\nq");
+                    string split = AutoRagContext.MergeIntoPrompt(plain.Context, "preamble\n\n---\n\nq");
                     TestAssert.True(
-                        split.MergedPrompt.StartsWith("preamble\n\n---Retrieved Context---\n", StringComparison.Ordinal),
+                        split.StartsWith("preamble\n\n---Retrieved Context---\n", StringComparison.Ordinal),
                         "context after the preamble");
-                    TestAssert.True(split.MergedPrompt.EndsWith("\n\n---\n\nq", StringComparison.Ordinal), "separator kept");
+                    TestAssert.True(split.EndsWith("\n\n---\n\nq", StringComparison.Ordinal), "separator kept");
 
-                    AutoRagResult blank = AutoRagContext.TryRetrieve(config, "   ", "   ");
-                    TestAssert.Equal("   ", blank.MergedPrompt, "blank query untouched");
+                    AutoRagResult blank = AutoRagContext.TryRetrieve(config, "   ");
+                    TestAssert.True(blank.Context == null, "blank query retrieves nothing");
                     TestAssert.True(blank.UserStatusLine == null, "blank query has no status");
 
                     ConfigHandler disabled = rag.Config("ragenabled=0\r\n");
-                    TestAssert.Equal("q", AutoRagContext.TryRetrieve(disabled, "q", "q").MergedPrompt, "disabled untouched");
+                    TestAssert.True(AutoRagContext.TryRetrieve(disabled, "q").Context == null, "disabled retrieves nothing");
 
                     // The embeddings server going away must not fail the turn.
                     config = rag.Config();
                     rag.Server.EmbeddingsStatusCode = 500;
-                    AutoRagResult down = AutoRagContext.TryRetrieve(config, "q", "q");
-                    TestAssert.Equal("q", down.MergedPrompt, "embeddings failure leaves the prompt alone");
+                    TestAssert.True(AutoRagContext.TryRetrieve(config, "q").Context == null, "embeddings failure retrieves nothing");
                     rag.Server.EmbeddingsStatusCode = 200;
 
                     // A source file deleted since indexing is skipped rather than quoted.
                     File.Delete(notes);
-                    AutoRagResult gone = AutoRagContext.TryRetrieve(config, "q", "q");
-                    TestAssert.Equal("q", gone.MergedPrompt, "deleted source untouched");
+                    AutoRagResult gone = AutoRagContext.TryRetrieve(config, "q");
+                    TestAssert.True(gone.Context == null, "deleted source retrieves nothing");
                     TestAssert.True(gone.UserStatusLine == null, "deleted source has no status");
+                }
+            });
+
+            TestRunner.Run("rag.chat_exchange_chunks", () =>
+            {
+                using (TempWorkspace ws = new TempWorkspace("cli-chat-chunks"))
+                {
+                    string path = ws.Combine("chat.json");
+                    WriteChat(path, "Garden plans", "C:\\work",
+                        "what grows in shade",
+                        "TOOL-OUTPUT-SECRET", "ferns and hostas",
+                        "and in sun", "tomatoes",
+                        "---Retrieved Context---\nOLD-CONTEXT\n---End Retrieved Context---");
+                    TestAssert.Contains(File.ReadAllText(path), "OLD-CONTEXT", "context saved with the message");
+                    string[] lines = File.ReadAllLines(path);
+                    List<IndexChunk> chunks = new List<IndexChunk>(ChatHistoryRag.ExchangeChunks(File.ReadAllText(path), 2000));
+
+                    TestAssert.Equal(2, chunks.Count, "one chunk per exchange");
+                    TestAssert.Contains(lines[chunks[0].Start - 1], "{", "starts at the user message");
+                    TestAssert.Contains(lines[chunks[0].Start], "\"role\": \"user\"", "the user message");
+                    TestAssert.Equal(chunks[1].Start - 1, chunks[0].End, "runs to the next exchange");
+                    TestAssert.Equal(lines.Length - 2, chunks[1].End, "last runs to the last message");
+
+                    TestAssert.Contains(chunks[0].Text, "Chat: Garden plans", "title");
+                    TestAssert.Contains(chunks[0].Text, "User: what grows in shade", "user's words");
+                    TestAssert.Contains(chunks[0].Text, "Assistant: ferns and hostas", "reply");
+                    TestAssert.True(chunks[0].Text.IndexOf("OLD-CONTEXT", StringComparison.Ordinal) < 0, "earlier retrieval left out");
+                    TestAssert.True(chunks[0].Text.IndexOf("TOOL-OUTPUT-SECRET", StringComparison.Ordinal) < 0, "tool output left out");
+                    TestAssert.Contains(chunks[1].Text, "User: and in sun", "second exchange");
+
+                    TestAssert.Equal(0, new List<IndexChunk>(ChatHistoryRag.ExchangeChunks("[1,2]", 2000)).Count, "not a chat file");
+                }
+            });
+
+            TestRunner.Run("rag.chat_recall", () =>
+            {
+                using (RagFixture rag = new RagFixture())
+                {
+                    string chats = rag.Ws.Combine("chats-ws");
+                    Directory.CreateDirectory(chats);
+                    string older = Path.Combine(chats, "older.json");
+                    string other = Path.Combine(chats, "other.json");
+                    string open = Path.Combine(chats, "open.json");
+                    WriteChat(older, "Older chat", null, "OLDER-QUESTION", null, "OLDER-ANSWER", "OLDER-FOLLOWUP", "OLDER-FOLLOWUP-ANSWER");
+                    WriteChat(other, "Other chat", null, "OTHER-QUESTION", null, "OTHER-ANSWER", null, null);
+                    WriteChat(open, "Open chat", null, "OPEN-QUESTION", null, "OPEN-ANSWER", null, null);
+                    ChatRecallScope scope = new ChatRecallScope { Directory = chats, CurrentPath = open };
+
+                    try
+                    {
+                        // Chats only: knowledge off.
+                        ConfigHandler config = rag.Config("ragenabled=0\r\nragchathistory=1\r\n");
+                        AutoRagResult result = AutoRagContext.TryRetrieve(config, "q", scope);
+                        TestAssert.Contains(result.Context, "Earlier chats in this workspace matching: q", "chat section");
+                        TestAssert.Contains(result.Context, older + ":", "file and lines for read/grep tools");
+                        TestAssert.Contains(result.Context, "    User: OLDER-QUESTION", "exchange text, indented");
+                        TestAssert.Contains(result.Context, "OTHER-ANSWER", "other chat");
+                        TestAssert.True(result.Context.IndexOf("OPEN-QUESTION", StringComparison.Ordinal) < 0, "open chat left out");
+                        TestAssert.True(result.Context.IndexOf("\"role\"", StringComparison.Ordinal) < 0, "no JSON quoted");
+                        TestAssert.Equal("[recalling 2 earlier chats]", result.ChatStatusLine, "3 exchanges from 2 chats");
+                        TestAssert.True(result.UserStatusLine == null, "no knowledge status");
+
+                        // Both on: top results of each, each with its own status line.
+                        rag.WriteFile("notes.txt", RagFixture.Lines("LINE-", 10));
+                        TestAssert.Equal("done", rag.Reconcile("ragchathistory=1\r\n"), "knowledge indexed");
+                        AutoRagResult both = AutoRagContext.TryRetrieve(rag.Config("ragchathistory=1\r\nragmaxresults=1\r\n"), "q", scope);
+                        TestAssert.Contains(both.Context, "Semantic search results for: q", "knowledge section");
+                        TestAssert.Contains(both.Context, "Earlier chats in this workspace matching: q", "chat section");
+                        TestAssert.Equal("[reading notes.txt]", both.UserStatusLine, "knowledge status");
+                        TestAssert.Equal("[recalling 1 earlier chat]", both.ChatStatusLine, "one result each");
+
+                        // Off when history isn't kept, or without a scope.
+                        ConfigHandler noHistory = rag.Config("ragenabled=0\r\nragchathistory=1\r\nchathistorylimit=0\r\n");
+                        TestAssert.True(AutoRagContext.TryRetrieve(noHistory, "q", scope).Context == null, "history off");
+                        TestAssert.True(AutoRagContext.TryRetrieve(config, "q", null).Context == null, "no scope");
+
+                        // A deleted chat drops out of the index.
+                        File.Delete(other);
+                        AutoRagResult afterDelete = AutoRagContext.TryRetrieve(config, "q", scope);
+                        TestAssert.True(afterDelete.Context.IndexOf("OTHER-ANSWER", StringComparison.Ordinal) < 0, "deleted chat gone");
+                        TestAssert.Equal("[recalling 1 earlier chat]", afterDelete.ChatStatusLine, "one chat left");
+                    }
+                    finally
+                    {
+                        string indexDir = DocumentIndex.LoadFor(ChatWorkspace.Normalize(chats)).IndexDir;
+                        if (Directory.Exists(indexDir))
+                            Directory.Delete(indexDir, true);
+                    }
                 }
             });
         }

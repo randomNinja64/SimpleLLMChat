@@ -33,6 +33,14 @@ public partial class LLMClient
     {
         public string Role;
         public string Content;
+
+        /// <summary>
+        /// Auto-RAG context retrieved for this user message, kept apart from what was
+        /// typed: merged in only when the request is built, so replays and chat recall
+        /// see the user's words alone. Null when nothing was retrieved.
+        /// </summary>
+        public string Context;
+
         public string Image;
         public string ImageMime;
         public List<ToolRegistry.ToolCall> ToolCalls;
@@ -42,6 +50,7 @@ public partial class LLMClient
         {
             Role = role;
             Content = content;
+            Context = null;
             ToolCallId = "";
             Image = null;
             ImageMime = null;
@@ -73,6 +82,12 @@ public partial class LLMClient
         public int ConsecutiveFailedToolCalls;
     }
 
+    /// <summary>
+    /// The workspace's chats for retrieval to recall from (set by the session before
+    /// each turn); null recalls none.
+    /// </summary>
+    public ChatRecallScope ChatRecall { get; set; }
+
     public void ProcessConversation(
         List<ChatMessage> conversation,
         string userMessage,
@@ -89,8 +104,8 @@ public partial class LLMClient
         RagHost.FlushPendingErrorOnce();
         RagHost.WaitIfIndexing();
 
-        string contentForLlm = userMessage ?? string.Empty;
-        if (config.Get(AppSettings.RagEnabled))
+        string retrieved = null;
+        if (config.Get(AppSettings.RagEnabled) || (ChatRecall != null && AutoRagContext.IsChatRecallEnabled(config)))
         {
             bool everyTurn = string.Equals(
                 config.Get(AppSettings.RagRetrieveMode),
@@ -100,17 +115,20 @@ public partial class LLMClient
 
             if (everyTurn || isNewChat)
             {
-                AutoRagResult rag = AutoRagContext.TryRetrieve(config, userMessage, contentForLlm);
+                AutoRagResult rag = AutoRagContext.TryRetrieve(config, userMessage, ChatRecall);
                 if (!string.IsNullOrEmpty(rag.UserStatusLine))
                     sink.Notice(rag.UserStatusLine);
-                contentForLlm = rag.MergedPrompt;
+                if (!string.IsNullOrEmpty(rag.ChatStatusLine))
+                    sink.Notice(rag.ChatStatusLine);
+                retrieved = rag.Context;
             }
         }
 
         conversation.Add(new ChatMessage
         {
             Role = "user",
-            Content = contentForLlm,
+            Content = userMessage ?? string.Empty,
+            Context = retrieved,
             Image = image,
             ImageMime = string.IsNullOrEmpty(imageMime) ? null : imageMime
         });
@@ -442,6 +460,8 @@ public partial class LLMClient
         {
             if (!string.IsNullOrEmpty(msg.Content))
                 count += msg.Content.Length;
+            if (!string.IsNullOrEmpty(msg.Context))
+                count += msg.Context.Length;
 
             if (!string.IsNullOrEmpty(msg.Image))
                 count += TokenEstimator.ImageCharEstimate;

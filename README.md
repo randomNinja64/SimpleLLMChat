@@ -72,6 +72,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `tooloutputdisplay`: Tool result appearance (`shown`, `collapsed`, or `hidden`; default `shown`). Hidden shows `[tool output]` with the exit code only.
 
 **RAG**
+- `ragchathistory`: Enabled retrieivng context from previous chat sessions within the current directory (`1` or `0`, default off).
 - `ragenabled`: Enables RAG (`1` or `0`, default off)
 - `ragallowedextensions`: Comma-separated file extensions to index (blank = built-in defaults, provided below)
   - Allowed formats: `.md`, `.markdown`, `.txt`, `.rst`, `.csv`, `.json`, `.xml`, `.yaml`, `.yml`, `.toml`, `.ini`, `.html`, `.htm`, `.css`, `.cs`, `.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.java`, `.go`, `.rs`, `.c`, `.h`, `.cpp`, `.hpp`, `.rb`, `.php`, `.sql`, `.sh`, `.ps1`, `.bat`
@@ -82,7 +83,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `embeddingsmodel`: Embeddings model name (required)
 - `ragknowledgepath`: Knowledge folder path (`knowledge` folder next to EXE by default)
 - `ragmaxsnippetlength`: Max characters per chunk for embedding/injection (default `2000`)
-- `ragmaxresults`: Number of chunks to retrieve per search (default `5`)
+- `ragmaxresults`: Number of chunks to retrieve per search. Applies per category (`ragmaxresults` document chunks and `ragmaxresults` previous chat chunks, if enabled) (default `5`)
 - `ragretrievemode`: When to retrieve information from knowledge (`everyturn` or `newchat`) (default: `newchat`)
 
 **System**

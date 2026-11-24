@@ -137,6 +137,11 @@ namespace SimpleLLMChatCLI
             if (_sessionPath == null && historyLimit > 0)
                 _sessionPath = ChatHistory.NewSessionPath(_registry.ResolveWorkingDirectory());
             bool newChat = _conversation.Count == 0;
+            _client.ChatRecall = new ChatRecallScope
+            {
+                Directory = ChatWorkspace.DirectoryFor(_registry.ResolveWorkingDirectory()),
+                CurrentPath = _sessionPath
+            };
 
             Cancel.Begin();
             _client.ProcessConversation(_conversation, textPrompt, imageBase64, imageMime, _settings);
@@ -252,27 +257,24 @@ namespace SimpleLLMChatCLI
                 return true;
 
             _registry.WorkingDirectoryOverride = null;
-            if (!string.IsNullOrEmpty(workspace))
+            if (!string.IsNullOrEmpty(workspace) && Directory.Exists(workspace))
             {
-                if (Directory.Exists(workspace))
-                {
-                    _registry.WorkingDirectoryOverride = ChatWorkspace.Normalize(workspace);
-                }
-                else
-                {
-                    string current = _registry.ResolveWorkingDirectory();
-                    int historyLimit = Program.Config.Get(AppSettings.ChatHistoryLimit);
-                    if (historyLimit > 0)
-                    {
-                        Console.Error.WriteLine("Chat workspace '" + workspace + "' not found; imported into " + current);
-                        ImportLoaded(loaded, title, historyLimit);
-                        return true;
-                    }
-                    // No history to import into: continue here.
-                    Console.Error.WriteLine("Chat workspace '" + workspace + "' not found; using " + current);
-                }
+                _registry.WorkingDirectoryOverride = ChatWorkspace.Normalize(workspace);
+                Restore(loaded, title, path);
+                return true;
             }
 
+            string current = _registry.ResolveWorkingDirectory();
+            int historyLimit = Program.Config.Get(AppSettings.ChatHistoryLimit);
+            if (historyLimit > 0)
+            {
+                Console.Error.WriteLine("Chat workspace '" + workspace + "' not found; imported into " + current);
+                ImportLoaded(loaded, title, historyLimit);
+                return true;
+            }
+
+            // No history to import into: continue here.
+            Console.Error.WriteLine("Chat workspace '" + workspace + "' not found; using " + current);
             Restore(loaded, title, path);
             return true;
         }

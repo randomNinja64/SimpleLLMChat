@@ -410,13 +410,11 @@ namespace SimpleLLMChatCLI.Tests
 
             TestRunner.Run("ChatPipe.ready_parse", () =>
             {
-                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.ReadyLine), "ready");
                 TestAssert.True(!ChatPipe.TryParseReadyLine("STATUS tokens=1"), "not ready");
                 string workspace;
-                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.FormatReady(@"C:\My Work\app"), out workspace), "ready with workspace");
+                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.FormatReady(@"C:\My Work\app"), out workspace), "ready");
                 TestAssert.Equal(@"C:\My Work\app", workspace, "workspace round trip");
-                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.ReadyLine, out workspace) && workspace == null, "bare ready");
-                TestAssert.True(!ChatPipe.TryParseReadyLine("STATUS readyish"), "prefix only");
+                TestAssert.True(!ChatPipe.TryParseReadyLine("STATUS ready"), "workspace required");
                 TestAssert.True(ChatWorkspace.FolderName(@"C:\Work\App").StartsWith("App-"), "folder name");
                 // Folder names differ only in case, which Windows treats as the same folder.
                 TestAssert.True(string.Equals(ChatWorkspace.FolderName(@"C:\Work\App"), ChatWorkspace.FolderName(@"c:\work\app\"),
@@ -554,20 +552,25 @@ namespace SimpleLLMChatCLI.Tests
                     server.EnqueueContent("after-load-ok");
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
                     string chatPath = Path.Combine(ws.Path, "saved chat.json");
-                    File.WriteAllText(chatPath, new JArray
+                    File.WriteAllText(chatPath, new JObject
                     {
-                        new JObject { ["role"] = "user", ["content"] = "loaded-question" },
-                        new JObject
+                        ["title"] = "loaded chat",
+                        ["workingDirectory"] = ws.Path,
+                        ["messages"] = new JArray
                         {
-                            ["role"] = "assistant",
-                            ["content"] = "",
-                            ["tool_calls"] = new JArray
+                            new JObject { ["role"] = "user", ["content"] = "loaded-question" },
+                            new JObject
                             {
-                                new JObject { ["id"] = "call_old", ["name"] = "run_shell_command", ["arguments"] = "{\"command\":\"echo old\"}" }
-                            }
-                        },
-                        new JObject { ["role"] = "tool", ["content"] = "Command: run_shell_command\nExit Code: 0\nOutput:\nloaded-tool-output", ["tool_call_id"] = "call_old" },
-                        new JObject { ["role"] = "assistant", ["content"] = "loaded-answer" }
+                                ["role"] = "assistant",
+                                ["content"] = "",
+                                ["tool_calls"] = new JArray
+                                {
+                                    new JObject { ["id"] = "call_old", ["name"] = "run_shell_command", ["arguments"] = "{\"command\":\"echo old\"}" }
+                                }
+                            },
+                            new JObject { ["role"] = "tool", ["content"] = "Command: run_shell_command\nExit Code: 0\nOutput:\nloaded-tool-output", ["tool_call_id"] = "call_old" },
+                            new JObject { ["role"] = "assistant", ["content"] = "loaded-answer" }
+                        }
                     }.ToString(), Encoding.UTF8);
 
                     using (CliProcess cli = new CliProcess(
@@ -594,10 +597,9 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.Contains(history, "loaded-answer", "history reply");
                         TestAssert.Contains((string)sent[sent.Count - 1]["content"], "next question", "new message last");
 
-                        // An untitled (bare array) file takes its title from the first user message.
                         string resavedPath = Path.Combine(ws.Path, "resaved.json");
                         cli.WriteLine("/save \"" + resavedPath + "\"");
-                        TestAssert.Equal("loaded-question", (string)WaitForSavedChat(resavedPath)["title"], "legacy title");
+                        TestAssert.Equal("loaded chat", (string)WaitForSavedChat(resavedPath)["title"], "title kept");
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }
@@ -808,6 +810,7 @@ namespace SimpleLLMChatCLI.Tests
                     File.WriteAllText(external, new JObject
                     {
                         ["title"] = "kept chat",
+                        ["workingDirectory"] = ws.Path,
                         ["messages"] = new JArray
                         {
                             new JObject { ["role"] = "user", ["content"] = "earlier question" },
@@ -985,6 +988,68 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(probe.WaitForSessions(2, 20000), "saved again");
                         TestAssert.Equal(1, server.TitleBodies.Count, "only after the first reply");
                         TestAssert.Equal("Planning the Garden", (string)WaitForSavedChat(session)["title"], "title kept");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.chat_recall", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply-ok");
+                    server.EnqueueContent("second-reply-ok");
+                    server.EnqueueContent("third-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    SetSystemIniValue(ws.Path, "ragchathistory=1\r\nembeddingsmodel=test-embed\r\nragretrievemode=everyturn");
+                    string project = UseProjectWorkspace(ws.Path, "project");
+                    string chats = Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(project));
+                    Directory.CreateDirectory(chats);
+                    string earlier = Path.Combine(chats, "earlier.json");
+                    RagTests.WriteChat(earlier, "Earlier chat", project, "EARLIER-QUESTION", null, "EARLIER-ANSWER", null, null);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        project))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("new question");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved");
+                        TestAssert.Contains(cli.Stdout, "[recalling 1 earlier chat]", "status line");
+                        string first = server.ChatBodies[0];
+                        TestAssert.Contains(first, earlier.Replace("\\", "\\\\") + ":", "earlier chat's file and lines");
+                        TestAssert.Contains(first, "EARLIER-ANSWER", "earlier exchange");
+
+                        // Saved apart: the user's words in content, the retrieval in context.
+                        string open = probe.Sessions()[0];
+                        JObject question = (JObject)((JArray)WaitForSavedChat(open)["messages"])[0];
+                        TestAssert.Equal("new question", (string)question["content"], "content is what was typed");
+                        TestAssert.Contains((string)question["context"], "EARLIER-ANSWER", "retrieval kept in context");
+
+                        // Every turn: the open chat (saved after the first turn) is not recalled.
+                        cli.WriteLine("second question");
+                        TestAssert.True(probe.WaitForSessions(2, 20000), "saved again");
+                        string second = server.ChatBodies[1];
+                        TestAssert.Contains(second, "EARLIER-ANSWER", "earlier chat recalled again");
+                        TestAssert.True(second.IndexOf(Path.GetFileName(open), StringComparison.Ordinal) < 0, "open chat not recalled");
+
+                        // Loading the chat replays what was typed; the model still gets the context.
+                        cli.WriteLine("/load \"" + open + "\"");
+                        cli.WriteLine("third question");
+                        TestAssert.True(probe.WaitForSessions(3, 20000), "saved after load");
+                        TestAssert.True(WaitStdoutContains(cli, "third-reply-ok", 10000), "third reply shown");
+                        TestAssert.True(cli.Stdout.IndexOf("Retrieved Context", StringComparison.Ordinal) < 0,
+                            "context never shown, live or in the replay");
+                        JArray sent = (JArray)JObject.Parse(server.ChatBodies[2])["messages"];
+                        TestAssert.Contains((string)sent[1]["content"], "Retrieved Context", "first question sent with its context");
+                        TestAssert.True(((string)sent[1]["content"]).EndsWith("new question", StringComparison.Ordinal), "then the question");
 
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");

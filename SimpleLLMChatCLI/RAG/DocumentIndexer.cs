@@ -15,6 +15,14 @@ namespace SimpleLLMChatCLI.RAG
         public string Message;
     }
 
+    /// <summary>One chunk of a file: its line range and the text that is embedded.</summary>
+    public struct IndexChunk
+    {
+        public int Start;
+        public int End;
+        public string Text;
+    }
+
     /// <summary>
     /// Incremental knowledge-folder indexer: extract, chunk, embed, persist.
     /// Scheduling / single-run serialization lives in <see cref="RagHost"/>.
@@ -70,11 +78,46 @@ namespace SimpleLLMChatCLI.RAG
 
             List<string> files = new List<string>(DocumentScanFilter.EnumerateFiles(
                 knowledgePath, DocumentScanFilter.GetAllowedExtensions(_config)));
-            Report(new IndexProgress { Phase = "start", Total = files.Count });
 
             int chunkLines = _config.Get(AppSettings.IndexChunkLines);
             int overlap = _config.Get(AppSettings.IndexChunkOverlap);
             int maxSnippet = _config.Get(AppSettings.RagMaxSnippetLength);
+
+            Func<string, string, IEnumerable<IndexChunk>> chunker = (file, content) =>
+                LineChunks(index.ToDisplayPath(file), content, chunkLines, overlap, maxSnippet);
+            if (!ReconcileFiles(index, files, embeddings, fullRebuild, chunker, Report))
+                return;
+
+            index.Manifest.EmbeddingsModel = _config.Get(AppSettings.EmbeddingsModel);
+            index.Manifest.IndexChunkLines = chunkLines;
+            index.Manifest.IndexChunkOverlap = overlap;
+            index.Manifest.RagMaxSnippetLength = maxSnippet;
+            index.Save();
+            DocumentIndex.SetCurrent(index);
+
+            Report(new IndexProgress
+            {
+                Phase = "done",
+                FileCount = index.Manifest.Files.Count
+            });
+        }
+
+        /// <summary>
+        /// Brings <paramref name="index"/> in line with <paramref name="files"/>: chunks and
+        /// embeds new or changed files (by mtime, then content hash), drops files no longer
+        /// listed. Shared by the knowledge folder and chat history, which differ only in
+        /// how a file is chunked. False (index left unsaved) when embedding fails.
+        /// </summary>
+        public static bool ReconcileFiles(
+            DocumentIndex index,
+            IList<string> files,
+            EmbeddingsClient embeddings,
+            bool fullRebuild,
+            Func<string, string, IEnumerable<IndexChunk>> chunker,
+            Action<IndexProgress> report)
+        {
+            Action<IndexProgress> send = p => { if (report != null) report(p); };
+            send(new IndexProgress { Phase = "start", Total = files.Count });
 
             var pendingTexts = new List<string>();
             var pendingChunks = new List<ChunkVector>();
@@ -86,7 +129,7 @@ namespace SimpleLLMChatCLI.RAG
             {
                 current++;
                 seen.Add(file);
-                Report(new IndexProgress
+                send(new IndexProgress
                 {
                     Phase = "progress",
                     Current = current,
@@ -127,21 +170,18 @@ namespace SimpleLLMChatCLI.RAG
                 if (string.IsNullOrWhiteSpace(content))
                     continue;
 
-                string relative = index.ToDisplayPath(file);
-                foreach (ChunkInfo ci in Chunk(content, chunkLines, overlap, maxSnippet))
+                foreach (IndexChunk chunk in chunker(file, content))
                 {
-                    string text = Truncate(ci.Text, maxSnippet);
-                    if (string.IsNullOrWhiteSpace(text))
+                    if (string.IsNullOrWhiteSpace(chunk.Text))
                         continue;
 
-                    ChunkVector cv = new ChunkVector
+                    pendingChunks.Add(new ChunkVector
                     {
                         File = file,
-                        StartLine = ci.Start,
-                        EndLine = ci.End
-                    };
-                    pendingChunks.Add(cv);
-                    pendingTexts.Add("File: " + relative + "\n" + text);
+                        StartLine = chunk.Start,
+                        EndLine = chunk.End
+                    });
+                    pendingTexts.Add(chunk.Text);
                 }
 
                 index.Manifest.Files[file] = new IndexFileEntry
@@ -176,27 +216,15 @@ namespace SimpleLLMChatCLI.RAG
                 {
                     // Discard this pass: hashes were stamped before embed, so saving would
                     // skip those files forever on the next reconcile.
-                    Report(new IndexProgress
+                    send(new IndexProgress
                     {
                         Phase = "error",
                         Message = "Embeddings failed: " + ex.Message + " (index not saved)."
                     });
-                    return;
+                    return false;
                 }
             }
-
-            index.Manifest.EmbeddingsModel = _config.Get(AppSettings.EmbeddingsModel);
-            index.Manifest.IndexChunkLines = chunkLines;
-            index.Manifest.IndexChunkOverlap = overlap;
-            index.Manifest.RagMaxSnippetLength = maxSnippet;
-            index.Save();
-            DocumentIndex.SetCurrent(index);
-
-            Report(new IndexProgress
-            {
-                Phase = "done",
-                FileCount = index.Manifest.Files.Count
-            });
+            return true;
         }
 
         public void ClearIndex()
@@ -251,21 +279,32 @@ namespace SimpleLLMChatCLI.RAG
             catch { return 0; }
         }
 
-        private static string Truncate(string text, int maxChars)
+        internal static string Truncate(string text, int maxChars)
         {
             if (string.IsNullOrEmpty(text) || text.Length <= maxChars)
                 return text;
             return text.Substring(0, maxChars);
         }
 
-        private struct ChunkInfo
+        // Knowledge files: chunkLines-line windows with overlap, labelled with the file.
+        private static IEnumerable<IndexChunk> LineChunks(
+            string displayPath, string content, int chunkLines, int overlap, int maxSnippet)
         {
-            public int Start;
-            public int End;
-            public string Text;
+            foreach (IndexChunk chunk in Chunk(content, chunkLines, overlap, maxSnippet))
+            {
+                string text = Truncate(chunk.Text, maxSnippet);
+                if (string.IsNullOrWhiteSpace(text))
+                    continue;
+                yield return new IndexChunk
+                {
+                    Start = chunk.Start,
+                    End = chunk.End,
+                    Text = "File: " + displayPath + "\n" + text
+                };
+            }
         }
 
-        private static IEnumerable<ChunkInfo> Chunk(string content, int chunkLines, int overlap, int maxChars)
+        private static IEnumerable<IndexChunk> Chunk(string content, int chunkLines, int overlap, int maxChars)
         {
             if (string.IsNullOrEmpty(content))
                 yield break;
@@ -294,7 +333,7 @@ namespace SimpleLLMChatCLI.RAG
                 string text = sb.ToString();
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    yield return new ChunkInfo
+                    yield return new IndexChunk
                     {
                         Start = start + 1,
                         End = end,

@@ -104,6 +104,11 @@ public partial class LLMClient
 
     private JObject BuildMessageObject(ChatMessage msg)
     {
+        // What the model reads: retrieved context (if any) ahead of the user's words.
+        string content = string.IsNullOrEmpty(msg.Context)
+            ? msg.Content
+            : AutoRagContext.MergeIntoPrompt(msg.Context, msg.Content);
+
         JObject msgObj = new JObject
         {
             ["role"] = msg.Role
@@ -141,12 +146,12 @@ public partial class LLMClient
         {
             JArray contentArray = new JArray();
 
-            if (!string.IsNullOrEmpty(msg.Content))
+            if (!string.IsNullOrEmpty(content))
             {
                 JObject textPart = new JObject
                 {
                     ["type"] = "text",
-                    ["text"] = msg.Content
+                    ["text"] = content
                 };
                 contentArray.Add(textPart);
             }
@@ -179,7 +184,7 @@ public partial class LLMClient
         }
         else
         {
-            msgObj["content"] = msg.Content ?? "";
+            msgObj["content"] = content ?? "";
         }
 
         return msgObj;

@@ -64,6 +64,7 @@
     <Compile Include="ToolRegistry.cs" />
     <Compile Include="ToolResultParser.cs" />
     <Compile Include="RAG\AutoRagContext.cs" />
+    <Compile Include="RAG\ChatHistoryRag.cs" />
     <Compile Include="RAG\DocumentIndex.cs" />
     <Compile Include="RAG\DocumentIndexer.cs" />
     <Compile Include="RAG\DocumentScanFilter.cs" />

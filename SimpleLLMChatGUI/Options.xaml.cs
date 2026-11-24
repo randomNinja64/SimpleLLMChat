@@ -293,6 +293,7 @@ namespace SimpleLLMChatGUI
             ChatFontSize = config.Get(AppSettings.FontSize);
 
             RagEnabled = config.Get(AppSettings.RagEnabled);
+            RagChatHistory = config.Get(AppSettings.RagChatHistory);
             RagKnowledgePath = config.Get(AppSettings.RagKnowledgePath);
             RagMaxResults = config.Get(AppSettings.RagMaxResults);
             IndexChunkLines = config.Get(AppSettings.IndexChunkLines);

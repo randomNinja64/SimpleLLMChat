@@ -260,6 +260,12 @@
                               IsChecked="{Binding RagEnabled, UpdateSourceTrigger=PropertyChanged}"
                               Margin="0,4,0,4"/>
 
+                    <Label Content="Reference Previous Chats:"/>
+                    <CheckBox x:Name="RagChatHistoryCheckBox"
+                              Content="Enable Context Retrieval from Previous Chats"
+                              IsChecked="{Binding RagChatHistory, UpdateSourceTrigger=PropertyChanged}"
+                              Margin="0,4,0,4"/>
+
                     <Label Content="Allowed File Extensions (comma-separated):"/>
                     <TextBox x:Name="RagAllowedExtensionsTextBox"
                              Text="{Binding RagAllowedExtensions, UpdateSourceTrigger=PropertyChanged}"

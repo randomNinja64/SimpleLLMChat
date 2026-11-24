@@ -5,7 +5,7 @@ using System.Globalization;
 /// Named-pipe channel for everything the CLI sends its front end: CLI hosts SimpleLLMChat.Chat.{pid}; GUI connects by child PID.
 /// Wire format lines (UTF-8, one per message):
 ///   STATUS tokens=1234
-///   STATUS ready [workspace=C:\path\tools\run\in]
+///   STATUS ready workspace=C:\path\tools\run\in
 ///   STATUS approval name=tool_name [confidence=0.91] args=...
 ///   STATUS indexing=start total=42
 ///   STATUS indexing=progress current=7 total=42 file=notes.md

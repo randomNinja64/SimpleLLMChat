@@ -61,6 +61,7 @@ public static class AppSettings
     public static readonly Setting<ChatBlockDisplayMode> ToolOutputDisplay = Def(SectionAppearance, "tooloutputdisplay", ChatBlockDisplayMode.Shown);
 
     public static readonly Setting<bool> RagEnabled = Def(SectionRag, "ragenabled", false);
+    public static readonly Setting<bool> RagChatHistory = Def(SectionRag, "ragchathistory", false);
     public static readonly Setting<string> RagAllowedExtensions = Def(SectionRag, "ragallowedextensions", AppConstants.DefaultRagAllowedExtensions);
     public static readonly Setting<int> IndexChunkOverlap = Def(SectionRag, "indexchunkoverlap", 10);
     public static readonly Setting<int> IndexChunkLines = Def(SectionRag, "indexchunklines", 60);

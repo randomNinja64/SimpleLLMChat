@@ -37,18 +37,10 @@ namespace SimpleLLMChatCLI
 
         public static List<LLMClient.ChatMessage> Load(string path, out string title, out string workingDirectory)
         {
-            JToken root = JToken.Parse(File.ReadAllText(path, Encoding.UTF8));
-
-            // Early saves were a bare message array with no title.
-            JArray messages = root as JArray;
-            title = null;
-            workingDirectory = null;
-            if (messages == null)
-            {
-                title = (string)root["title"];
-                workingDirectory = (string)root["workingDirectory"];
-                messages = root["messages"] as JArray ?? new JArray();
-            }
+            JObject root = JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
+            title = (string)root["title"];
+            workingDirectory = (string)root["workingDirectory"];
+            JArray messages = root["messages"] as JArray ?? new JArray();
 
             List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
             foreach (JObject obj in messages)
@@ -56,6 +48,7 @@ namespace SimpleLLMChatCLI
                 LLMClient.ChatMessage message = new LLMClient.ChatMessage(
                     (string)obj["role"] ?? string.Empty, (string)obj["content"] ?? string.Empty);
                 message.ToolCallId = (string)obj["tool_call_id"] ?? string.Empty;
+                message.Context = (string)obj["context"];
                 message.Image = (string)obj["image"];
                 message.ImageMime = (string)obj["image_mime"];
 
@@ -74,9 +67,6 @@ namespace SimpleLLMChatCLI
                 }
                 conversation.Add(message);
             }
-
-            if (string.IsNullOrEmpty(title))
-                title = TitleFromConversation(conversation);
             return conversation;
         }
 
@@ -117,18 +107,6 @@ namespace SimpleLLMChatCLI
             return null;
         }
 
-        // For files without a title: the first user message. RAG context or a
-        // summary may have been merged into it, but it is the best there is.
-        private static string TitleFromConversation(List<LLMClient.ChatMessage> conversation)
-        {
-            foreach (LLMClient.ChatMessage message in conversation)
-            {
-                if (message.Role == "user")
-                    return MakeTitle(message.Content);
-            }
-            return null;
-        }
-
         private static JObject ToJson(LLMClient.ChatMessage message)
         {
             JObject obj = new JObject
@@ -136,6 +114,9 @@ namespace SimpleLLMChatCLI
                 ["role"] = message.Role ?? string.Empty,
                 ["content"] = message.Content ?? string.Empty
             };
+
+            if (!string.IsNullOrEmpty(message.Context))
+                obj["context"] = message.Context;
 
             if (!string.IsNullOrEmpty(message.ToolCallId))
                 obj["tool_call_id"] = message.ToolCallId;

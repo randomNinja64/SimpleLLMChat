@@ -194,6 +194,9 @@
     <Compile Include="..\..\SimpleLLMChatCLI\TurnSettings.cs">
       <Link>CLI\TurnSettings.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\RAG\ChatHistoryRag.cs">
+      <Link>CLI\RAG\ChatHistoryRag.cs</Link>
+    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\RAG\AutoRagContext.cs">
       <Link>CLI\RAG\AutoRagContext.cs</Link>
     </Compile>

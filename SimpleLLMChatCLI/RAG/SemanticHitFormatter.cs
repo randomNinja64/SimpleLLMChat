@@ -18,21 +18,46 @@ namespace SimpleLLMChatCLI.RAG
             if (index == null || !index.HasIndex)
                 return null;
 
-            EmbeddingsClient client = EmbeddingsClient.CreateFromConfig(config);
-            if (client == null)
-                return null;
-
-            float[] queryVector;
-            try { queryVector = client.Embed(query); }
-            catch (EmbeddingsException) { return null; }
+            float[] queryVector = EmbedQuery(config, query);
             if (queryVector == null)
                 return null;
 
+            int maxSnippet = config != null ? config.Get(AppSettings.RagMaxSnippetLength) : 2000;
+            IndexedHitSet hits = FormatHits(index, queryVector, maxResults, maxSnippet, ReadSnippet);
+            if (hits == null)
+                return null;
+
+            hits.FormattedText = "Semantic search results for: " + query + Environment.NewLine
+                + Environment.NewLine + hits.FormattedText;
+            return hits;
+        }
+
+        /// <summary>The query's embedding, or null when embeddings are unavailable.</summary>
+        public static float[] EmbedQuery(ConfigHandler config, string query)
+        {
+            EmbeddingsClient client = EmbeddingsClient.CreateFromConfig(config);
+            if (client == null)
+                return null;
+            try { return client.Embed(query); }
+            catch (EmbeddingsException) { return null; }
+        }
+
+        /// <summary>
+        /// The top hits as "path:start-end  (score)" followed by the text
+        /// <paramref name="readSnippet"/> gives for that range (file, start, end, max
+        /// length; null shows the location alone). Hits whose file is gone are skipped.
+        /// </summary>
+        public static IndexedHitSet FormatHits(
+            DocumentIndex index,
+            float[] queryVector,
+            int maxResults,
+            int maxSnippet,
+            Func<string, int, int, int, string> readSnippet)
+        {
             List<ChunkHit> hits = index.Vectors.Search(queryVector, maxResults);
             if (hits == null || hits.Count == 0)
                 return null;
 
-            int maxSnippet = config != null ? config.Get(AppSettings.RagMaxSnippetLength) : 2000;
             var sb = new StringBuilder();
             var files = new List<string>();
             int shown = 0;
@@ -48,10 +73,10 @@ namespace SimpleLLMChatCLI.RAG
                 if (string.IsNullOrEmpty(file) || !File.Exists(file))
                     continue;
 
+                string snippet = readSnippet(file, hit.Chunk.StartLine, hit.Chunk.EndLine, maxSnippet);
+
                 sb.AppendLine(string.Format("{0}:{1}-{2}  (score {3:F3})",
                     file, hit.Chunk.StartLine, hit.Chunk.EndLine, hit.Score));
-
-                string snippet = ReadSnippet(file, hit.Chunk.StartLine, hit.Chunk.EndLine, maxSnippet);
                 if (!string.IsNullOrEmpty(snippet))
                     sb.AppendLine(snippet);
                 sb.AppendLine();
@@ -65,18 +90,14 @@ namespace SimpleLLMChatCLI.RAG
             if (shown == 0)
                 return null;
 
-            var header = new StringBuilder();
-            header.AppendLine("Semantic search results for: " + query);
-            header.AppendLine();
-
             return new IndexedHitSet
             {
-                FormattedText = header.ToString() + sb.ToString().TrimEnd(),
+                FormattedText = sb.ToString().TrimEnd(),
                 FilePaths = files
             };
         }
 
-        private static string ReadSnippet(string file, int startLine, int endLine, int maxSnippet)
+        public static string ReadSnippet(string file, int startLine, int endLine, int maxSnippet)
         {
             try
             {

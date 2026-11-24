@@ -21,6 +21,7 @@ namespace SimpleLLMChatGUI
         private int _chatFontSize;
 
         private bool _ragEnabled;
+        private bool _ragChatHistory;
         private string _ragKnowledgePath;
         private int _ragMaxResults;
         private int _indexChunkLines;
@@ -59,6 +60,7 @@ namespace SimpleLLMChatGUI
         public int ChatFontSize { get => _chatFontSize; set => Set(ref _chatFontSize, FontHandler.ClampFontSize(value), nameof(ChatFontSize)); }
 
         public bool RagEnabled { get => _ragEnabled; set => Set(ref _ragEnabled, value, nameof(RagEnabled)); }
+        public bool RagChatHistory { get => _ragChatHistory; set => Set(ref _ragChatHistory, value, nameof(RagChatHistory)); }
         public string RagKnowledgePath { get => _ragKnowledgePath; set => Set(ref _ragKnowledgePath, value, nameof(RagKnowledgePath)); }
         public int RagMaxResults { get => _ragMaxResults; set => Set(ref _ragMaxResults, value, nameof(RagMaxResults)); }
         public int IndexChunkLines { get => _indexChunkLines; set => Set(ref _indexChunkLines, value, nameof(IndexChunkLines)); }
@@ -98,6 +100,7 @@ namespace SimpleLLMChatGUI
             CustomFontFamily = AppSettings.CustomFontFamily.Default;
             ChatFontSize = AppSettings.FontSize.Default;
             RagEnabled = AppSettings.RagEnabled.Default;
+            RagChatHistory = AppSettings.RagChatHistory.Default;
             RagKnowledgePath = AppSettings.RagKnowledgePath.Default;
             RagMaxResults = AppSettings.RagMaxResults.Default;
             IndexChunkLines = AppSettings.IndexChunkLines.Default;
@@ -153,6 +156,7 @@ namespace SimpleLLMChatGUI
             return new List<string>
             {
                 AppSettings.RagEnabled.Line(RagEnabled ? "1" : "0"),
+                AppSettings.RagChatHistory.Line(RagChatHistory ? "1" : "0"),
                 AppSettings.RagAllowedExtensions.Line(RagExtensionList.FormatForStorage(RagAllowedExtensions)),
                 AppSettings.IndexChunkOverlap.Line(IndexChunkOverlap),
                 AppSettings.IndexChunkLines.Line(IndexChunkLines),
