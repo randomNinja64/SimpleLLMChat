@@ -472,7 +472,7 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
-            TestRunner.Run("cli.save_markdown", () =>
+            TestRunner.Run("cli.save_json", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
                 using (TempWorkspace ws = PackageCliWorkspace())
@@ -484,7 +484,7 @@ namespace SimpleLLMChatCLI.Tests
                         "{\"command\":\"echo hi\"}");
                     server.EnqueueContent("save-reply-ok");
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
-                    string mdPath = Path.Combine(ws.Path, "my chat.md");
+                    string mdPath = Path.Combine(ws.Path, "my chat.json");
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
                         "--no-banners",
@@ -508,10 +508,26 @@ namespace SimpleLLMChatCLI.Tests
                             }
                             System.Threading.Thread.Sleep(50);
                         }
-                        TestAssert.Contains(md, "You: hello save", "user text");
-                        TestAssert.Contains(md, "LLM: save-reply-ok", "reply");
-                        TestAssert.True(md.IndexOf("\"Role\"", StringComparison.Ordinal) < 0, "no json wrapper");
-                        TestAssert.True(md.IndexOf("call_save", StringComparison.Ordinal) < 0, "no tool-call json");
+                        JObject saved = JObject.Parse(md);
+                        TestAssert.Equal("LLM", (string)saved["assistant_name"], "assistant name");
+                        JArray messages = (JArray)saved["messages"];
+                        TestAssert.Equal(4, messages.Count, "user, tool call, tool result, reply");
+
+                        TestAssert.Equal("user", (string)messages[0]["role"], "user role");
+                        TestAssert.Contains((string)messages[0]["content"], "hello save", "user text");
+
+                        TestAssert.Equal("assistant", (string)messages[1]["role"], "call role");
+                        JObject call = (JObject)messages[1]["tool_calls"][0];
+                        TestAssert.Equal("call_save", (string)call["id"], "call id");
+                        TestAssert.Equal("run_shell_command", (string)call["name"], "call name");
+                        TestAssert.Equal("{\"command\":\"echo hi\"}", (string)call["arguments"], "call arguments");
+
+                        TestAssert.Equal("tool", (string)messages[2]["role"], "tool role");
+                        TestAssert.Equal("call_save", (string)messages[2]["tool_call_id"], "result links to call");
+
+                        TestAssert.Equal("assistant", (string)messages[3]["role"], "reply role");
+                        TestAssert.Equal("save-reply-ok", (string)messages[3]["content"], "reply");
+                        TestAssert.True(messages[3]["tool_calls"] == null, "plain reply has no tool calls");
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }
@@ -585,7 +601,7 @@ namespace SimpleLLMChatCLI.Tests
                         "{\"command\":\"echo QUEUED_MARKER\"}");
                     server.EnqueueContent("queued-final-ok");
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "run_shell_command", "run_shell_command");
-                    string mdPath = Path.Combine(ws.Path, "queued.md");
+                    string mdPath = Path.Combine(ws.Path, "queued.json");
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),

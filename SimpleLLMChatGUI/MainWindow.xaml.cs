@@ -567,8 +567,8 @@ namespace SimpleLLMChatGUI
             }
 
             Microsoft.Win32.SaveFileDialog dialog = new Microsoft.Win32.SaveFileDialog();
-            dialog.Filter = "Markdown (*.md)|*.md";
-            dialog.FileName = "chat.md";
+            dialog.Filter = "Chat (*.json)|*.json";
+            dialog.FileName = "chat.json";
             if (dialog.ShowDialog(this) != true)
                 return;
 

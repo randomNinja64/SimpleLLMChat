@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using SimpleLLMChatCLI.RAG;
 
 namespace SimpleLLMChatCLI
@@ -159,27 +158,8 @@ namespace SimpleLLMChatCLI
 
             try
             {
-                StringBuilder markdown = new StringBuilder();
-                foreach (LLMClient.ChatMessage message in _conversation)
-                {
-                    if (string.IsNullOrEmpty(message.Content))
-                        continue;
-                    string label = message.Role;
-                    if (string.Equals(label, "user", StringComparison.OrdinalIgnoreCase))
-                        label = "You";
-                    else if (string.Equals(label, "assistant", StringComparison.OrdinalIgnoreCase))
-                        label = _settings.AssistantName;
-                    else if (string.Equals(label, "tool", StringComparison.OrdinalIgnoreCase))
-                        label = "Tool";
-                    if (markdown.Length > 0)
-                        markdown.Append("\n\n");
-                    markdown.Append(label);
-                    markdown.Append(": ");
-                    markdown.Append(message.Content.Replace("\r\n", "\n").Replace("\r", "\n").TrimEnd('\n'));
-                }
-                if (markdown.Length > 0)
-                    markdown.Append('\n');
-                File.WriteAllText(arguments.Trim().Trim('"'), markdown.ToString());
+                ChatTranscript.Save(
+                    arguments.Trim().Trim('"'), _conversation, _settings.AssistantName, _client.ReasoningEffort);
             }
             catch (Exception ex)
             {
@@ -237,7 +217,7 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
             ChatOutput.WriteLine("| /reload: Reload configuration                   |");
-            ChatOutput.WriteLine("| /save <path>: Save chat markdown                |");
+            ChatOutput.WriteLine("| /save <path>: Save chat as JSON                 |");
             ChatOutput.WriteLine("| Ctrl+C: Stop the response in progress           |");
             ChatOutput.WriteLine("===================================================");
         }

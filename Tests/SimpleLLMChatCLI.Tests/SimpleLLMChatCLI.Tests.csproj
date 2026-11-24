@@ -140,6 +140,9 @@
     <Compile Include="..\..\SimpleLLMChatCLI\ChatSession.cs">
       <Link>CLI\ChatSession.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ChatTranscript.cs">
+      <Link>CLI\ChatTranscript.cs</Link>
+    </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ConsecutiveToolFailures.cs">
       <Link>CLI\ConsecutiveToolFailures.cs</Link>
     </Compile>
