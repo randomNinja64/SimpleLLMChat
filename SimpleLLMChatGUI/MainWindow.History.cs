@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,21 +24,107 @@ namespace SimpleLLMChatGUI
         // this workspace's chats only. Null until the CLI first reports it.
         private string _currentWorkspace;
 
+        // At most 250 the sidebar, handle (5) and chat (150 minimum) fit the smallest
+        // window (MinWidth 415, less margins), so window resizes never need to re-fit it.
+        private const double SidebarMinWidth = 100;
+        private const double SidebarMaxWidth = 250;
+        private const double SidebarDefaultWidth = 140;
+        private const string SidebarWidthKey = "historysidebarwidth";
+
+        // The width the user chose by dragging, kept in layout.ini. -1 until first read.
+        private double _sidebarWidth = -1;
+
+        // Whether the chat was scrolled to its end when a sidebar drag began.
+        private bool _chatAtEndBeforeDrag;
+
         private void historyButton_Toggled(object sender, RoutedEventArgs e)
         {
             bool open = historyButton.IsChecked == true;
             if (open)
                 RefreshHistory();
 
-            // Narrowing or widening the chat reflows every turn (chatList_SizeChanged
-            // resets page widths), which changes heights. Keep a reader who was
-            // following the end of the chat at the end.
-            ScrollViewer scroll = FindScrollViewer(chatList);
-            bool atEnd = scroll != null && scroll.VerticalOffset >= scroll.ScrollableHeight - 1;
-
-            historyPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-
+            bool atEnd = IsChatAtEnd();
+            Visibility visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            historyPanel.Visibility = visibility;
+            historySplitter.Visibility = visibility;
+            ApplySidebarWidth();
             if (atEnd)
+                ScrollChatToEndAfterLayout();
+        }
+
+        private void ApplySidebarWidth()
+        {
+            if (historyPanel.Visibility != Visibility.Visible)
+            {
+                historyColumn.MinWidth = 0;
+                historyColumn.MaxWidth = 0;
+                historyColumn.Width = new GridLength(0);
+                return;
+            }
+
+            if (_sidebarWidth < 0)
+                _sidebarWidth = LoadSidebarWidth();
+
+            // The limits also bound the drag.
+            historyColumn.MaxWidth = SidebarMaxWidth;
+            historyColumn.MinWidth = SidebarMinWidth;
+            historyColumn.Width = new GridLength(_sidebarWidth);
+        }
+
+        private void historySplitter_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+        {
+            _chatAtEndBeforeDrag = IsChatAtEnd();
+        }
+
+        private void historySplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+        {
+            _sidebarWidth = Math.Round(historyColumn.Width.Value);
+            if (_chatAtEndBeforeDrag)
+                ScrollChatToEndAfterLayout();
+
+            try
+            {
+                File.WriteAllLines(App.LayoutFilePath, new[]
+                {
+                    SidebarWidthKey + "=" + ((int)_sidebarWidth).ToString(CultureInfo.InvariantCulture)
+                });
+            }
+            catch (Exception)
+            {
+                // Not remembered this time; the sidebar keeps the width for this run.
+            }
+        }
+
+        private static double LoadSidebarWidth()
+        {
+            try
+            {
+                string text;
+                int width;
+                if (IniFileHandler.LoadIni(App.LayoutFilePath).TryGetValue(SidebarWidthKey, out text)
+                    && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out width))
+                    return Math.Max(SidebarMinWidth, Math.Min(SidebarMaxWidth, width));   // A hand-edited file.
+            }
+            catch (Exception)
+            {
+                // Unreadable: the default, as with colors.ini.
+            }
+            return SidebarDefaultWidth;
+        }
+
+        // Narrowing or widening the chat reflows every turn (chatList_SizeChanged
+        // resets page widths), which changes heights. A reader who was following
+        // the end of the chat is kept at the end.
+        private bool IsChatAtEnd()
+        {
+            ScrollViewer scroll = FindScrollViewer(chatList);
+            return scroll != null && scroll.VerticalOffset >= scroll.ScrollableHeight - 1;
+        }
+
+        private void ScrollChatToEndAfterLayout()
+        {
+            ScrollViewer scroll = FindScrollViewer(chatList);
+            if (scroll != null)
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => scroll.ScrollToEnd()));
         }
 
@@ -73,26 +160,30 @@ namespace SimpleLLMChatGUI
                 historyList.ItemsSource = _historyEntries;
 
             _historyEntries.Clear();
-            if (_currentWorkspace != null)
+            bool enabled = App.Config.Get(AppSettings.ChatHistoryLimit) > 0;
+            if (enabled && _currentWorkspace != null)
             {
                 foreach (ChatHistoryEntry entry in ChatHistoryStore.Read(ChatWorkspace.DirectoryFor(_currentWorkspace)))
                     _historyEntries.Add(entry);
             }
 
+            historyEmptyText.Text = enabled ? "(empty)" : "Chat history disabled.";
             historyEmptyText.Visibility = _historyEntries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             SelectCurrentChat();
         }
 
+        // Marks the open chat (its own highlight, kept while arrow keys move the
+        // selection) and starts the selection there for keyboard use.
         private void SelectCurrentChat()
         {
             historyList.SelectedItem = null;
             foreach (ChatHistoryEntry entry in _historyEntries)
             {
-                if (string.Equals(entry.Path, _currentChatPath, StringComparison.OrdinalIgnoreCase))
+                entry.IsCurrent = string.Equals(entry.Path, _currentChatPath, StringComparison.OrdinalIgnoreCase);
+                if (entry.IsCurrent)
                 {
                     historyList.SelectedItem = entry;
                     historyList.ScrollIntoView(entry);
-                    break;
                 }
             }
         }

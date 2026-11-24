@@ -215,6 +215,60 @@ namespace SimpleLLMChatGUI.Tests
             return null;
         }
 
+        /// <summary>Opens or closes the history sidebar (the History toggle button).</summary>
+        public void ToggleHistory()
+        {
+            AutomationElement button = FindById("historyButton");
+            if (button == null)
+                throw new TestFailureException("historyButton not found");
+            ((TogglePattern)button.GetCurrentPattern(TogglePattern.Pattern)).Toggle();
+        }
+
+        /// <summary>Clicks New Chat.</summary>
+        public void NewChat()
+        {
+            Condition byName = new PropertyCondition(AutomationElement.NameProperty, "New Chat");
+            AutomationElement button = _window.FindFirst(TreeScope.Descendants, byName);
+            if (button == null)
+                throw new TestFailureException("New Chat button not found");
+            ((InvokePattern)button.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        }
+
+        /// <summary>
+        /// The sidebar's entries, top to bottom, as "title" or "title*" for the
+        /// selected one (the open chat, unless the arrow keys moved it).
+        /// </summary>
+        public string ReadHistory()
+        {
+            AutomationElement list = FindById("historyList");
+            if (list == null)
+                return null;
+            StringBuilder sb = new StringBuilder();
+            Condition items = new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem);
+            foreach (AutomationElement item in list.FindAll(TreeScope.Children, items))
+            {
+                SelectionItemPattern selection = item.GetCurrentPattern(SelectionItemPattern.Pattern) as SelectionItemPattern;
+                if (sb.Length > 0)
+                    sb.Append('|');
+                sb.Append(item.Current.Name);
+                if (selection != null && selection.Current.IsSelected)
+                    sb.Append('*');
+            }
+            return sb.ToString();
+        }
+
+        public bool WaitForHistory(string expected, int timeoutMs)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                if (ReadHistory() == expected)
+                    return true;
+                Thread.Sleep(100);
+            }
+            return false;
+        }
+
         private AutomationElement FindById(string automationId)
         {
             if (_window == null) return null;

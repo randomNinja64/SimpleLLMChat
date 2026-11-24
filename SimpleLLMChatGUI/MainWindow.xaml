@@ -95,13 +95,15 @@
             <!-- Token status bar -->
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <!-- History sidebar (collapsed when closed) -->
+            <!-- History sidebar: width set in code (0 when closed, else the saved width) -->
+            <ColumnDefinition Name="historyColumn" Width="0" />
+            <!-- Drag handle between sidebar and chat -->
             <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" MinWidth="150" />
         </Grid.ColumnDefinitions>
 
         <!-- Top bar -->
-        <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,5">
+        <Grid Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -147,8 +149,7 @@
               Grid.Row="1"
               Grid.RowSpan="2"
               Grid.Column="0"
-              Width="160"
-              Margin="0,0,5,2"
+              Margin="0,0,0,2"
               Visibility="Collapsed">
             <ListBox Name="historyList"
                      AutomationProperties.AutomationId="historyList"
@@ -163,6 +164,40 @@
                         <Setter Property="Padding" Value="4,3"/>
                         <Setter Property="ToolTip" Value="{Binding Title}"/>
                         <EventSetter Event="MouseLeftButtonUp" Handler="historyItem_MouseLeftButtonUp"/>
+                        <!-- Own template: the theme's selection highlight fades when the list
+                             loses focus. The open chat (IsCurrent) is highlighted always;
+                             hover and the keyboard selection get a faint tint. -->
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Grid SnapsToDevicePixels="True">
+                                        <Border x:Name="Tint"
+                                                Background="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"
+                                                Opacity="0.2"
+                                                Visibility="Collapsed"/>
+                                        <Border x:Name="Bd"
+                                                Background="Transparent"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter/>
+                                        </Border>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Tint" Property="Visibility" Value="Visible"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Tint" Property="Visibility" Value="Visible"/>
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                            <Setter TargetName="Bd" Property="Background"
+                                                    Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
                     </Style>
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
@@ -172,7 +207,7 @@
                 </ListBox.ItemTemplate>
             </ListBox>
             <TextBlock Name="historyEmptyText"
-                       Text="No saved chats yet."
+                       Text="(empty)"
                        Margin="8"
                        TextWrapping="Wrap"
                        Opacity="0.65"
@@ -180,11 +215,29 @@
                        Foreground="{DynamicResource ChatTextColorBrush}"/>
         </Grid>
 
+        <!-- Drags the sidebar's width. ShowsPreview applies it once on release:
+             each width change reflows every chat turn. -->
+        <GridSplitter Name="historySplitter"
+                      Grid.Row="1"
+                      Grid.RowSpan="2"
+                      Grid.Column="1"
+                      Width="5"
+                      Margin="0,0,0,2"
+                      HorizontalAlignment="Stretch"
+                      ResizeBehavior="PreviousAndNext"
+                      ResizeDirection="Columns"
+                      ShowsPreview="True"
+                      Focusable="False"
+                      Background="Transparent"
+                      Visibility="Collapsed"
+                      DragStarted="historySplitter_DragStarted"
+                      DragCompleted="historySplitter_DragCompleted" />
+
         <!-- Chat history: one ListBox item per turn -->
         <ListBox Name="chatList"
                  AutomationProperties.AutomationId="chatList"
                  Grid.Row="1"
-                 Grid.Column="1"
+                 Grid.Column="2"
                  Margin="0,0,0,5"
                  Padding="4"
                  BorderThickness="1"
@@ -223,7 +276,7 @@
         </ListBox>
 
         <!-- Bottom bar: attach + input + send -->
-        <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,2">
+        <Grid Grid.Row="2" Grid.Column="2" Margin="0,0,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -267,7 +320,7 @@
         </Grid>
 
         <!-- Status bar -->
-        <StatusBar Grid.Row="3" Grid.ColumnSpan="2" Margin="0" Padding="0"
+        <StatusBar Grid.Row="3" Grid.ColumnSpan="3" Margin="0" Padding="0"
                    Background="Transparent"
                    Foreground="{DynamicResource LabelTextColorBrush}"
                    FontFamily="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=FontFamily}"

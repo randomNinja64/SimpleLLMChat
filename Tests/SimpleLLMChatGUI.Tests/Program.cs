@@ -106,6 +106,39 @@ namespace SimpleLLMChatGUI.Tests
                 }
             });
 
+            TestRunner.Run("gui.history_sidebar", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageGuiWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply");
+                    server.EnqueueContent("second-reply");
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
+
+                    using (GuiDriver gui = new GuiDriver(ws.Path))
+                    {
+                        gui.WaitUntilReady(30000);
+                        gui.ToggleHistory();
+                        TestAssert.True(gui.WaitForHistory("", 10000), "empty before any chat");
+
+                        // Saved after the turn; the open chat is listed and marked.
+                        gui.SendTurn("first chat", 60000);
+                        TestAssert.True(gui.WaitForHistory("first chat*", 10000),
+                            "first chat listed as current: " + gui.ReadHistory());
+
+                        // New Chat: nothing is current until the new chat saves.
+                        gui.NewChat();
+                        TestAssert.True(gui.WaitForHistory("first chat", 10000),
+                            "no current chat after New Chat: " + gui.ReadHistory());
+                        gui.WaitUntilReady(30000);
+                        gui.SendTurn("second chat", 60000);
+                        TestAssert.True(gui.WaitForHistory("second chat*|first chat", 10000),
+                            "newest first, new chat current: " + gui.ReadHistory());
+                    }
+                }
+            });
+
             TestRunner.Run("gui.model_tag_text_kept", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

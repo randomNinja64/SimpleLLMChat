@@ -646,6 +646,9 @@ namespace SimpleLLMChatGUI
             if (optionsDialog.ShowDialog() == true)
             {
                 ApplySavedSettings();
+                // The chat history limit may have been turned on or off.
+                if (historyPanel.Visibility == Visibility.Visible)
+                    RefreshHistory();
 
                 if (processHandler != null && processHandler.IsProcessRunning)
                     processHandler.SendReload();

@@ -11,6 +11,7 @@ namespace SimpleLLMChatGUI
     {
         public const string ConfigFileName = "LLMSettings.ini";
         public const string ColorsFileName = "colors.ini";
+        public const string LayoutFileName = "layout.ini";
         public static ConfigHandler Config;
 
         /// <summary>Absolute path to LLMSettings.ini next to the executable.</summary>
@@ -23,6 +24,12 @@ namespace SimpleLLMChatGUI
         public static string ColorsFilePath
         {
             get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ColorsFileName); }
+        }
+
+        /// <summary>Absolute path to layout.ini (window layout the GUI remembers) next to the executable.</summary>
+        public static string LayoutFilePath
+        {
+            get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LayoutFileName); }
         }
 
         /// <summary>
