@@ -19,6 +19,7 @@ namespace SimpleLLMChatGUI
         private ContextMenu reasoningEffortMenu;
         private readonly ObservableCollection<ChatTurn> _chatTurns = new ObservableCollection<ChatTurn>();
         private ChatTurn _streamingTurn;
+        private string _pendingLoadPath;
 
         private const double ChatTurnGapMin = 8;
         private const double ChatTurnGapMax = 24;
@@ -306,6 +307,19 @@ namespace SimpleLLMChatGUI
                 EndStreamingTurn();
                 if (IsMarkdownParsingEnabled())
                     ApplyMarkdown();
+
+                if (_pendingLoadPath != null)
+                {
+                    string path = _pendingLoadPath;
+                    _pendingLoadPath = null;
+                    if (processHandler != null && processHandler.SendInput("/load \"" + path + "\""))
+                    {
+                        SetInputControlsEnabled(false);
+                        return;
+                    }
+                    MessageBox.Show("Failed to load chat.");
+                }
+
                 SetInputControlsEnabled(true);
                 chatInput.Focus();
             }));
@@ -574,6 +588,19 @@ namespace SimpleLLMChatGUI
 
             if (!processHandler.SendInput("/save \"" + dialog.FileName + "\""))
                 MessageBox.Show("Failed to save chat.");
+        }
+
+        private void loadButton_Click(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog();
+            dialog.Filter = "Chat (*.json)|*.json";
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            // Sent once the new CLI is ready: chat output published before the
+            // GUI connects to the pipe is lost.
+            _pendingLoadPath = dialog.FileName;
+            clearButton_Click(sender, e);
         }
 
         private void clearButton_Click(object sender, RoutedEventArgs e)

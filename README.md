@@ -111,6 +111,8 @@ Tool-specific configuration options for the included tools are available in the 
 - To adjust application settings, select `Options`.
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
 - To clear the chat, press `Clear Chat`.
+- To save the chat, press `Save Chat`.
+- To load a previous chat session, press `Load Chat`.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
 - To cancel the currently generating response, press `Stop` (shown while generating).
 
@@ -122,6 +124,7 @@ Interactive mode provides the following commands:
 - `/clearindex`: Clears the on-disk knowledge index
 - `/exit`: Exits the application
 - `/image`: Sends an image to the model alongside the next message, used as `/image "path" prompt`
+- `/load <path>`: Loads a chat from JSON and continues from it.
 - `/reasoning`: Sets reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); `/reasoning` alone uses the API default
 - `/reload`: Reloads configuration in place (doesn't clear chat)
 - `/save <path>`: Saves the chat as JSON

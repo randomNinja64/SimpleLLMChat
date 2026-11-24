@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
@@ -15,22 +13,42 @@ namespace SimpleLLMChatCLI
     /// </summary>
     internal static class ChatTranscript
     {
-        public static void Save(string path, List<LLMClient.ChatMessage> conversation, string assistantName, string reasoningEffort)
+        public static void Save(string path, List<LLMClient.ChatMessage> conversation)
         {
-            JObject root = new JObject
-            {
-                ["saved_at"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                ["assistant_name"] = assistantName ?? string.Empty
-            };
-            if (!string.IsNullOrEmpty(reasoningEffort))
-                root["reasoning_effort"] = reasoningEffort;
-
             JArray messages = new JArray();
             foreach (LLMClient.ChatMessage message in conversation)
                 messages.Add(ToJson(message));
-            root["messages"] = messages;
 
-            File.WriteAllText(path, root.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
+            File.WriteAllText(path, messages.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
+        }
+
+        public static List<LLMClient.ChatMessage> Load(string path)
+        {
+            List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
+            foreach (JObject obj in JArray.Parse(File.ReadAllText(path, Encoding.UTF8)))
+            {
+                LLMClient.ChatMessage message = new LLMClient.ChatMessage(
+                    (string)obj["role"] ?? string.Empty, (string)obj["content"] ?? string.Empty);
+                message.ToolCallId = (string)obj["tool_call_id"] ?? string.Empty;
+                message.Image = (string)obj["image"];
+                message.ImageMime = (string)obj["image_mime"];
+
+                JArray calls = obj["tool_calls"] as JArray;
+                if (calls != null)
+                {
+                    foreach (JObject call in calls)
+                    {
+                        message.ToolCalls.Add(new ToolRegistry.ToolCall
+                        {
+                            Id = (string)call["id"] ?? string.Empty,
+                            Name = (string)call["name"] ?? string.Empty,
+                            Arguments = (string)call["arguments"] ?? string.Empty
+                        });
+                    }
+                }
+                conversation.Add(message);
+            }
+            return conversation;
         }
 
         private static JObject ToJson(LLMClient.ChatMessage message)

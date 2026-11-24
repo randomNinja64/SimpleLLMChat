@@ -508,9 +508,7 @@ namespace SimpleLLMChatCLI.Tests
                             }
                             System.Threading.Thread.Sleep(50);
                         }
-                        JObject saved = JObject.Parse(md);
-                        TestAssert.Equal("LLM", (string)saved["assistant_name"], "assistant name");
-                        JArray messages = (JArray)saved["messages"];
+                        JArray messages = JArray.Parse(md);
                         TestAssert.Equal(4, messages.Count, "user, tool call, tool result, reply");
 
                         TestAssert.Equal("user", (string)messages[0]["role"], "user role");
@@ -528,6 +526,60 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.Equal("assistant", (string)messages[3]["role"], "reply role");
                         TestAssert.Equal("save-reply-ok", (string)messages[3]["content"], "reply");
                         TestAssert.True(messages[3]["tool_calls"] == null, "plain reply has no tool calls");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.load_json", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("after-load-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string chatPath = Path.Combine(ws.Path, "saved chat.json");
+                    File.WriteAllText(chatPath, new JArray
+                    {
+                        new JObject { ["role"] = "user", ["content"] = "loaded-question" },
+                        new JObject
+                        {
+                            ["role"] = "assistant",
+                            ["content"] = "",
+                            ["tool_calls"] = new JArray
+                            {
+                                new JObject { ["id"] = "call_old", ["name"] = "run_shell_command", ["arguments"] = "{\"command\":\"echo old\"}" }
+                            }
+                        },
+                        new JObject { ["role"] = "tool", ["content"] = "Command: run_shell_command\nExit Code: 0\nOutput:\nloaded-tool-output", ["tool_call_id"] = "call_old" },
+                        new JObject { ["role"] = "assistant", ["content"] = "loaded-answer" }
+                    }.ToString(), Encoding.UTF8);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("/load \"" + chatPath + "\"");
+                        TestAssert.True(WaitStdoutContains(cli, "loaded-answer", 10000), "replayed reply");
+                        TestAssert.Contains(cli.Stdout, "You: loaded-question", "replayed user");
+                        // A turn that opens with a tool call prints the name on its own line.
+                        TestAssert.Contains(cli.Stdout, "LLM:\n", "replayed assistant name");
+                        TestAssert.Contains(cli.Stdout, "loaded-tool-output", "replayed tool output");
+
+                        cli.WriteLine("next question");
+                        TestAssert.True(WaitStdoutContains(cli, "after-load-ok", 20000), "reply");
+                        JArray sent = (JArray)JObject.Parse(server.ChatBodies[0])["messages"];
+                        string history = sent.ToString();
+                        TestAssert.Contains(history, "loaded-question", "history user");
+                        TestAssert.Contains(history, "call_old", "history tool call");
+                        TestAssert.Contains(history, "loaded-answer", "history reply");
+                        TestAssert.Contains((string)sent[sent.Count - 1]["content"], "next question", "new message last");
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }

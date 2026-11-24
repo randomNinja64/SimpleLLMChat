@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using SimpleLLMChatCLI.RAG;
 
 namespace SimpleLLMChatCLI
@@ -35,6 +36,7 @@ namespace SimpleLLMChatCLI
             _commands["/buildindex"] = NoArguments(() => { RagHost.BuildIndex(); ChatOutput.MarkSeparated(); });
             _commands["/clearindex"] = NoArguments(() => { RagHost.ClearIndex(); ChatOutput.MarkSeparated(); });
             _commands["/save"] = Save;
+            _commands["/load"] = Load;
             _commands["/reasoning"] = SetReasoning;
         }
 
@@ -158,8 +160,7 @@ namespace SimpleLLMChatCLI
 
             try
             {
-                ChatTranscript.Save(
-                    arguments.Trim().Trim('"'), _conversation, _settings.AssistantName, _client.ReasoningEffort);
+                ChatTranscript.Save(arguments.Trim().Trim('"'), _conversation);
             }
             catch (Exception ex)
             {
@@ -167,6 +168,92 @@ namespace SimpleLLMChatCLI
             }
             ChatOutput.MarkSeparated();
             return true;
+        }
+
+        private bool Load(string arguments)
+        {
+            if (arguments == null)
+                return false;
+
+            List<LLMClient.ChatMessage> loaded;
+            try
+            {
+                loaded = ChatTranscript.Load(arguments.Trim().Trim('"'));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error loading chat: " + ex.Message);
+                ChatOutput.MarkSeparated();
+                return true;
+            }
+
+            _conversation.Clear();
+            _conversation.AddRange(loaded);
+            _client.PublishStatusTokens(
+                LLMClient.GetConversationCharacterCount(_conversation) + _client.GetBaseCharacterOverhead());
+
+            // No blank line before the replay: the GUI would show it at the top of the window.
+            if (!_showBanners)
+                ChatOutput.MarkSeparated();
+            Replay();
+            return true;
+        }
+
+        /// <summary>
+        /// Prints a loaded conversation through the same sink a live turn uses,
+        /// so it looks as it did when it ran.
+        /// </summary>
+        private void Replay()
+        {
+            StreamSink sink = null;
+            foreach (LLMClient.ChatMessage message in _conversation)
+            {
+                if (message.Role == "user")
+                {
+                    EndReplayedTurn(sink);
+                    sink = null;
+                    ChatOutput.StartBlock();
+                    ChatOutput.WriteLine("You: " + message.Content);
+                    continue;
+                }
+
+                if (sink == null)
+                    sink = StreamSink.For(_settings);
+
+                if (message.Role == "tool")
+                {
+                    sink.ToolOutput(message.Content, ReplayedExitCode(message.Content));
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(message.Content))
+                {
+                    sink.ContentStart();
+                    sink.Content(message.Content);
+                }
+                foreach (ToolRegistry.ToolCall call in message.ToolCalls ?? new List<ToolRegistry.ToolCall>())
+                {
+                    sink.ToolCallStarted(call.Name);
+                    sink.ToolCallArgs(call.Arguments);
+                }
+                sink.EndResponse();
+            }
+            EndReplayedTurn(sink);
+        }
+
+        private static void EndReplayedTurn(StreamSink sink)
+        {
+            if (sink == null)
+                return;
+            sink.EndResponse();
+            sink.EndLine();
+        }
+
+        // Tool results start with ToolRegistry.FormatCommandResult's "Exit Code: N" line.
+        private static int ReplayedExitCode(string content)
+        {
+            Match match = Regex.Match(content ?? string.Empty, @"^Exit Code: (-?\d+)", RegexOptions.Multiline);
+            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
         }
 
         private bool SetReasoning(string arguments)
@@ -215,6 +302,7 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| /clearindex: Clear knowledge index              |");
             ChatOutput.WriteLine("| /exit: Exit the application                     |");
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
+            ChatOutput.WriteLine("| /load <path>: Load a saved chat                 |");
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
             ChatOutput.WriteLine("| /reload: Reload configuration                   |");
             ChatOutput.WriteLine("| /save <path>: Save chat as JSON                 |");
