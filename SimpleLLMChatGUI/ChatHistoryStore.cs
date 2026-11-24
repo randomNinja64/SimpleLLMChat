@@ -11,27 +11,14 @@ namespace SimpleLLMChatGUI
     {
         public string Path { get; set; }
         public string Title { get; set; }
-        public DateTime Modified { get; set; }
 
-        public string WhenText
-        {
-            get
-            {
-                return Modified.Date == DateTime.Today
-                    ? Modified.ToShortTimeString()
-                    : Modified.ToShortDateString();
-            }
-        }
+        // Last save time: orders the list newest first. Not shown.
+        public DateTime Modified { get; set; }
     }
 
-    /// <summary>Lists the saved sessions in the chats folder beside the program.</summary>
+    /// <summary>Lists a workspace's saved sessions (see <see cref="ChatWorkspace"/>).</summary>
     public static class ChatHistoryStore
     {
-        public static string ChatsDirectory
-        {
-            get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chats"); }
-        }
-
         /// <summary>Saved sessions in <paramref name="directory"/>, newest first.</summary>
         public static List<ChatHistoryEntry> Read(string directory)
         {
@@ -61,7 +48,11 @@ namespace SimpleLLMChatGUI
         {
             try
             {
-                using (StreamReader stream = new StreamReader(path, Encoding.UTF8))
+                // Share everything, Delete included: the CLI's save swaps a new file
+                // over this one, and a plain open would block that swap.
+                using (FileStream file = new FileStream(
+                    path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (StreamReader stream = new StreamReader(file, Encoding.UTF8))
                 using (JsonTextReader reader = new JsonTextReader(stream))
                 {
                     if (!reader.Read() || reader.TokenType != JsonToken.StartObject)

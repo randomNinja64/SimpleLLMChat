@@ -9,7 +9,7 @@ using System.Windows.Threading;
 namespace SimpleLLMChatGUI
 {
     /// <summary>
-    /// The history sidebar: lists saved sessions and opens one on click.
+    /// The history sidebar: lists the current workspace's saved sessions and opens one on click.
     /// </summary>
     public partial class MainWindow
     {
@@ -18,6 +18,10 @@ namespace SimpleLLMChatGUI
 
         // The session the chat window shows, or null for an unsaved new chat.
         private string _currentChatPath;
+
+        // The folder the CLI's tools run in, from its ready line; the sidebar lists
+        // this workspace's chats only. Null until the CLI first reports it.
+        private string _currentWorkspace;
 
         private void historyButton_Toggled(object sender, RoutedEventArgs e)
         {
@@ -37,14 +41,43 @@ namespace SimpleLLMChatGUI
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => scroll.ScrollToEnd()));
         }
 
+        // The CLI saved the session after a turn: a new chat now has its file,
+        // and its title and position in the list may have changed.
+        private void OnSessionSaved(string path)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _currentChatPath = path;
+                if (historyPanel.Visibility == Visibility.Visible)
+                    RefreshHistory();
+            }));
+        }
+
+        // Sent with every ready line. It changes when a loaded chat switches to the
+        // workspace it was made in, and back on New Chat.
+        private void OnWorkspaceReceived(string workspace)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (ChatWorkspace.SamePath(workspace, _currentWorkspace))
+                    return;
+                _currentWorkspace = workspace;
+                if (historyPanel.Visibility == Visibility.Visible)
+                    RefreshHistory();
+            }));
+        }
+
         private void RefreshHistory()
         {
             if (historyList.ItemsSource == null)
                 historyList.ItemsSource = _historyEntries;
 
             _historyEntries.Clear();
-            foreach (ChatHistoryEntry entry in ChatHistoryStore.Read(ChatHistoryStore.ChatsDirectory))
-                _historyEntries.Add(entry);
+            if (_currentWorkspace != null)
+            {
+                foreach (ChatHistoryEntry entry in ChatHistoryStore.Read(ChatWorkspace.DirectoryFor(_currentWorkspace)))
+                    _historyEntries.Add(entry);
+            }
 
             historyEmptyText.Visibility = _historyEntries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             SelectCurrentChat();

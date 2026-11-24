@@ -13,6 +13,7 @@ public sealed class CliProcess : IDisposable
     private readonly StringBuilder _stdout = new StringBuilder();
     private readonly StringBuilder _stderr = new StringBuilder();
     private readonly object _stdoutGate = new object();
+    private readonly object _stderrGate = new object();
     private readonly Thread _outThread;
     private readonly Thread _errThread;
     private bool _disposed;
@@ -47,7 +48,7 @@ public sealed class CliProcess : IDisposable
         {
             IsBackground = true
         };
-        _errThread = new Thread(() => Drain(_process.StandardError, _stderr, null))
+        _errThread = new Thread(() => Drain(_process.StandardError, _stderr, _stderrGate))
         {
             IsBackground = true
         };
@@ -64,6 +65,11 @@ public sealed class CliProcess : IDisposable
     public string Stdout
     {
         get { lock (_stdoutGate) return _stdout.ToString(); }
+    }
+
+    public string Stderr
+    {
+        get { lock (_stderrGate) return _stderr.ToString(); }
     }
 
     public bool WaitForExit(int timeoutMs)

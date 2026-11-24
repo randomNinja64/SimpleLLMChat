@@ -19,7 +19,7 @@ namespace SimpleLLMChatGUI
         private ContextMenu reasoningEffortMenu;
         private readonly ObservableCollection<ChatTurn> _chatTurns = new ObservableCollection<ChatTurn>();
         private ChatTurn _streamingTurn;
-        private string _pendingLoadPath;
+        private string _pendingCommand;
 
         private const double ChatTurnGapMin = 8;
         private const double ChatTurnGapMax = 24;
@@ -175,6 +175,8 @@ namespace SimpleLLMChatGUI
             processHandler.GenerationComplete += OnGenerationComplete;
             processHandler.ApprovalRequested += OnApprovalRequested;
             processHandler.StatusReceived += OnStatusReceived;
+            processHandler.SessionSaved += OnSessionSaved;
+            processHandler.WorkspaceReceived += OnWorkspaceReceived;
 
             if (tokenTracker != null)
                 tokenTracker.Reset();
@@ -308,11 +310,11 @@ namespace SimpleLLMChatGUI
                 if (IsMarkdownParsingEnabled())
                     ApplyMarkdown();
 
-                if (_pendingLoadPath != null)
+                if (_pendingCommand != null)
                 {
-                    string path = _pendingLoadPath;
-                    _pendingLoadPath = null;
-                    if (processHandler != null && processHandler.SendInput("/load \"" + path + "\""))
+                    string command = _pendingCommand;
+                    _pendingCommand = null;
+                    if (processHandler != null && processHandler.SendInput(command))
                     {
                         SetInputControlsEnabled(false);
                         return;
@@ -592,6 +594,8 @@ namespace SimpleLLMChatGUI
                 MessageBox.Show("Failed to save chat.");
         }
 
+        // Copies the chat into the current workspace (the CLI's /import), so it
+        // shows in this workspace's history; the original file is untouched.
         private void ImportChat()
         {
             Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog();
@@ -599,18 +603,25 @@ namespace SimpleLLMChatGUI
             if (dialog.ShowDialog(this) != true)
                 return;
 
-            LoadChat(dialog.FileName);
+            // The copy's path arrives with the CLI's first session message.
+            RestartChat("/import \"" + dialog.FileName + "\"", null);
         }
 
         private void LoadChat(string path)
         {
-            // Sent once the new CLI is ready: chat output published before the
-            // GUI connects to the pipe is lost.
-            _pendingLoadPath = path;
-            newChatButton_Click(this, new RoutedEventArgs());
+            RestartChat("/load \"" + path + "\"", path);
         }
 
         private void newChatButton_Click(object sender, RoutedEventArgs e)
+        {
+            RestartChat(null, null);
+        }
+
+        /// <summary>
+        /// Starts a fresh CLI, then sends <paramref name="command"/> once it is ready:
+        /// chat output published before the GUI connects to the pipe is lost.
+        /// </summary>
+        private void RestartChat(string command, string chatPath)
         {
             // Kill running process first to stop any new output
             if (processHandler != null)
@@ -619,8 +630,8 @@ namespace SimpleLLMChatGUI
                 processHandler = null;
             }
 
-            // LoadChat comes through here with its path pending; New Chat has none.
-            _currentChatPath = _pendingLoadPath;
+            _pendingCommand = command;
+            _currentChatPath = chatPath;
             if (historyPanel.Visibility == Visibility.Visible)
                 SelectCurrentChat();
 

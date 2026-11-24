@@ -97,6 +97,9 @@
     <Compile Include="..\..\Shared\ChatBlockDisplayMode.cs">
       <Link>Shared\ChatBlockDisplayMode.cs</Link>
     </Compile>
+    <Compile Include="..\..\Shared\ChatWorkspace.cs">
+      <Link>Shared\ChatWorkspace.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
     </Compile>
@@ -114,6 +117,9 @@
     </Compile>
     <Compile Include="..\..\Shared\ChatPipe\ChatPipe.Indexing.cs">
       <Link>Shared\ChatPipe\ChatPipe.Indexing.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Shared\ChatPipe\ChatPipe.Session.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Session.cs</Link>
     </Compile>
     <Compile Include="..\..\Shared\ChatPipe\ChatPipe.Ready.cs">
       <Link>Shared\ChatPipe\ChatPipe.Ready.cs</Link>
@@ -136,6 +142,9 @@
     </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ChatPipeServer.cs">
       <Link>CLI\ChatPipeServer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\SimpleLLMChatCLI\ChatHistory.cs">
+      <Link>CLI\ChatHistory.cs</Link>
     </Compile>
     <Compile Include="..\..\SimpleLLMChatCLI\ChatSession.cs">
       <Link>CLI\ChatSession.cs</Link>

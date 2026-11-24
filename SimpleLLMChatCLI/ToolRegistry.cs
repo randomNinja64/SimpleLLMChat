@@ -53,9 +53,9 @@ namespace SimpleLLMChatCLI
         // Config values to pass to tool executables
         private readonly ConfigHandler config;
 
-        // Where tools run when no working directory is configured: the folder this process
-        // was started in (the shell's folder, or a shortcut's "Start in"), or the user's
-        // profile folder when that is just the app folder.
+        // Where tools run (the workspace): the folder this process was started in (the
+        // shell's folder, or a shortcut's "Start in"), or the user's profile folder when
+        // that is just the app folder.
         private static readonly string StartDirectory = DefaultWorkingDirectory(
             Environment.CurrentDirectory,
             AppDomain.CurrentDomain.BaseDirectory,
@@ -68,25 +68,12 @@ namespace SimpleLLMChatCLI
         /// </summary>
         public static string DefaultWorkingDirectory(string startDirectory, string appDirectory, string profileDirectory)
         {
-            string start = TrimDirectory(startDirectory);
-            bool isAppFolder = string.Equals(start, TrimDirectory(appDirectory), StringComparison.OrdinalIgnoreCase);
-            if (isAppFolder && !string.IsNullOrEmpty(profileDirectory) && Directory.Exists(profileDirectory))
-                return TrimDirectory(profileDirectory);
+            string start = ChatWorkspace.Normalize(startDirectory);
+            if (ChatWorkspace.SamePath(start, appDirectory)
+                && !string.IsNullOrEmpty(profileDirectory) && Directory.Exists(profileDirectory))
+                return ChatWorkspace.Normalize(profileDirectory);
             return start;
         }
-
-        // Full path without a trailing separator (a drive root keeps its own).
-        private static string TrimDirectory(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return path;
-            string full = Path.GetFullPath(path);
-            string root = Path.GetPathRoot(full);
-            return full.Length > root.Length ? full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) : full;
-        }
-
-        // The last unusable workingdirectory value reported, so it is reported once.
-        private string reportedBadWorkingDirectory;
 
         public ToolRegistry(ConfigHandler config)
         {
@@ -358,34 +345,20 @@ namespace SimpleLLMChatCLI
         }
 
         /// <summary>
-        /// The folder tools run in: the workingdirectory setting (environment variables
-        /// expanded; a relative path is taken from the app folder, like the other folder
-        /// settings), or the default (see <see cref="DefaultWorkingDirectory"/>) when the
-        /// setting is empty or names a folder that does not exist.
+        /// A loaded chat's workspace, which wins over the setting for that session so
+        /// the chat continues where it was made. Null for a new chat.
+        /// </summary>
+        public string WorkingDirectoryOverride { get; set; }
+
+        /// <summary>
+        /// The folder tools run in: <see cref="WorkingDirectoryOverride"/> when set and
+        /// still there, else the folder the process started in (see
+        /// <see cref="DefaultWorkingDirectory"/>).
         /// </summary>
         public string ResolveWorkingDirectory()
         {
-            string configured = config != null ? (config.Get(AppSettings.WorkingDirectory) ?? "").Trim() : "";
-            if (string.IsNullOrEmpty(configured))
-                return StartDirectory;
-
-            try
-            {
-                string path = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                    Environment.ExpandEnvironmentVariables(configured)));
-                if (Directory.Exists(path))
-                    return path;
-            }
-            catch
-            {
-                // Not a valid path: reported below like a missing folder.
-            }
-
-            if (!string.Equals(reportedBadWorkingDirectory, configured, StringComparison.OrdinalIgnoreCase))
-            {
-                reportedBadWorkingDirectory = configured;
-                Console.Error.WriteLine("Working directory '" + configured + "' not found; using " + StartDirectory);
-            }
+            if (!string.IsNullOrEmpty(WorkingDirectoryOverride) && Directory.Exists(WorkingDirectoryOverride))
+                return WorkingDirectoryOverride;
             return StartDirectory;
         }
 

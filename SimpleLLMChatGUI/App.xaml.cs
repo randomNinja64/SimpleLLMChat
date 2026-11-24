@@ -28,7 +28,7 @@ namespace SimpleLLMChatGUI
         /// <summary>
         /// The folder the app was started in (a shortcut's "Start in", or the shell's folder),
         /// captured at startup because file dialogs can change the current directory later.
-        /// The CLI is started here, so tools use it when no working directory is configured.
+        /// The CLI is started here, so it is the workspace tools run in and chats are grouped by.
         /// </summary>
         public static readonly string StartDirectory = Environment.CurrentDirectory;
 

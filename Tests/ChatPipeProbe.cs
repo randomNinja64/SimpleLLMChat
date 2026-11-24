@@ -145,6 +145,63 @@ public sealed class ChatPipeProbe : IDisposable
         return sb.Append('\n').ToString();
     }
 
+    /// <summary>Paths from every session (auto-save) line so far, in order.</summary>
+    public System.Collections.Generic.List<string> Sessions()
+    {
+        var paths = new System.Collections.Generic.List<string>();
+        lock (_gate)
+        {
+            foreach (string line in _lines)
+            {
+                string path;
+                if (ChatPipe.TryParseSessionLine(line, out path))
+                    paths.Add(path);
+            }
+        }
+        return paths;
+    }
+
+    public bool WaitForSessions(int count, int timeoutMs)
+    {
+        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Sessions().Count >= count)
+                return true;
+            Thread.Sleep(25);
+        }
+        return false;
+    }
+
+    /// <summary>The workspace named by the latest ready line, or null.</summary>
+    public string LastWorkspace()
+    {
+        string last = null;
+        lock (_gate)
+        {
+            foreach (string line in _lines)
+            {
+                string workspace;
+                if (ChatPipe.TryParseReadyLine(line, out workspace))
+                    last = workspace;
+            }
+        }
+        return last;
+    }
+
+    /// <summary>Waits until the latest ready line names <paramref name="workspace"/>.</summary>
+    public bool WaitForWorkspace(string workspace, int timeoutMs)
+    {
+        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (string.Equals(LastWorkspace(), workspace, StringComparison.OrdinalIgnoreCase))
+                return true;
+            Thread.Sleep(25);
+        }
+        return false;
+    }
+
     public bool WaitForReady(int timeoutMs)
     {
         return WaitFor(line => ChatPipe.TryParseReadyLine(line), timeoutMs);

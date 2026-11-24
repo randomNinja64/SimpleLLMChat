@@ -75,6 +75,9 @@
     <Compile Include="..\..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>
+    <Compile Include="..\..\Shared\ChatWorkspace.cs">
+      <Link>Shared\ChatWorkspace.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
     </Compile>

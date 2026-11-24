@@ -178,10 +178,10 @@
                              Text="{Binding ContextWindowSize, UpdateSourceTrigger=PropertyChanged}"
                              Height="23"/>
 
-                    <!-- Working Directory -->
-                    <Label Content="Working Directory (Default: start folder, or %USERPROFILE% if started from the app folder):"/>
-                    <TextBox x:Name="WorkingDirectoryTextBox"
-                             Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                    <!-- Chat History -->
+                    <Label Content="Chat History (sessions to keep, 0 = off):"/>
+                    <TextBox x:Name="ChatHistoryLimitTextBox"
+                             Text="{Binding ChatHistoryLimit, UpdateSourceTrigger=PropertyChanged}"
                              Height="23"/>
 
                 </StackPanel>

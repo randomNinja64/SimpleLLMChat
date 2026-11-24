@@ -412,6 +412,17 @@ namespace SimpleLLMChatCLI.Tests
             {
                 TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.ReadyLine), "ready");
                 TestAssert.True(!ChatPipe.TryParseReadyLine("STATUS tokens=1"), "not ready");
+                string workspace;
+                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.FormatReady(@"C:\My Work\app"), out workspace), "ready with workspace");
+                TestAssert.Equal(@"C:\My Work\app", workspace, "workspace round trip");
+                TestAssert.True(ChatPipe.TryParseReadyLine(ChatPipe.ReadyLine, out workspace) && workspace == null, "bare ready");
+                TestAssert.True(!ChatPipe.TryParseReadyLine("STATUS readyish"), "prefix only");
+                TestAssert.True(ChatWorkspace.FolderName(@"C:\Work\App").StartsWith("App-"), "folder name");
+                // Folder names differ only in case, which Windows treats as the same folder.
+                TestAssert.True(string.Equals(ChatWorkspace.FolderName(@"C:\Work\App"), ChatWorkspace.FolderName(@"c:\work\app\"),
+                    StringComparison.OrdinalIgnoreCase), "case and slash insensitive");
+                TestAssert.True(ChatWorkspace.FolderName(@"C:\Work\App") != ChatWorkspace.FolderName(@"D:\Work\App"), "same name, different folder");
+                TestAssert.True(ChatWorkspace.FolderName(@"C:\").StartsWith("C-"), "drive root");
             });
 
             TestRunner.Run("ChatPipe.approval_roundtrip", () =>
@@ -640,6 +651,288 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(WaitStdoutContains(cli, "second-reply-ok", 20000), "second reply");
                         cli.WriteLine("/save \"" + resavedPath + "\"");
                         TestAssert.Equal("kept title", (string)WaitForSavedChat(resavedPath)["title"], "kept title");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.autosave", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply-ok");
+                    server.EnqueueContent("second-reply-ok");
+                    server.EnqueueContent("third-reply-ok");
+                    // No chathistorylimit key: the default keeps history on.
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string project = UseProjectWorkspace(ws.Path, "project");
+                    string chats = Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(project));
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        project))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        TestAssert.Equal(project, probe.LastWorkspace(), "ready line names the workspace");
+
+                        cli.WriteLine("first question");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved after first turn");
+                        string session = probe.Sessions()[0];
+                        TestAssert.Equal(chats, Path.GetDirectoryName(session), "in the workspace's chats folder");
+                        JObject saved = WaitForSavedChat(session);
+                        TestAssert.Equal("first question", (string)saved["title"], "title");
+                        TestAssert.Equal(project, (string)saved["workingDirectory"], "workspace recorded");
+                        TestAssert.Equal(2, ((JArray)saved["messages"]).Count, "first turn");
+
+                        // A reader holding the file open (as the sidebar does) must not block the save.
+                        using (new FileStream(session, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                        {
+                            cli.WriteLine("second question");
+                            TestAssert.True(probe.WaitForSessions(2, 20000), "saved after second turn");
+                        }
+                        TestAssert.Equal(session, probe.Sessions()[1], "same file");
+                        TestAssert.Equal(4, ((JArray)WaitForSavedChat(session)["messages"]).Count, "both turns");
+                        TestAssert.Equal(0, Directory.GetFiles(chats, "*.tmp").Length, "no temp file left");
+
+                        cli.WriteLine("/clear");
+                        cli.WriteLine("third question");
+                        TestAssert.True(probe.WaitForSessions(3, 20000), "saved after third turn");
+                        string next = probe.Sessions()[2];
+                        TestAssert.True(!string.Equals(session, next, StringComparison.OrdinalIgnoreCase), "new chat, new file");
+                        TestAssert.Equal("third question", (string)WaitForSavedChat(next)["title"], "new title");
+                        TestAssert.Equal(2, Directory.GetFiles(chats, "*.json").Length, "two sessions");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.autosave_prune", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("prune-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    SetSystemIniValue(ws.Path, "chathistorylimit=2");
+                    string project = UseProjectWorkspace(ws.Path, "project");
+
+                    string chats = Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(project));
+                    Directory.CreateDirectory(chats);
+                    // The limit is per workspace: another workspace's old chats stay.
+                    string otherChats = Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(Path.Combine(ws.Path, "other")));
+                    Directory.CreateDirectory(otherChats);
+                    string otherOld = Path.Combine(otherChats, "other-old.json");
+                    File.WriteAllText(otherOld, "{\"title\":\"x\",\"messages\":[]}");
+                    File.SetLastWriteTimeUtc(otherOld, DateTime.UtcNow.AddDays(-30));
+                    string oldest = Path.Combine(chats, "oldest.json");
+                    string older = Path.Combine(chats, "older.json");
+                    string newer = Path.Combine(chats, "newer.json");
+                    foreach (string path in new[] { oldest, older, newer })
+                        File.WriteAllText(path, "{\"title\":\"x\",\"messages\":[]}");
+                    File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddDays(-3));
+                    File.SetLastWriteTimeUtc(older, DateTime.UtcNow.AddDays(-2));
+                    File.SetLastWriteTimeUtc(newer, DateTime.UtcNow.AddDays(-1));
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        project))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("prune me");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved");
+
+                        TestAssert.True(File.Exists(probe.Sessions()[0]), "current kept");
+                        TestAssert.True(File.Exists(newer), "newest old session kept");
+                        TestAssert.True(!File.Exists(older), "older pruned");
+                        TestAssert.True(!File.Exists(oldest), "oldest pruned");
+                        TestAssert.True(File.Exists(otherOld), "other workspace untouched");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.autosave_off", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("off-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    SetSystemIniValue(ws.Path, "chathistorylimit=0");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("do not save");
+                        TestAssert.True(WaitStdoutContains(cli, "off-reply-ok", 20000), "reply");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                        TestAssert.Equal(0, probe.Sessions().Count, "no session line");
+                        TestAssert.True(!Directory.Exists(Path.Combine(ws.Path, "chats")), "no chats folder");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.autosave_after_load", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("continued-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string external = Path.Combine(ws.Path, "elsewhere", "kept chat.json");
+                    Directory.CreateDirectory(Path.GetDirectoryName(external));
+                    File.WriteAllText(external, new JObject
+                    {
+                        ["title"] = "kept chat",
+                        ["messages"] = new JArray
+                        {
+                            new JObject { ["role"] = "user", ["content"] = "earlier question" },
+                            new JObject { ["role"] = "assistant", ["content"] = "earlier answer" }
+                        }
+                    }.ToString(), Encoding.UTF8);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("/load \"" + external + "\"");
+                        TestAssert.True(WaitStdoutContains(cli, "earlier answer", 10000), "replayed");
+                        cli.WriteLine("follow-up question");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved");
+
+                        TestAssert.Equal(external, probe.Sessions()[0], "saves back to the loaded file");
+                        JObject saved = WaitForSavedChat(external);
+                        TestAssert.Equal("kept chat", (string)saved["title"], "title kept");
+                        TestAssert.Equal(4, ((JArray)saved["messages"]).Count, "turn appended");
+                        string chats = Path.Combine(ws.Path, "chats");
+                        TestAssert.True(!Directory.Exists(chats) || Directory.GetFiles(chats).Length == 0, "nothing new in chats");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.load_switches_workspace", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("in-other-workspace-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string current = UseProjectWorkspace(ws.Path, "current");
+                    string other = Path.Combine(ws.Path, "other");
+                    Directory.CreateDirectory(other);
+                    string chatPath = WriteChatFile(ws.Path, "other chat.json", "other chat", other);
+                    string gonePath = WriteChatFile(ws.Path, "gone chat.json", "gone chat", Path.Combine(ws.Path, "deleted"));
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        current))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        TestAssert.Equal(current, probe.LastWorkspace(), "starts in the setting's workspace");
+
+                        cli.WriteLine("/load \"" + chatPath + "\"");
+                        TestAssert.True(probe.WaitForWorkspace(other, 10000), "switched to the chat's workspace");
+                        cli.WriteLine("continue there");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved");
+                        TestAssert.Equal(other, (string)WaitForSavedChat(chatPath)["workingDirectory"], "workspace kept");
+
+                        // A chat whose folder is gone is imported into the current workspace.
+                        string goneText = File.ReadAllText(gonePath);
+                        cli.WriteLine("/load \"" + gonePath + "\"");
+                        TestAssert.True(WaitStderrContains(cli, "imported into", 10000), "missing workspace reported");
+                        TestAssert.True(probe.WaitForWorkspace(current, 10000), "falls back to the setting");
+                        TestAssert.True(probe.WaitForSessions(2, 10000), "copy saved");
+                        string copy = probe.Sessions()[1];
+                        TestAssert.Equal(
+                            Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(current)),
+                            Path.GetDirectoryName(copy), "copied into the current workspace");
+                        JObject imported = WaitForSavedChat(copy);
+                        TestAssert.Equal(current, (string)imported["workingDirectory"], "rewritten to this workspace");
+                        TestAssert.Equal("gone chat", (string)imported["title"], "title kept");
+                        TestAssert.Equal(goneText, File.ReadAllText(gonePath), "original untouched");
+
+                        cli.WriteLine("/clear");
+                        TestAssert.True(probe.WaitForWorkspace(current, 10000), "new chat back in the setting's workspace");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.import", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("after-import-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string current = UseProjectWorkspace(ws.Path, "current");
+                    string other = Path.Combine(ws.Path, "other");
+                    Directory.CreateDirectory(other);
+                    string original = WriteChatFile(ws.Path, "shared chat.json", "shared chat", other);
+                    string originalText = File.ReadAllText(original);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        current))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("/import \"" + original + "\"");
+                        TestAssert.True(probe.WaitForSessions(1, 10000), "copy saved on import");
+
+                        string copy = probe.Sessions()[0];
+                        TestAssert.Equal(
+                            Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(current)),
+                            Path.GetDirectoryName(copy), "copied into the current workspace");
+                        JObject saved = WaitForSavedChat(copy);
+                        TestAssert.Equal("shared chat", (string)saved["title"], "title kept");
+                        TestAssert.Equal(current, (string)saved["workingDirectory"], "moved to this workspace");
+                        TestAssert.Equal(2, ((JArray)saved["messages"]).Count, "messages copied");
+                        TestAssert.True(WaitStdoutContains(cli, "earlier answer", 10000), "replayed");
+                        TestAssert.Equal(current, probe.LastWorkspace(), "workspace not switched");
+
+                        cli.WriteLine("next question");
+                        TestAssert.True(probe.WaitForSessions(2, 20000), "saved again");
+                        TestAssert.Equal(copy, probe.Sessions()[1], "continues in the copy");
+                        TestAssert.Equal(originalText, File.ReadAllText(original), "original untouched");
 
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
@@ -1340,6 +1633,18 @@ namespace SimpleLLMChatCLI.Tests
                 Encoding.UTF8);
         }
 
+        internal static bool WaitStderrContains(CliProcess cli, string needle, int timeoutMs)
+        {
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (cli.Stderr.IndexOf(needle, StringComparison.Ordinal) >= 0)
+                    return true;
+                System.Threading.Thread.Sleep(50);
+            }
+            return false;
+        }
+
         internal static bool WaitStdoutContains(CliProcess cli, string needle, int timeoutMs)
         {
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
@@ -1350,6 +1655,40 @@ namespace SimpleLLMChatCLI.Tests
                 System.Threading.Thread.Sleep(50);
             }
             return false;
+        }
+
+        /// <summary>
+        /// Creates a folder in the test workspace for the CLI to start in: the folder
+        /// it starts in is its workspace (the app folder itself maps to the profile).
+        /// </summary>
+        internal static string UseProjectWorkspace(string dir, string name)
+        {
+            string project = Path.Combine(dir, name);
+            Directory.CreateDirectory(project);
+            return project;
+        }
+
+        internal static string WriteChatFile(string dir, string fileName, string title, string workingDirectory)
+        {
+            string path = Path.Combine(dir, fileName);
+            File.WriteAllText(path, new JObject
+            {
+                ["title"] = title,
+                ["workingDirectory"] = workingDirectory,
+                ["messages"] = new JArray
+                {
+                    new JObject { ["role"] = "user", ["content"] = "earlier question" },
+                    new JObject { ["role"] = "assistant", ["content"] = "earlier answer" }
+                }
+            }.ToString(), Encoding.UTF8);
+            return path;
+        }
+
+        /// <summary>Adds a key=value line to the [System] section of the workspace's LLMSettings.ini.</summary>
+        internal static void SetSystemIniValue(string dir, string line)
+        {
+            string path = Path.Combine(dir, "LLMSettings.ini");
+            File.WriteAllText(path, File.ReadAllText(path).Replace("[System]\r\n", "[System]\r\n" + line + "\r\n"));
         }
 
         // Retries the parse: the CLI may still be writing the file.

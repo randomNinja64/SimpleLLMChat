@@ -19,6 +19,8 @@ namespace SimpleLLMChatGUI
         public event Action GenerationComplete;
         public event Func<string, string, string, bool> ApprovalRequested;
         public event Action<int> StatusReceived;
+        public event Action<string> SessionSaved;
+        public event Action<string> WorkspaceReceived;
 
         private ChatPipeClient chatPipeClient;
 
@@ -40,7 +42,7 @@ namespace SimpleLLMChatGUI
                 llmProcess = new Process();
                 llmProcess.StartInfo.FileName = executablePath;
                 // The CLI finds its own files from its EXE folder; its current directory is
-                // where tools run when no working directory is configured.
+                // its workspace: where tools run and which chat history it uses.
                 llmProcess.StartInfo.WorkingDirectory = App.StartDirectory;
                 llmProcess.StartInfo.UseShellExecute = false;
                 llmProcess.StartInfo.RedirectStandardOutput = true;
@@ -63,6 +65,8 @@ namespace SimpleLLMChatGUI
                 chatPipeClient.TextReceived += OutputText;
                 chatPipeClient.BlockStarted += OnChatPipeBlockStarted;
                 chatPipeClient.BlockEnded += OnChatPipeBlockEnded;
+                chatPipeClient.SessionReceived += OnChatPipeSession;
+                chatPipeClient.WorkspaceReceived += OnChatPipeWorkspace;
                 chatPipeClient.Start();
 
                 // Chat output arrives on the chat pipe. Stdout is only drained
@@ -111,6 +115,20 @@ namespace SimpleLLMChatGUI
                 handler();
         }
 
+        private void OnChatPipeSession(string path)
+        {
+            Action<string> handler = SessionSaved;
+            if (handler != null)
+                handler(path);
+        }
+
+        private void OnChatPipeWorkspace(string workspace)
+        {
+            Action<string> handler = WorkspaceReceived;
+            if (handler != null)
+                handler(workspace);
+        }
+
         private void OnChatPipeReady()
         {
             Action handler = GenerationComplete;
@@ -143,6 +161,8 @@ namespace SimpleLLMChatGUI
                 chatPipeClient.TextReceived -= OutputText;
                 chatPipeClient.BlockStarted -= OnChatPipeBlockStarted;
                 chatPipeClient.BlockEnded -= OnChatPipeBlockEnded;
+                chatPipeClient.SessionReceived -= OnChatPipeSession;
+                chatPipeClient.WorkspaceReceived -= OnChatPipeWorkspace;
                 chatPipeClient.Dispose();
                 chatPipeClient = null;
             }
@@ -302,6 +322,8 @@ namespace SimpleLLMChatGUI
             GenerationComplete = null;
             ApprovalRequested = null;
             StatusReceived = null;
+            SessionSaved = null;
+            WorkspaceReceived = null;
             if (llmProcess != null && !llmProcess.HasExited)
             {
                 try { llmProcess.Kill(); }

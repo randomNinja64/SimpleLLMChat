@@ -280,33 +280,27 @@ namespace SimpleLLMChatCLI.Tests
                     TestAssert.Equal(work, ToolRegistry.DefaultWorkingDirectory(work, ws.Path, profile), "other folder kept");
                     TestAssert.Equal(ws.Path, ToolRegistry.DefaultWorkingDirectory(ws.Path, ws.Path, ws.Combine("no-profile")), "missing profile -> start folder");
 
-                    Func<string, string> runIn = setting =>
+                    File.WriteAllText(ini, "[System]\r\n", Encoding.UTF8);
+                    ToolRegistry registry = new ToolRegistry(new ConfigHandler(ini));
+                    registry.LoadToolsFromDirectory(toolsDir);
+                    Func<string> runCwd = () =>
                     {
-                        File.WriteAllText(ini, "[System]\r\nworkingdirectory=" + setting + "\r\n", Encoding.UTF8);
-                        ToolRegistry registry = new ToolRegistry(new ConfigHandler(ini));
-                        registry.LoadToolsFromDirectory(toolsDir);
                         string content;
                         int exitCode;
                         registry.ExecuteToolCall("fix_cwd", "{}", out content, out exitCode);
-                        TestAssert.Equal(0, exitCode, "exit for '" + setting + "'");
+                        TestAssert.Equal(0, exitCode, "exit");
                         return content.Substring(content.IndexOf("Output:\n", StringComparison.Ordinal) + 8).Trim();
                     };
 
-                    TestAssert.Equal(work, runIn(work), "configured folder");
-                    TestAssert.Equal(startDir, runIn(""), "empty: the folder the host started in");
+                    TestAssert.Equal(startDir, runCwd(), "the folder the host started in");
 
-                    TextWriter originalError = Console.Error;
-                    StringWriter error = new StringWriter();
-                    Console.SetError(error);
-                    try
-                    {
-                        TestAssert.Equal(startDir, runIn(ws.Combine("no-such-dir")), "missing folder falls back");
-                    }
-                    finally
-                    {
-                        Console.SetError(originalError);
-                    }
-                    TestAssert.Contains(error.ToString(), "no-such-dir", "missing folder reported");
+                    // A loaded chat's workspace wins for that session.
+                    registry.WorkingDirectoryOverride = work;
+                    TestAssert.Equal(work, runCwd(), "override");
+                    registry.WorkingDirectoryOverride = ws.Combine("no-such-dir");
+                    TestAssert.Equal(startDir, runCwd(), "missing override folder falls back");
+                    registry.WorkingDirectoryOverride = null;
+                    TestAssert.Equal(startDir, runCwd(), "cleared");
                 }
             });
 

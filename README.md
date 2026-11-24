@@ -87,11 +87,11 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 
 **System**
 - `apikey`: API key (if required by model provider)
+- `chathistorylimit`: Number of previous chat sessions to keep (per working directory); oldest chats deleted first; stored in `chats` next to application.
 - `llmserver`: Base URL of the OpenAI-compatible endpoint (e.g `http://127.0.0.1:8080/v1`)
 - `model`: Model name to use for text generation (if supported by the endpoint)
 - `sysprompt`: System prompt for the LLM
 - `contextWindowSize`: If known, can be set here to enable automatic context summarization when context fills
-- `workingdirectory`: Current working directory for the application. Tool calls start in this folder. Environment variables are supported as well. This can be set either in the config or by changing the directory the application starts in; if neither is set, `%USERPROFILE%` is used.
 **Tools**
 - `autoapprovaltools`: Comma-separated list of tools that request approval from a Jev-compatible endpoint before running
 - `jevapikey`: API key if required for your Jev-compatible server
@@ -111,6 +111,8 @@ Tool-specific configuration options for the included tools are available in the 
 - To adjust application settings, select `Options`.
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
 - To start a new chat, press `New Chat`.
+- To open a previous chat, press the history button icon in the upper left and select a chat in the sidebar.
+- To set a working directory, create a shortcut to `SimpleLLMChatGUI.exe` and set its "Start in" directory to that folder.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
 - To cancel the currently generating response, press `Stop` (shown while generating).
 
@@ -122,7 +124,8 @@ Interactive mode provides the following commands:
 - `/clearindex`: Clears the on-disk knowledge index
 - `/exit`: Exits the application
 - `/image`: Sends an image to the model alongside the next message, used as `/image "path" prompt`
-- `/load <path>`: Loads a chat from JSON and continues from it.
+- `/import <path>`: Loads a chat, copying it into your current working directory.
+- `/load <path>`: Loads a chat, changing your working directory to its working directory.
 - `/reasoning`: Sets reasoning effort for supported models (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); `/reasoning` alone uses the API default
 - `/reload`: Reloads configuration in place (doesn't clear chat)
 - `/save <path>`: Saves the chat as JSON

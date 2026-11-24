@@ -22,6 +22,11 @@ namespace SimpleLLMChatCLI
         // can carry merged RAG context, or be replaced by a summary.
         private string _title;
 
+        // Where this session auto-saves: a new file in its workspace's chats folder,
+        // or the file /load read from (wherever it is). Null until there is one.
+        // The workspace itself is _registry.ResolveWorkingDirectory().
+        private string _sessionPath;
+
         // A handler gets the text after the command name, or null when there is none.
         // It returns false to have the line sent to the model as a message instead.
         private readonly Dictionary<string, Func<string, bool>> _commands =
@@ -41,6 +46,7 @@ namespace SimpleLLMChatCLI
             _commands["/clearindex"] = NoArguments(() => { RagHost.ClearIndex(); ChatOutput.MarkSeparated(); });
             _commands["/save"] = Save;
             _commands["/load"] = Load;
+            _commands["/import"] = Import;
             _commands["/reasoning"] = SetReasoning;
         }
 
@@ -55,7 +61,7 @@ namespace SimpleLLMChatCLI
                 // how the previous turn's output ended.
                 ChatOutput.StartBlock();
                 ChatOutput.Write("You: ", false);
-                Program.Pipe.PublishDiscrete(ChatPipe.ReadyLine);
+                Program.Pipe.PublishDiscrete(ChatPipe.FormatReady(_registry.ResolveWorkingDirectory()));
                 string userInput = Program.DeferredInput.Count > 0 ? Program.DeferredInput.Dequeue() : Console.ReadLine();
                 ChatOutput.EndInputLine();
 
@@ -127,15 +133,42 @@ namespace SimpleLLMChatCLI
             if (_title == null)
                 _title = ChatTranscript.MakeTitle(textPrompt);
 
+            int historyLimit = Program.Config.Get(AppSettings.ChatHistoryLimit);
+            if (_sessionPath == null && historyLimit > 0)
+                _sessionPath = ChatHistory.NewSessionPath(_registry.ResolveWorkingDirectory());
+
             Cancel.Begin();
             _client.ProcessConversation(_conversation, textPrompt, imageBase64, imageMime, _settings);
             Cancel.End();
+
+            // After every turn, finished or stopped.
+            AutoSave(historyLimit);
+        }
+
+        private void AutoSave(int historyLimit)
+        {
+            if (historyLimit <= 0 || _sessionPath == null || _conversation.Count == 0)
+                return;
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_sessionPath));
+                ChatTranscript.Save(_sessionPath, _title, _registry.ResolveWorkingDirectory(), _conversation);
+                ChatHistory.Prune(historyLimit, _sessionPath);
+                Program.Pipe.PublishDiscrete(ChatPipe.FormatSession(_sessionPath));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error auto-saving chat: " + ex.Message);
+            }
         }
 
         private void Clear()
         {
             _conversation.Clear();
             _title = null;
+            _sessionPath = null;
+            _registry.WorkingDirectoryOverride = null;
             _client.PublishStatusTokens(_client.GetBaseCharacterOverhead());
             if (_showBanners)
             {
@@ -169,7 +202,7 @@ namespace SimpleLLMChatCLI
 
             try
             {
-                ChatTranscript.Save(arguments.Trim().Trim('"'), _title, _conversation);
+                ChatTranscript.Save(arguments.Trim().Trim('"'), _title, _registry.ResolveWorkingDirectory(), _conversation);
             }
             catch (Exception ex)
             {
@@ -179,27 +212,107 @@ namespace SimpleLLMChatCLI
             return true;
         }
 
+        /// <summary>
+        /// Continues a saved chat in the workspace it was made in; later turns save
+        /// back to the same file. If that folder no longer exists, the chat is
+        /// imported into the current workspace instead.
+        /// </summary>
         private bool Load(string arguments)
         {
             if (arguments == null)
                 return false;
 
+            string path, title, workspace;
             List<LLMClient.ChatMessage> loaded;
-            string title;
+            if (!TryReadChat(arguments, out path, out loaded, out title, out workspace))
+                return true;
+
+            _registry.WorkingDirectoryOverride = null;
+            if (!string.IsNullOrEmpty(workspace))
+            {
+                if (Directory.Exists(workspace))
+                {
+                    _registry.WorkingDirectoryOverride = ChatWorkspace.Normalize(workspace);
+                }
+                else
+                {
+                    string current = _registry.ResolveWorkingDirectory();
+                    int historyLimit = Program.Config.Get(AppSettings.ChatHistoryLimit);
+                    if (historyLimit > 0)
+                    {
+                        Console.Error.WriteLine("Chat workspace '" + workspace + "' not found; imported into " + current);
+                        ImportLoaded(loaded, title, historyLimit);
+                        return true;
+                    }
+                    // No history to import into: continue here.
+                    Console.Error.WriteLine("Chat workspace '" + workspace + "' not found; using " + current);
+                }
+            }
+
+            Restore(loaded, title, path);
+            return true;
+        }
+
+        /// <summary>
+        /// Copies a chat into the current workspace's history and continues it there.
+        /// The original file is left as it was.
+        /// </summary>
+        private bool Import(string arguments)
+        {
+            if (arguments == null)
+                return false;
+
+            int historyLimit = Program.Config.Get(AppSettings.ChatHistoryLimit);
+            if (historyLimit <= 0)
+            {
+                Console.Error.WriteLine("Error importing chat: chat history is off (chathistorylimit=0).");
+                ChatOutput.MarkSeparated();
+                return true;
+            }
+
+            string path, title, workspace;
+            List<LLMClient.ChatMessage> loaded;
+            if (!TryReadChat(arguments, out path, out loaded, out title, out workspace))
+                return true;
+
+            ImportLoaded(loaded, title, historyLimit);
+            return true;
+        }
+
+        // A new file in the current workspace's history, saved right away.
+        private void ImportLoaded(List<LLMClient.ChatMessage> loaded, string title, int historyLimit)
+        {
+            Restore(loaded, title, ChatHistory.NewSessionPath(_registry.ResolveWorkingDirectory()));
+            AutoSave(historyLimit);
+        }
+
+        private static bool TryReadChat(string arguments, out string path,
+            out List<LLMClient.ChatMessage> loaded, out string title, out string workspace)
+        {
+            path = null;
+            loaded = null;
+            title = null;
+            workspace = null;
             try
             {
-                loaded = ChatTranscript.Load(arguments.Trim().Trim('"'), out title);
+                path = Path.GetFullPath(arguments.Trim().Trim('"'));
+                loaded = ChatTranscript.Load(path, out title, out workspace);
+                return true;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine("Error loading chat: " + ex.Message);
                 ChatOutput.MarkSeparated();
-                return true;
+                return false;
             }
+        }
 
+        private void Restore(List<LLMClient.ChatMessage> loaded, string title, string sessionPath)
+        {
             _conversation.Clear();
             _conversation.AddRange(loaded);
             _title = title;
+            _sessionPath = sessionPath;
             _client.PublishStatusTokens(
                 LLMClient.GetConversationCharacterCount(_conversation) + _client.GetBaseCharacterOverhead());
 
@@ -207,7 +320,6 @@ namespace SimpleLLMChatCLI
             if (!_showBanners)
                 ChatOutput.MarkSeparated();
             Replay();
-            return true;
         }
 
         /// <summary>
@@ -313,6 +425,7 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| /clearindex: Clear knowledge index              |");
             ChatOutput.WriteLine("| /exit: Exit the application                     |");
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
+            ChatOutput.WriteLine("| /import <path>: Copy a chat into this workspace |");
             ChatOutput.WriteLine("| /load <path>: Load a saved chat                 |");
             ChatOutput.WriteLine("| /reasoning [effort]: Set reasoning effort       |");
             ChatOutput.WriteLine("| /reload: Reload configuration                   |");

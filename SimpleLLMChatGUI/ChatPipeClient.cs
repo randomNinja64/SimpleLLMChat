@@ -21,6 +21,8 @@ public sealed class ChatPipeClient : IDisposable
     public event Action<string> TextReceived;
     public event Action<ChatBlockKind, string> BlockStarted;
     public event Action BlockEnded;
+    public event Action<string> SessionReceived;
+    public event Action<string> WorkspaceReceived;
 
     public ChatPipeClient(int processId)
     {
@@ -87,8 +89,22 @@ public sealed class ChatPipeClient : IDisposable
                             continue;
                         }
 
-                        if (ChatPipe.TryParseReadyLine(line))
+                        string sessionPath;
+                        if (ChatPipe.TryParseSessionLine(line, out sessionPath))
                         {
+                            Action<string> handler = SessionReceived;
+                            if (handler != null)
+                                handler(sessionPath);
+                            continue;
+                        }
+
+                        string workspace;
+                        if (ChatPipe.TryParseReadyLine(line, out workspace))
+                        {
+                            Action<string> workspaceHandler = WorkspaceReceived;
+                            if (workspace != null && workspaceHandler != null)
+                                workspaceHandler(workspace);
+
                             Action handler = ReadyReceived;
                             if (handler != null)
                                 handler();
@@ -153,6 +169,8 @@ public sealed class ChatPipeClient : IDisposable
         TextReceived = null;
         BlockStarted = null;
         BlockEnded = null;
+        SessionReceived = null;
+        WorkspaceReceived = null;
 
         NamedPipeClientStream pipe = _pipe;
         _pipe = null;

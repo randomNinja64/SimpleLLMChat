@@ -167,10 +167,7 @@
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate DataType="{x:Type local:ChatHistoryEntry}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding WhenText}" Opacity="0.65"/>
-                        </StackPanel>
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>

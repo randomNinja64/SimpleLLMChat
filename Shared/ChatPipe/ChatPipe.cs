@@ -5,13 +5,14 @@ using System.Globalization;
 /// Named-pipe channel for everything the CLI sends its front end: CLI hosts SimpleLLMChat.Chat.{pid}; GUI connects by child PID.
 /// Wire format lines (UTF-8, one per message):
 ///   STATUS tokens=1234
-///   STATUS ready
+///   STATUS ready [workspace=C:\path\tools\run\in]
 ///   STATUS approval name=tool_name [confidence=0.91] args=...
 ///   STATUS indexing=start total=42
 ///   STATUS indexing=progress current=7 total=42 file=notes.md
 ///   STATUS indexing=done files=5
 ///   STATUS indexing=cleared
 ///   STATUS indexing=error message=...
+///   STATUS session=C:\path\to\chats\20261123-221530.json   (after each auto-save)
 /// Chat output, in order (what the terminal shows, minus input prompts and block tags):
 ///   TEXT escaped-chunk                 (\n, \r and \\ escaped)
 ///   STARTBLOCK Thinking|ToolCall|ToolOutput [name]

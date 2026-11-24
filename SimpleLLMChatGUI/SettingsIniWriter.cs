@@ -73,16 +73,16 @@ namespace SimpleLLMChatGUI
             string model,
             string sysPrompt,
             int contextWindowSize,
-            string workingDirectory = "")
+            int? chatHistoryLimit = null)
         {
             return new List<string>
             {
                 AppSettings.ApiKey.Line(apiKey ?? string.Empty),
+                AppSettings.ChatHistoryLimit.Line(chatHistoryLimit ?? AppSettings.ChatHistoryLimit.Default),
                 AppSettings.ContextWindowSize.Line(contextWindowSize),
                 AppSettings.LlmServer.Line(llmServer ?? string.Empty),
                 AppSettings.Model.Line(model ?? string.Empty),
                 AppSettings.SysPrompt.Line("\"" + EscapePromptForStorage(sysPrompt) + "\""),
-                AppSettings.WorkingDirectory.Line(workingDirectory ?? string.Empty),
             };
         }
 

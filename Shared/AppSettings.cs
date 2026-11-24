@@ -73,11 +73,12 @@ public static class AppSettings
     public static readonly Setting<string> RagRetrieveMode = Def(SectionRag, "ragretrievemode", "newchat");
 
     public static readonly Setting<string> ApiKey = Def(SectionSystem, "apikey", "");
+    // Sessions kept in the chats folder beside the program; 0 turns auto-save off.
+    public static readonly Setting<int> ChatHistoryLimit = Def(SectionSystem, "chathistorylimit", 50);
     public static readonly Setting<int> ContextWindowSize = Def(SectionSystem, "contextWindowSize", 0);
     public static readonly Setting<string> LlmServer = Def(SectionSystem, "llmserver", "");
     public static readonly Setting<string> Model = Def(SectionSystem, "model", "");
     public static readonly Setting<string> SysPrompt = Def(SectionSystem, "sysprompt", "");
-    public static readonly Setting<string> WorkingDirectory = Def(SectionSystem, "workingdirectory", "");
 
     public static readonly Setting<string> EnabledTools = Def(SectionTools, "tools", "");
     public static readonly Setting<string> ToolsRequiringApproval = Def(SectionTools, "toolsrequiringapproval", "");

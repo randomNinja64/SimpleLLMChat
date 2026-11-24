@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="Cancel.cs" />
     <Compile Include="ChatOutput.cs" />
+    <Compile Include="ChatHistory.cs" />
     <Compile Include="ChatSession.cs" />
     <Compile Include="ChatTranscript.cs" />
     <Compile Include="ConsecutiveToolFailures.cs" />
@@ -72,6 +73,9 @@
     <Compile Include="RAG\VectorStore.cs" />
     <Compile Include="..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\ChatWorkspace.cs">
+      <Link>Shared\ChatWorkspace.cs</Link>
     </Compile>
     <Compile Include="..\Shared\Constants.cs">
       <Link>Shared\Constants.cs</Link>
@@ -120,6 +124,9 @@
     </Compile>
     <Compile Include="..\Shared\ChatPipe\ChatPipe.Indexing.cs">
       <Link>Shared\ChatPipe\ChatPipe.Indexing.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\ChatPipe\ChatPipe.Session.cs">
+      <Link>Shared\ChatPipe\ChatPipe.Session.cs</Link>
     </Compile>
     <Compile Include="..\Shared\ChatPipe\ChatPipe.Ready.cs">
       <Link>Shared\ChatPipe\ChatPipe.Ready.cs</Link>
