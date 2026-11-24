@@ -480,5 +480,30 @@ public partial class LLMClient
 
         return response.Content ?? string.Empty;
     }
+
+    /// <summary>
+    /// Asks the model for a short title for a chat from its first exchange. The
+    /// raw answer, or null when the request fails; see ChatTranscript.CleanModelTitle.
+    /// </summary>
+    public string GenerateTitle(string prompt, string reply)
+    {
+        const int excerpt = 1000;
+        Func<string, string> cut = text =>
+            text == null ? string.Empty : text.Length <= excerpt ? text : text.Substring(0, excerpt);
+
+        List<ChatMessage> request = new List<ChatMessage>
+        {
+            new ChatMessage("user",
+                "Write a short title (3 to 6 words) for a chat that begins with the exchange below. " +
+                "Reply with the title only, no quotes or punctuation at the end.\n\n" +
+                "User: " + cut(prompt) + "\n\nAssistant: " + cut(reply))
+        };
+
+        // No tools, silent sink, like the summary.
+        LLMCompletionResponse response = SendMessages(request, new List<string>(), StreamSink.Silent);
+        if (response.FinishReason == "request_failed")
+            return null;
+        return response.Content;
+    }
 }
 }

@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace SimpleLLMChatGUI
@@ -29,13 +31,55 @@ namespace SimpleLLMChatGUI
         private const double SidebarMinWidth = 100;
         private const double SidebarMaxWidth = 250;
         private const double SidebarDefaultWidth = 140;
-        private const string SidebarWidthKey = "historysidebarwidth";
 
-        // The width the user chose by dragging, kept in layout.ini. -1 until first read.
-        private double _sidebarWidth = -1;
+        // layout.ini keys: what the GUI remembers about its own layout.
+        private const string SidebarWidthKey = "historysidebarwidth";
+        private const string SidebarOpenKey = "historysidebaropen";
+
+        // The width the user chose by dragging.
+        private double _sidebarWidth = SidebarDefaultWidth;
 
         // Whether the chat was scrolled to its end when a sidebar drag began.
         private bool _chatAtEndBeforeDrag;
+
+        /// <summary>Reopens the sidebar as it was left, at its saved width.</summary>
+        private void RestoreSidebar()
+        {
+            Dictionary<string, string> layout;
+            try
+            {
+                layout = IniFileHandler.LoadIni(App.LayoutFilePath);
+            }
+            catch (Exception)
+            {
+                return;   // Unreadable: the defaults, as with colors.ini.
+            }
+
+            string text;
+            int width;
+            if (layout.TryGetValue(SidebarWidthKey, out text)
+                && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out width))
+                _sidebarWidth = Math.Max(SidebarMinWidth, Math.Min(SidebarMaxWidth, width));   // A hand-edited file.
+
+            if (layout.TryGetValue(SidebarOpenKey, out text) && text.Trim() == "1")
+                historyButton.IsChecked = true;   // Opens it through historyButton_Toggled.
+        }
+
+        private void SaveLayout()
+        {
+            try
+            {
+                File.WriteAllLines(App.LayoutFilePath, new[]
+                {
+                    SidebarOpenKey + "=" + (historyButton.IsChecked == true ? "1" : "0"),
+                    SidebarWidthKey + "=" + ((int)_sidebarWidth).ToString(CultureInfo.InvariantCulture)
+                });
+            }
+            catch (Exception)
+            {
+                // Not remembered this time.
+            }
+        }
 
         private void historyButton_Toggled(object sender, RoutedEventArgs e)
         {
@@ -50,6 +94,7 @@ namespace SimpleLLMChatGUI
             ApplySidebarWidth();
             if (atEnd)
                 ScrollChatToEndAfterLayout();
+            SaveLayout();
         }
 
         private void ApplySidebarWidth()
@@ -61,9 +106,6 @@ namespace SimpleLLMChatGUI
                 historyColumn.Width = new GridLength(0);
                 return;
             }
-
-            if (_sidebarWidth < 0)
-                _sidebarWidth = LoadSidebarWidth();
 
             // The limits also bound the drag.
             historyColumn.MaxWidth = SidebarMaxWidth;
@@ -81,35 +123,7 @@ namespace SimpleLLMChatGUI
             _sidebarWidth = Math.Round(historyColumn.Width.Value);
             if (_chatAtEndBeforeDrag)
                 ScrollChatToEndAfterLayout();
-
-            try
-            {
-                File.WriteAllLines(App.LayoutFilePath, new[]
-                {
-                    SidebarWidthKey + "=" + ((int)_sidebarWidth).ToString(CultureInfo.InvariantCulture)
-                });
-            }
-            catch (Exception)
-            {
-                // Not remembered this time; the sidebar keeps the width for this run.
-            }
-        }
-
-        private static double LoadSidebarWidth()
-        {
-            try
-            {
-                string text;
-                int width;
-                if (IniFileHandler.LoadIni(App.LayoutFilePath).TryGetValue(SidebarWidthKey, out text)
-                    && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out width))
-                    return Math.Max(SidebarMinWidth, Math.Min(SidebarMaxWidth, width));   // A hand-edited file.
-            }
-            catch (Exception)
-            {
-                // Unreadable: the default, as with colors.ini.
-            }
-            return SidebarDefaultWidth;
+            SaveLayout();
         }
 
         // Narrowing or widening the chat reflows every turn (chatList_SizeChanged
@@ -160,7 +174,7 @@ namespace SimpleLLMChatGUI
                 historyList.ItemsSource = _historyEntries;
 
             _historyEntries.Clear();
-            bool enabled = App.Config.Get(AppSettings.ChatHistoryLimit) > 0;
+            bool enabled = IsHistoryEnabled();
             if (enabled && _currentWorkspace != null)
             {
                 foreach (ChatHistoryEntry entry in ChatHistoryStore.Read(ChatWorkspace.DirectoryFor(_currentWorkspace)))
@@ -168,7 +182,10 @@ namespace SimpleLLMChatGUI
             }
 
             historyEmptyText.Text = enabled ? "(empty)" : "Chat history disabled.";
-            historyEmptyText.Visibility = _historyEntries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            // Not "(empty)" before the CLI has said which workspace it is in (the
+            // sidebar can open at startup, ahead of the CLI).
+            bool known = !enabled || _currentWorkspace != null;
+            historyEmptyText.Visibility = _historyEntries.Count == 0 && known ? Visibility.Visible : Visibility.Collapsed;
             SelectCurrentChat();
         }
 
@@ -196,13 +213,120 @@ namespace SimpleLLMChatGUI
         }
 
         // Opening is on click or Enter, not selection change, so arrowing through
-        // the list doesn't restart the CLI for every row passed.
+        // the list doesn't restart the CLI for every row passed. Delete acts on the
+        // selected row, as in Explorer.
         private void historyList_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Enter)
+            ChatHistoryEntry entry = historyList.SelectedItem as ChatHistoryEntry;
+            if (e.Key == Key.Enter)
+                OpenHistoryEntry(entry);
+            else if (e.Key == Key.Delete && entry != null)
+                DeleteChat(entry);
+            else
                 return;
-            OpenHistoryEntry(historyList.SelectedItem as ChatHistoryEntry);
             e.Handled = true;
+        }
+
+        private static bool IsHistoryEnabled()
+        {
+            return App.Config.Get(AppSettings.ChatHistoryLimit) > 0;
+        }
+
+        // Built when it opens: a chat's actions when right-clicking a chat, and
+        // Import anywhere in the list.
+        private void historyList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            DependencyObject node = e.OriginalSource as DependencyObject;
+            while (node != null && !(node is ListBoxItem))
+                node = node is Visual ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
+            ChatHistoryEntry entry = node != null ? ((ListBoxItem)node).DataContext as ChatHistoryEntry : null;
+
+            ContextMenu menu = historyList.ContextMenu;
+            menu.Items.Clear();
+            if (entry != null)
+            {
+                menu.Items.Add(MenuItemFor("Export...", () => ExportChat(entry)));
+                menu.Items.Add(MenuItemFor("Delete", () => DeleteChat(entry)));
+                menu.Items.Add(new Separator());
+            }
+            MenuItem import = MenuItemFor("Import...", ImportChat);
+            import.IsEnabled = IsHistoryEnabled();
+            menu.Items.Add(import);
+        }
+
+        private static MenuItem MenuItemFor(string header, Action action)
+        {
+            MenuItem item = new MenuItem { Header = header };
+            item.Click += (s, a) => action();
+            return item;
+        }
+
+        // A copy of the saved file: auto-save keeps it current after every turn.
+        private void ExportChat(ChatHistoryEntry entry)
+        {
+            Microsoft.Win32.SaveFileDialog dialog = new Microsoft.Win32.SaveFileDialog();
+            dialog.Filter = "Chat (*.json)|*.json";
+            dialog.FileName = SafeFileName(entry.Title) + ".json";
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            try
+            {
+                File.Copy(entry.Path, dialog.FileName, true);
+            }
+            catch (Exception ex)
+            {
+                ShowError("Failed to export chat: " + ex.Message);
+            }
+        }
+
+        // Copies the chat into the current workspace (the CLI's /import), so it
+        // shows in this workspace's history; the original file is untouched.
+        private void ImportChat()
+        {
+            Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog();
+            dialog.Filter = "Chat (*.json)|*.json";
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            // The copy's path arrives with the CLI's first session message.
+            RestartChat("/import \"" + dialog.FileName + "\"", null);
+        }
+
+        private void DeleteChat(ChatHistoryEntry entry)
+        {
+            MessageBoxResult answer = MessageBox.Show(
+                "Delete \"" + entry.Title + "\"? This can't be undone.",
+                "Delete Chat", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (answer != MessageBoxResult.Yes)
+                return;
+
+            // Stop the CLI first, or its next auto-save would write the chat back.
+            if (entry.IsCurrent)
+                RestartChat(null, null);
+
+            try
+            {
+                File.Delete(entry.Path);
+            }
+            catch (Exception ex)
+            {
+                ShowError("Failed to delete chat: " + ex.Message);
+            }
+            RefreshHistory();
+        }
+
+        private void ShowError(string message)
+        {
+            MessageBox.Show(this, message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private static string SafeFileName(string title)
+        {
+            string name = title ?? "chat";
+            foreach (char invalid in Path.GetInvalidFileNameChars())
+                name = name.Replace(invalid, '_');
+            return name.Trim().Length == 0 ? "chat" : name.Trim();
         }
 
         private void OpenHistoryEntry(ChatHistoryEntry entry)
@@ -213,7 +337,7 @@ namespace SimpleLLMChatGUI
 
             if (!File.Exists(entry.Path))
             {
-                MessageBox.Show("Chat file not found.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowError("Chat file not found.");
                 RefreshHistory();
                 return;
             }

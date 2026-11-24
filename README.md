@@ -112,6 +112,7 @@ Tool-specific configuration options for the included tools are available in the 
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
 - To start a new chat, press `New Chat`.
 - To open a previous chat, press the history button icon in the upper left and select a chat in the sidebar.
+- To manage history, open the sidebar with the history button. Chats can be exported or deleted via the context menu. In the same context menu, chats can be imported.
 - To set a working directory, create a shortcut to `SimpleLLMChatGUI.exe` and set its "Start in" directory to that folder.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
 - To cancel the currently generating response, press `Stop` (shown while generating).

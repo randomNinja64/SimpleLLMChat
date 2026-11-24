@@ -99,6 +99,23 @@ public sealed class FakeOpenAiServer : IDisposable
         get { lock (_scriptGate) return new List<string>(_chatBodies); }
     }
 
+    /// <summary>
+    /// Text in the CLI's chat-title request. Title requests are answered with
+    /// <see cref="TitleReply"/> and kept apart from the scripted replies and
+    /// <see cref="ChatBodies"/>, so tests script only the conversation.
+    /// </summary>
+    public const string TitleRequestMarker = "Reply with the title only";
+
+    /// <summary>The model's answer to a title request. Null: an empty reply, so the CLI keeps the first-message title.</summary>
+    public string TitleReply { get; set; }
+
+    private readonly List<string> _titleBodies = new List<string>();
+
+    public List<string> TitleBodies
+    {
+        get { lock (_scriptGate) return new List<string>(_titleBodies); }
+    }
+
     public int SystemOneRequestCount { get; private set; }
     public string SystemOneAuthorization { get; private set; }
     public string SystemOneBody { get; private set; }
@@ -276,7 +293,10 @@ public sealed class FakeOpenAiServer : IDisposable
             using (StreamReader reader = new StreamReader(ctx.Request.InputStream, Encoding.UTF8))
                 body = reader.ReadToEnd();
         }
-        LastBody = body;
+        // A title request follows a chat's first reply; tests asking for the last
+        // request mean the conversation's (see TitleBodies for title requests).
+        if (body.IndexOf(TitleRequestMarker, StringComparison.Ordinal) < 0)
+            LastBody = body;
         TestLog.Detail("FakeOpenAi " + ctx.Request.HttpMethod + " " + path + " body_len=" + body.Length);
 
         if (path.EndsWith("/v1/models", StringComparison.OrdinalIgnoreCase) ||
@@ -314,6 +334,19 @@ public sealed class FakeOpenAiServer : IDisposable
 
         if (path.IndexOf("/v1/chat/completions", StringComparison.OrdinalIgnoreCase) >= 0)
         {
+            if (body.IndexOf(TitleRequestMarker, StringComparison.Ordinal) >= 0)
+            {
+                lock (_scriptGate)
+                    _titleBodies.Add(body);
+                ctx.Response.StatusCode = 200;
+                ctx.Response.ContentType = "text/event-stream";
+                ctx.Response.SendChunked = true;
+                using (Stream output = ctx.Response.OutputStream)
+                    WriteContentSse(output, TitleReply ?? "", false);
+                ctx.Response.Close();
+                return;
+            }
+
             lock (_scriptGate)
                 _chatBodies.Add(body);
             WriteSseChat(ctx);

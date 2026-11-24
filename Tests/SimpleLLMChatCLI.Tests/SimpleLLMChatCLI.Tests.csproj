@@ -97,6 +97,9 @@
     <Compile Include="..\..\Shared\ChatBlockDisplayMode.cs">
       <Link>Shared\ChatBlockDisplayMode.cs</Link>
     </Compile>
+    <Compile Include="..\..\Shared\AtomicFile.cs">
+      <Link>Shared\AtomicFile.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\ChatWorkspace.cs">
       <Link>Shared\ChatWorkspace.cs</Link>
     </Compile>

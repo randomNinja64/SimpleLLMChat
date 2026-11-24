@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -33,48 +32,7 @@ namespace SimpleLLMChatCLI
                 root["workingDirectory"] = workingDirectory;
             root["messages"] = messages;
 
-            WriteAtomically(path, new UTF8Encoding(false).GetBytes(root.ToString(Formatting.Indented) + "\n"));
-        }
-
-        /// <summary>
-        /// Writes beside the target, flushes to disk, then swaps it into place, so
-        /// the file is always the old or the new version, never a partial one. The
-        /// GUI kills the CLI on New Chat, which can land mid-save, and a session is
-        /// rewritten whole every turn: a plain overwrite would lose all of it.
-        /// </summary>
-        private static void WriteAtomically(string path, byte[] contents)
-        {
-            string target = Path.GetFullPath(path);
-            string temp = target + ".tmp";
-
-            using (FileStream stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                stream.Write(contents, 0, contents.Length);
-                stream.Flush(true);
-            }
-
-            // A reader (the GUI's sidebar, antivirus) can hold the target open for
-            // a moment and block the swap; retry briefly before giving up.
-            for (int attempt = 1; ; attempt++)
-            {
-                try
-                {
-                    if (File.Exists(target))
-                        File.Replace(temp, target, null);
-                    else
-                        File.Move(temp, target);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    if (!(ex is IOException || ex is UnauthorizedAccessException) || attempt >= 5)
-                    {
-                        try { File.Delete(temp); } catch (Exception) { }
-                        throw;
-                    }
-                    Thread.Sleep(50 * attempt);
-                }
-            }
+            AtomicFile.WriteAllBytes(path, new UTF8Encoding(false).GetBytes(root.ToString(Formatting.Indented) + "\n"));
         }
 
         public static List<LLMClient.ChatMessage> Load(string path, out string title, out string workingDirectory)
@@ -138,6 +96,25 @@ namespace SimpleLLMChatCLI
             if (cut < TitleMaxLength / 2)
                 cut = TitleMaxLength;
             return text.Substring(0, cut).TrimEnd() + "...";
+        }
+
+        /// <summary>
+        /// The model's title answer as a title: thinking removed, first line only,
+        /// without quotes, a "Title:" label or end punctuation. Null when nothing is left.
+        /// </summary>
+        public static string CleanModelTitle(string answer)
+        {
+            string text = Regex.Replace(answer ?? string.Empty, @"<think>.*?</think>", " ",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            foreach (string line in text.Split('\n'))
+            {
+                string title = line.Trim().Trim('"', '\'', '*', '`', '#').Trim();
+                title = Regex.Replace(title, @"^title\s*:\s*", "", RegexOptions.IgnoreCase);
+                title = title.Trim('"', '\'', '*', '`').TrimEnd('.', '!', '?', ':', ';').Trim();
+                if (title.Length > 0)
+                    return MakeTitle(title);
+            }
+            return null;
         }
 
         // For files without a title: the first user message. RAG context or a

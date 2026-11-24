@@ -158,7 +158,12 @@
                      HorizontalContentAlignment="Stretch"
                      Background="{DynamicResource ChatBackgroundColorBrush}"
                      Foreground="{DynamicResource ChatTextColorBrush}"
-                     KeyDown="historyList_KeyDown">
+                     KeyDown="historyList_KeyDown"
+                     ContextMenuOpening="historyList_ContextMenuOpening">
+                <!-- Items are added when it opens (see historyList_ContextMenuOpening). -->
+                <ListBox.ContextMenu>
+                    <ContextMenu/>
+                </ListBox.ContextMenu>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Padding" Value="4,3"/>

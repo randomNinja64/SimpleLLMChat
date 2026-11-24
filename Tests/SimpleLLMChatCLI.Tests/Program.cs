@@ -790,6 +790,7 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                         TestAssert.Equal(0, probe.Sessions().Count, "no session line");
                         TestAssert.True(!Directory.Exists(Path.Combine(ws.Path, "chats")), "no chats folder");
+                        TestAssert.Equal(0, server.TitleBodies.Count, "no title request");
                     }
                 }
             });
@@ -933,6 +934,57 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(probe.WaitForSessions(2, 20000), "saved again");
                         TestAssert.Equal(copy, probe.Sessions()[1], "continues in the copy");
                         TestAssert.Equal(originalText, File.ReadAllText(original), "original untouched");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("transcript.clean_model_title", () =>
+            {
+                TestAssert.Equal("Fixing the build", ChatTranscript.CleanModelTitle("\"Fixing the build.\""), "quotes and period");
+                TestAssert.Equal("Debugging the parser", ChatTranscript.CleanModelTitle("Title: Debugging the parser"), "label");
+                TestAssert.Equal("Plan", ChatTranscript.CleanModelTitle("<think>a\nb</think>\n\n**Plan**\nmore text"), "thinking, markdown, first line");
+                TestAssert.True(ChatTranscript.CleanModelTitle("  \n ") == null, "blank");
+                TestAssert.True(ChatTranscript.CleanModelTitle(null) == null, "failed request");
+                TestAssert.True(ChatTranscript.CleanModelTitle(new string('x', 200)).Length <= 63, "capped like a typed title");
+            });
+
+            TestRunner.Run("cli.model_title", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply-ok");
+                    server.EnqueueContent("second-reply-ok");
+                    server.TitleReply = "<think>short</think>\"Planning the Garden.\"";
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string project = UseProjectWorkspace(ws.Path, "project");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        project))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("what should I plant in spring");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved");
+                        string session = probe.Sessions()[0];
+                        TestAssert.Equal("Planning the Garden", (string)WaitForSavedChat(session)["title"], "model title, cleaned");
+
+                        List<string> titleRequests = server.TitleBodies;
+                        TestAssert.Equal(1, titleRequests.Count, "one title request");
+                        TestAssert.Contains(titleRequests[0], "what should I plant in spring", "first prompt sent");
+                        TestAssert.Contains(titleRequests[0], "first-reply-ok", "first reply sent");
+
+                        cli.WriteLine("and in autumn");
+                        TestAssert.True(probe.WaitForSessions(2, 20000), "saved again");
+                        TestAssert.Equal(1, server.TitleBodies.Count, "only after the first reply");
+                        TestAssert.Equal("Planning the Garden", (string)WaitForSavedChat(session)["title"], "title kept");
 
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");

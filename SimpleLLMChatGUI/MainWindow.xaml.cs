@@ -85,6 +85,7 @@ namespace SimpleLLMChatGUI
             UpdateReasoningEffortLabel();
             BuildReasoningEffortMenu();
             tokenTracker = new TokenTracker(tokenStatusText);
+            RestoreSidebar();
 
             // Gate send until the CLI is up; leave input/attach usable meanwhile.
             sendButton.IsEnabled = false;
@@ -574,39 +575,7 @@ namespace SimpleLLMChatGUI
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        // ExportChat, ImportChat and LoadChat back the history sidebar's menu
-        // (Export / Import) and its click-to-open; the CLI keeps /save and /load.
-        private void ExportChat()
-        {
-            if (processHandler == null || !processHandler.IsProcessRunning)
-            {
-                MessageBox.Show("Error: CLI is not running!");
-                return;
-            }
-
-            Microsoft.Win32.SaveFileDialog dialog = new Microsoft.Win32.SaveFileDialog();
-            dialog.Filter = "Chat (*.json)|*.json";
-            dialog.FileName = "chat.json";
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            if (!processHandler.SendInput("/save \"" + dialog.FileName + "\""))
-                MessageBox.Show("Failed to save chat.");
-        }
-
-        // Copies the chat into the current workspace (the CLI's /import), so it
-        // shows in this workspace's history; the original file is untouched.
-        private void ImportChat()
-        {
-            Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog();
-            dialog.Filter = "Chat (*.json)|*.json";
-            if (dialog.ShowDialog(this) != true)
-                return;
-
-            // The copy's path arrives with the CLI's first session message.
-            RestartChat("/import \"" + dialog.FileName + "\"", null);
-        }
-
+        // Opens a saved chat (the history sidebar); the CLI keeps /load for its own use.
         private void LoadChat(string path)
         {
             RestartChat("/load \"" + path + "\"", path);

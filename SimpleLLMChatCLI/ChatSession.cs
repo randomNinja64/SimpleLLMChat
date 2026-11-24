@@ -136,13 +136,37 @@ namespace SimpleLLMChatCLI
             int historyLimit = Program.Config.Get(AppSettings.ChatHistoryLimit);
             if (_sessionPath == null && historyLimit > 0)
                 _sessionPath = ChatHistory.NewSessionPath(_registry.ResolveWorkingDirectory());
+            bool newChat = _conversation.Count == 0;
 
             Cancel.Begin();
             _client.ProcessConversation(_conversation, textPrompt, imageBase64, imageMime, _settings);
+            // Titles name saved chats, so only with history on; and not if stopped.
+            if (newChat && historyLimit > 0 && !Cancel.Requested)
+                TitleFromFirstReply(textPrompt);
             Cancel.End();
 
             // After every turn, finished or stopped.
             AutoSave(historyLimit);
+        }
+
+        /// <summary>
+        /// Replaces the first-message title with one the model writes from the first
+        /// exchange. Any failure keeps the first-message title.
+        /// </summary>
+        private void TitleFromFirstReply(string prompt)
+        {
+            string reply = null;
+            for (int i = _conversation.Count - 1; i >= 0 && reply == null; i--)
+            {
+                if (_conversation[i].Role == "assistant" && !string.IsNullOrWhiteSpace(_conversation[i].Content))
+                    reply = _conversation[i].Content;
+            }
+            if (reply == null)
+                return;
+
+            string title = ChatTranscript.CleanModelTitle(_client.GenerateTitle(prompt, reply));
+            if (title != null)
+                _title = title;
         }
 
         private void AutoSave(int historyLimit)
