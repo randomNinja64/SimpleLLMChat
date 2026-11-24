@@ -69,6 +69,9 @@
     <Compile Include="..\..\SimpleLLMChatGUI\ModelsClient.cs">
       <Link>GUI\ModelsClient.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatGUI\ChatHistoryStore.cs">
+      <Link>GUI\ChatHistoryStore.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>

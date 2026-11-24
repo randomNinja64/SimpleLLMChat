@@ -110,9 +110,7 @@ Tool-specific configuration options for the included tools are available in the 
 
 - To adjust application settings, select `Options`.
 - To attach an image, press the image attachment button (camera icon) and choose a file using the file picker.
-- To clear the chat, press `Clear Chat`.
-- To save the chat, press `Save Chat`.
-- To load a previous chat session, press `Load Chat`.
+- To start a new chat, press `New Chat`.
 - To send a message, type it into the input box and press `Enter` or `Send`. To create multi-line messages, press `Shift+Enter`.
 - To cancel the currently generating response, press `Stop` (shown while generating).
 

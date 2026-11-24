@@ -94,36 +94,40 @@
             <RowDefinition Height="Auto" />
             <!-- Token status bar -->
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <!-- History sidebar (collapsed when closed) -->
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
         <!-- Top bar -->
-        <Grid Grid.Row="0" Margin="0,0,0,5">
+        <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button Name="clearButton"
-                        Content="Clear Chat"
+                <ToggleButton Name="historyButton"
+                              AutomationProperties.AutomationId="historyButton"
+                              AutomationProperties.Name="History"
+                              ToolTip="History"
+                              MinWidth="30"
+                              MinHeight="25"
+                              Margin="0,0,5,0"
+                              VerticalAlignment="Center"
+                              Checked="historyButton_Toggled"
+                              Unchecked="historyButton_Toggled">
+                    <Image Source="pack://application:,,,/Resources/history.png"
+                           Width="16" Height="16" Stretch="Uniform"/>
+                </ToggleButton>
+                <Button Name="newChatButton"
+                        Content="New Chat"
                         MinWidth="80"
                         MinHeight="25"
                         Margin="0,0,5,0"
                         VerticalAlignment="Center"
-                        Click="clearButton_Click" />
-                <Button Name="saveButton"
-                        Content="Save Chat"
-                        MinWidth="80"
-                        MinHeight="25"
-                        Margin="0,0,5,0"
-                        VerticalAlignment="Center"
-                        Click="saveButton_Click" />
-                <Button Name="loadButton"
-                        Content="Load Chat"
-                        MinWidth="80"
-                        MinHeight="25"
-                        Margin="0,0,5,0"
-                        VerticalAlignment="Center"
-                        Click="loadButton_Click" />
+                        Click="newChatButton_Click" />
             </StackPanel>
 
             <Button Name="optionsButton"
@@ -137,10 +141,53 @@
                     Click="optionsButton_Click" />
         </Grid>
 
+        <!-- History sidebar: saved sessions, newest first. Opening it narrows the
+             chat column, which reflows turns as a window resize does. -->
+        <Grid Name="historyPanel"
+              Grid.Row="1"
+              Grid.RowSpan="2"
+              Grid.Column="0"
+              Width="160"
+              Margin="0,0,5,2"
+              Visibility="Collapsed">
+            <ListBox Name="historyList"
+                     AutomationProperties.AutomationId="historyList"
+                     BorderThickness="1"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     HorizontalContentAlignment="Stretch"
+                     Background="{DynamicResource ChatBackgroundColorBrush}"
+                     Foreground="{DynamicResource ChatTextColorBrush}"
+                     KeyDown="historyList_KeyDown">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="4,3"/>
+                        <Setter Property="ToolTip" Value="{Binding Title}"/>
+                        <EventSetter Event="MouseLeftButtonUp" Handler="historyItem_MouseLeftButtonUp"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:ChatHistoryEntry}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding WhenText}" Opacity="0.65"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Name="historyEmptyText"
+                       Text="No saved chats yet."
+                       Margin="8"
+                       TextWrapping="Wrap"
+                       Opacity="0.65"
+                       IsHitTestVisible="False"
+                       Foreground="{DynamicResource ChatTextColorBrush}"/>
+        </Grid>
+
         <!-- Chat history: one ListBox item per turn -->
         <ListBox Name="chatList"
                  AutomationProperties.AutomationId="chatList"
                  Grid.Row="1"
+                 Grid.Column="1"
                  Margin="0,0,0,5"
                  Padding="4"
                  BorderThickness="1"
@@ -179,7 +226,7 @@
         </ListBox>
 
         <!-- Bottom bar: attach + input + send -->
-        <Grid Grid.Row="2" Margin="0,0,0,2">
+        <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -223,7 +270,7 @@
         </Grid>
 
         <!-- Status bar -->
-        <StatusBar Grid.Row="3" Margin="0" Padding="0"
+        <StatusBar Grid.Row="3" Grid.ColumnSpan="2" Margin="0" Padding="0"
                    Background="Transparent"
                    Foreground="{DynamicResource LabelTextColorBrush}"
                    FontFamily="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=FontFamily}"

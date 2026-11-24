@@ -38,6 +38,34 @@ namespace SimpleLLMChatGUI.Tests
                 }
             });
 
+            TestRunner.Run("ChatHistoryStore.read", () =>
+            {
+                using (TempWorkspace ws = new TempWorkspace("gui-history"))
+                {
+                    TestAssert.Equal(0, ChatHistoryStore.Read(ws.Combine("missing")).Count, "no folder");
+
+                    string titled = ws.Combine("titled.json");
+                    File.WriteAllText(titled,
+                        "{\"title\":\"Fix the build\",\"messages\":[{\"role\":\"user\",\"content\":\"x\"}]}");
+                    string legacy = ws.Combine("legacy chat.json");
+                    File.WriteAllText(legacy, "[{\"role\":\"user\",\"content\":\"old\"}]");
+                    string broken = ws.Combine("broken.json");
+                    File.WriteAllText(broken, "{\"title\":");
+                    File.WriteAllText(ws.Combine("notes.txt"), "not a chat");
+
+                    File.SetLastWriteTime(legacy, new DateTime(2026, 1, 1));
+                    File.SetLastWriteTime(broken, new DateTime(2026, 2, 1));
+                    File.SetLastWriteTime(titled, new DateTime(2026, 3, 1));
+
+                    List<ChatHistoryEntry> entries = ChatHistoryStore.Read(ws.Path);
+                    TestAssert.Equal(3, entries.Count, "json files only");
+                    TestAssert.Equal("Fix the build", entries[0].Title, "newest, stored title");
+                    TestAssert.Equal("broken", entries[1].Title, "unreadable falls back to file name");
+                    TestAssert.Equal("legacy chat", entries[2].Title, "untitled falls back to file name");
+                    TestAssert.Equal(titled, entries[0].Path, "path");
+                }
+            });
+
             TestRunner.Run("ModelsClient.list_models", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

@@ -572,7 +572,9 @@ namespace SimpleLLMChatGUI
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        private void saveButton_Click(object sender, RoutedEventArgs e)
+        // ExportChat, ImportChat and LoadChat back the history sidebar's menu
+        // (Export / Import) and its click-to-open; the CLI keeps /save and /load.
+        private void ExportChat()
         {
             if (processHandler == null || !processHandler.IsProcessRunning)
             {
@@ -590,20 +592,25 @@ namespace SimpleLLMChatGUI
                 MessageBox.Show("Failed to save chat.");
         }
 
-        private void loadButton_Click(object sender, RoutedEventArgs e)
+        private void ImportChat()
         {
             Microsoft.Win32.OpenFileDialog dialog = new Microsoft.Win32.OpenFileDialog();
             dialog.Filter = "Chat (*.json)|*.json";
             if (dialog.ShowDialog(this) != true)
                 return;
 
-            // Sent once the new CLI is ready: chat output published before the
-            // GUI connects to the pipe is lost.
-            _pendingLoadPath = dialog.FileName;
-            clearButton_Click(sender, e);
+            LoadChat(dialog.FileName);
         }
 
-        private void clearButton_Click(object sender, RoutedEventArgs e)
+        private void LoadChat(string path)
+        {
+            // Sent once the new CLI is ready: chat output published before the
+            // GUI connects to the pipe is lost.
+            _pendingLoadPath = path;
+            newChatButton_Click(this, new RoutedEventArgs());
+        }
+
+        private void newChatButton_Click(object sender, RoutedEventArgs e)
         {
             // Kill running process first to stop any new output
             if (processHandler != null)
@@ -611,6 +618,11 @@ namespace SimpleLLMChatGUI
                 processHandler.Dispose();
                 processHandler = null;
             }
+
+            // LoadChat comes through here with its path pending; New Chat has none.
+            _currentChatPath = _pendingLoadPath;
+            if (historyPanel.Visibility == Visibility.Visible)
+                SelectCurrentChat();
 
             ClearChatAndRestart();
         }
