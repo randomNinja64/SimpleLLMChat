@@ -11,6 +11,7 @@ namespace SimpleLLMChatGUI
         private string _sysPrompt;
         private int _contextWindowSize;
         private int _chatHistoryLimit;
+        private bool _chatTitlesByModel;
         private string _assistantName;
         private string _thinkingDisplayModeText;
         private string _toolCallDisplayModeText;
@@ -50,6 +51,7 @@ namespace SimpleLLMChatGUI
         public string SysPrompt { get => _sysPrompt; set => Set(ref _sysPrompt, value, nameof(SysPrompt)); }
         public int ContextWindowSize { get => _contextWindowSize; set => Set(ref _contextWindowSize, value, nameof(ContextWindowSize)); }
         public int ChatHistoryLimit { get => _chatHistoryLimit; set => Set(ref _chatHistoryLimit, value < 0 ? 0 : value, nameof(ChatHistoryLimit)); }
+        public bool ChatTitlesByModel { get => _chatTitlesByModel; set => Set(ref _chatTitlesByModel, value, nameof(ChatTitlesByModel)); }
         public string AssistantName { get => _assistantName; set => Set(ref _assistantName, value, nameof(AssistantName)); }
         public string ThinkingDisplayModeText { get => _thinkingDisplayModeText; set => Set(ref _thinkingDisplayModeText, value, nameof(ThinkingDisplayModeText)); }
         public string ToolCallDisplayModeText { get => _toolCallDisplayModeText; set => Set(ref _toolCallDisplayModeText, value, nameof(ToolCallDisplayModeText)); }
@@ -91,6 +93,7 @@ namespace SimpleLLMChatGUI
             SysPrompt = AppSettings.SysPrompt.Default;
             ContextWindowSize = AppSettings.ContextWindowSize.Default;
             ChatHistoryLimit = AppSettings.ChatHistoryLimit.Default;
+            ChatTitlesByModel = AppSettings.ChatTitlesByModel.Default;
             AssistantName = AppSettings.AssistantName.Default;
             ThinkingDisplayModeText = AppSettings.ThinkingDisplay.Default.ToString();
             ToolCallDisplayModeText = AppSettings.ToolCallDisplay.Default.ToString();
@@ -148,7 +151,7 @@ namespace SimpleLLMChatGUI
 
         private List<string> GetSystemSettings()
         {
-            return SettingsIniWriter.GetSystemSettings(ApiKey, ServerURL, Model, SysPrompt, ContextWindowSize, ChatHistoryLimit);
+            return SettingsIniWriter.GetSystemSettings(ApiKey, ServerURL, Model, SysPrompt, ContextWindowSize, ChatHistoryLimit, ChatTitlesByModel);
         }
 
         private List<string> GetRagSettings()

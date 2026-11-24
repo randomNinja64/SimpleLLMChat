@@ -183,6 +183,10 @@
                     <TextBox x:Name="ChatHistoryLimitTextBox"
                              Text="{Binding ChatHistoryLimit, UpdateSourceTrigger=PropertyChanged}"
                              Height="23"/>
+                    <CheckBox x:Name="ChatTitlesByModelCheckBox"
+                              Content="Let the model title chats (one short extra request per new chat)"
+                              IsChecked="{Binding ChatTitlesByModel, UpdateSourceTrigger=PropertyChanged}"
+                              Margin="0,6,0,4"/>
 
                 </StackPanel>
             </ScrollViewer>

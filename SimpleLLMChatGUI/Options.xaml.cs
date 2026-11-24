@@ -281,6 +281,7 @@ namespace SimpleLLMChatGUI
             SysPrompt = ConfigHandler.DecodeStoredPrompt(config.Get(AppSettings.SysPrompt));
             ContextWindowSize = config.Get(AppSettings.ContextWindowSize);
             ChatHistoryLimit = config.Get(AppSettings.ChatHistoryLimit);
+            ChatTitlesByModel = config.Get(AppSettings.ChatTitlesByModel);
             AssistantName = config.Get(AppSettings.AssistantName);
             if (string.IsNullOrWhiteSpace(AssistantName))
                 AssistantName = AppConstants.DefaultAssistantName;

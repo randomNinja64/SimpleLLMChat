@@ -995,6 +995,37 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.model_title_off", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("reply-ok");
+                    server.TitleReply = "Should Not Be Used";
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    SetSystemIniValue(ws.Path, "chattitlesbymodel=0");
+                    string project = UseProjectWorkspace(ws.Path, "project");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        project))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("typed title please");
+                        TestAssert.True(probe.WaitForSessions(1, 20000), "saved");
+                        TestAssert.Equal("typed title please", (string)WaitForSavedChat(probe.Sessions()[0])["title"], "first-message title");
+                        TestAssert.Equal(0, server.TitleBodies.Count, "no title request");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.chat_recall", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

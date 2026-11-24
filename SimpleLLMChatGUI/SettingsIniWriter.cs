@@ -73,12 +73,14 @@ namespace SimpleLLMChatGUI
             string model,
             string sysPrompt,
             int contextWindowSize,
-            int? chatHistoryLimit = null)
+            int? chatHistoryLimit = null,
+            bool? chatTitlesByModel = null)
         {
             return new List<string>
             {
                 AppSettings.ApiKey.Line(apiKey ?? string.Empty),
                 AppSettings.ChatHistoryLimit.Line(chatHistoryLimit ?? AppSettings.ChatHistoryLimit.Default),
+                AppSettings.ChatTitlesByModel.Line(chatTitlesByModel ?? AppSettings.ChatTitlesByModel.Default ? "1" : "0"),
                 AppSettings.ContextWindowSize.Line(contextWindowSize),
                 AppSettings.LlmServer.Line(llmServer ?? string.Empty),
                 AppSettings.Model.Line(model ?? string.Empty),

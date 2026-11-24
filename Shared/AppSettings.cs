@@ -76,6 +76,8 @@ public static class AppSettings
     public static readonly Setting<string> ApiKey = Def(SectionSystem, "apikey", "");
     // Sessions kept in the chats folder beside the program; 0 turns auto-save off.
     public static readonly Setting<int> ChatHistoryLimit = Def(SectionSystem, "chathistorylimit", 50);
+    // After a new chat's first reply, ask the model for its title (else the first message names it).
+    public static readonly Setting<bool> ChatTitlesByModel = Def(SectionSystem, "chattitlesbymodel", true);
     public static readonly Setting<int> ContextWindowSize = Def(SectionSystem, "contextWindowSize", 0);
     public static readonly Setting<string> LlmServer = Def(SectionSystem, "llmserver", "");
     public static readonly Setting<string> Model = Def(SectionSystem, "model", "");

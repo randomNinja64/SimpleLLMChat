@@ -146,7 +146,8 @@ namespace SimpleLLMChatCLI
             Cancel.Begin();
             _client.ProcessConversation(_conversation, textPrompt, imageBase64, imageMime, _settings);
             // Titles name saved chats, so only with history on; and not if stopped.
-            if (newChat && historyLimit > 0 && !Cancel.Requested)
+            if (newChat && historyLimit > 0 && !Cancel.Requested
+                && Program.Config.Get(AppSettings.ChatTitlesByModel))
                 TitleFromFirstReply(textPrompt);
             Cancel.End();
 
