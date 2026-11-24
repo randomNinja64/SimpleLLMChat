@@ -18,6 +18,10 @@ namespace SimpleLLMChatCLI
         public ChatBlockDisplayMode ThinkingDisplay;
         public ChatBlockDisplayMode ToolCallDisplay;
         public ChatBlockDisplayMode ToolOutputDisplay;
+        /// <summary>Show "[reading …]" when document retrieval adds context.</summary>
+        public bool ShowDocStatus;
+        /// <summary>Show "[recalling …]" when earlier chats are recalled.</summary>
+        public bool ShowChatStatus;
         public int MaxConsecutiveFailures;
         public bool OutputOnly;
 
@@ -42,6 +46,8 @@ namespace SimpleLLMChatCLI
                 ThinkingDisplay = config.Get(AppSettings.ThinkingDisplay),
                 ToolCallDisplay = config.Get(AppSettings.ToolCallDisplay),
                 ToolOutputDisplay = config.Get(AppSettings.ToolOutputDisplay),
+                ShowDocStatus = config.Get(AppSettings.ShowDocStatus),
+                ShowChatStatus = config.Get(AppSettings.ShowChatStatus),
                 MaxConsecutiveFailures = Math.Max(0, config.Get(AppSettings.MaxConsecutiveFailedToolCalls)),
                 OutputOnly = outputOnly
             };

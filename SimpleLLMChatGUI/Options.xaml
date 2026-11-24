@@ -95,6 +95,16 @@
                               IsChecked="{Binding MarkdownParsing, UpdateSourceTrigger=PropertyChanged}"
                               Margin="0,4,0,4"/>
 
+                    <Label Content="RAG Notifications:"/>
+                    <CheckBox x:Name="ShowChatStatusCheckBox"
+                              Content="Show notifications for RAG from previous chats"
+                              IsChecked="{Binding ShowChatStatus, UpdateSourceTrigger=PropertyChanged}"
+                              Margin="0,4,0,4"/>
+                    <CheckBox x:Name="ShowDocStatusCheckBox"
+                              Content="Show notifications for RAG from documents"
+                              IsChecked="{Binding ShowDocStatus, UpdateSourceTrigger=PropertyChanged}"
+                              Margin="0,0,0,4"/>
+
                     <Label Content="Tool Approvals:"/>
                     <CheckBox x:Name="ShowJevConfidenceCheckBox"
                               Content="Show confidence level for automatic approvals"
@@ -183,10 +193,13 @@
                     <TextBox x:Name="ChatHistoryLimitTextBox"
                              Text="{Binding ChatHistoryLimit, UpdateSourceTrigger=PropertyChanged}"
                              Height="23"/>
+
+                    <!-- Chat Titles -->
+                    <Label Content="Chat Titles:"/>
                     <CheckBox x:Name="ChatTitlesByModelCheckBox"
-                              Content="Let the model title chats (one short extra request per new chat)"
+                              Content="Generate chat titles from model"
                               IsChecked="{Binding ChatTitlesByModel, UpdateSourceTrigger=PropertyChanged}"
-                              Margin="0,6,0,4"/>
+                              Margin="0,4,0,4"/>
 
                 </StackPanel>
             </ScrollViewer>

@@ -1026,6 +1026,47 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.rag_status_hidden", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("quiet-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    // Both sources on (appended: later keys win over the ini's ragenabled=0);
+                    // only the chat recall line hidden.
+                    File.AppendAllText(Path.Combine(ws.Path, "LLMSettings.ini"),
+                        "ragenabled=1\r\nragchathistory=1\r\nembeddingsmodel=test-embed\r\nshowchatstatus=0\r\n");
+                    Directory.CreateDirectory(Path.Combine(ws.Path, "knowledge"));
+                    File.WriteAllText(Path.Combine(ws.Path, "knowledge", "notes.txt"), "DOC-LINE\r\n", Encoding.UTF8);
+                    string project = UseProjectWorkspace(ws.Path, "project");
+                    string chats = Path.Combine(ws.Path, "chats", ChatWorkspace.FolderName(project));
+                    Directory.CreateDirectory(chats);
+                    RagTests.WriteChat(Path.Combine(chats, "earlier.json"), "Earlier chat", project,
+                        "EARLIER-QUESTION", null, "EARLIER-ANSWER", null, null);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        project))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+                        cli.WriteLine("quiet question");
+                        TestAssert.True(WaitStdoutContains(cli, "quiet-reply-ok", 20000), "reply");
+                        TestAssert.Contains(server.ChatBodies[0], "EARLIER-ANSWER", "chats still recalled");
+                        TestAssert.Contains(server.ChatBodies[0], "DOC-LINE", "documents still retrieved");
+                        TestAssert.True(cli.Stdout.IndexOf("[recalling", StringComparison.Ordinal) < 0, "chat line hidden");
+                        TestAssert.Contains(cli.Stdout, "[reading notes.txt]", "document line still shown");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.chat_recall", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

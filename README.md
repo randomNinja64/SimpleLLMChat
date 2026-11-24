@@ -66,6 +66,8 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `customfontfamily`: Font used for all non-code block text in the GUI
 - `fontsize`: Font size for chat and input text
 - `markdownparsing`: Enables/disables Markdown rendering in the GUI (`1` or `0`)
+- `showchatstatus`: Shows a status message when context is retrieved from previous chats (`1` or `0`, default on)
+- `showdocstatus`: Shows a status message when context is retrieved from RAG documents (`1` or `0`, default on)
 - `showjevconfidence`: Show/Hide automatic tool approval confidence level (`1` or `0`, default `1`)
 - `thinkingdisplay`: Model reasoning appearance (`shown`, `collapsed`, or `hidden`; default `collapsed`). Hidden shows a short `[thought for N seconds]` stub instead of the full reasoning.
 - `toolcalldisplay`: Model tool call appearance (`shown`, `collapsed`, or `hidden`; default `collapsed`). Hidden shows an expanded tool-call header with the tool name only (no arguments).

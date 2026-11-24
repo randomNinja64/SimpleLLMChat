@@ -17,6 +17,8 @@ namespace SimpleLLMChatGUI
         private string _toolCallDisplayModeText;
         private string _toolOutputDisplayModeText;
         private bool _markdownParsing;
+        private bool _showDocStatus;
+        private bool _showChatStatus;
         private string _codeFontFamily;
         private string _customFontFamily;
         private int _chatFontSize;
@@ -57,6 +59,8 @@ namespace SimpleLLMChatGUI
         public string ToolCallDisplayModeText { get => _toolCallDisplayModeText; set => Set(ref _toolCallDisplayModeText, value, nameof(ToolCallDisplayModeText)); }
         public string ToolOutputDisplayModeText { get => _toolOutputDisplayModeText; set => Set(ref _toolOutputDisplayModeText, value, nameof(ToolOutputDisplayModeText)); }
         public bool MarkdownParsing { get => _markdownParsing; set => Set(ref _markdownParsing, value, nameof(MarkdownParsing)); }
+        public bool ShowDocStatus { get => _showDocStatus; set => Set(ref _showDocStatus, value, nameof(ShowDocStatus)); }
+        public bool ShowChatStatus { get => _showChatStatus; set => Set(ref _showChatStatus, value, nameof(ShowChatStatus)); }
         public string CodeFontFamily { get => _codeFontFamily; set => Set(ref _codeFontFamily, value, nameof(CodeFontFamily)); }
         public string CustomFontFamily { get => _customFontFamily; set => Set(ref _customFontFamily, value, nameof(CustomFontFamily)); }
         public int ChatFontSize { get => _chatFontSize; set => Set(ref _chatFontSize, FontHandler.ClampFontSize(value), nameof(ChatFontSize)); }
@@ -99,6 +103,8 @@ namespace SimpleLLMChatGUI
             ToolCallDisplayModeText = AppSettings.ToolCallDisplay.Default.ToString();
             ToolOutputDisplayModeText = AppSettings.ToolOutputDisplay.Default.ToString();
             MarkdownParsing = AppSettings.MarkdownParsing.Default;
+            ShowDocStatus = AppSettings.ShowDocStatus.Default;
+            ShowChatStatus = AppSettings.ShowChatStatus.Default;
             CodeFontFamily = AppSettings.CodeBlockFontFamily.Default;
             CustomFontFamily = AppSettings.CustomFontFamily.Default;
             ChatFontSize = AppSettings.FontSize.Default;
@@ -143,6 +149,8 @@ namespace SimpleLLMChatGUI
                 AppSettings.CustomFontFamily.Line(CustomFontFamily),
                 AppSettings.FontSize.Line(ChatFontSize),
                 AppSettings.MarkdownParsing.Line(MarkdownParsing ? "1" : "0"),
+                AppSettings.ShowDocStatus.Line(ShowDocStatus ? "1" : "0"),
+                AppSettings.ShowChatStatus.Line(ShowChatStatus ? "1" : "0"),
                 AppSettings.ThinkingDisplay.Line((ThinkingDisplayModeText ?? AppSettings.ThinkingDisplay.DefaultText).ToLowerInvariant()),
                 AppSettings.ToolCallDisplay.Line((ToolCallDisplayModeText ?? AppSettings.ToolCallDisplay.DefaultText).ToLowerInvariant()),
                 AppSettings.ToolOutputDisplay.Line((ToolOutputDisplayModeText ?? AppSettings.ToolOutputDisplay.DefaultText).ToLowerInvariant()),

@@ -116,9 +116,9 @@ public partial class LLMClient
             if (everyTurn || isNewChat)
             {
                 AutoRagResult rag = AutoRagContext.TryRetrieve(config, userMessage, ChatRecall);
-                if (!string.IsNullOrEmpty(rag.UserStatusLine))
+                if (settings.ShowDocStatus && !string.IsNullOrEmpty(rag.UserStatusLine))
                     sink.Notice(rag.UserStatusLine);
-                if (!string.IsNullOrEmpty(rag.ChatStatusLine))
+                if (settings.ShowChatStatus && !string.IsNullOrEmpty(rag.ChatStatusLine))
                     sink.Notice(rag.ChatStatusLine);
                 retrieved = rag.Context;
             }

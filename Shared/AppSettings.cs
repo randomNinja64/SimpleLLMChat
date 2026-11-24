@@ -56,6 +56,8 @@ public static class AppSettings
     public static readonly Setting<string> CustomFontFamily = Def(SectionAppearance, "customfontfamily", "");
     public static readonly Setting<int> FontSize = Def(SectionAppearance, "fontsize", AppConstants.DefaultChatFontSize);
     public static readonly Setting<bool> MarkdownParsing = Def(SectionAppearance, "markdownparsing", true);
+    public static readonly Setting<bool> ShowDocStatus = Def(SectionAppearance, "showdocstatus", true);
+    public static readonly Setting<bool> ShowChatStatus = Def(SectionAppearance, "showchatstatus", true);
     public static readonly Setting<ChatBlockDisplayMode> ThinkingDisplay = Def(SectionAppearance, "thinkingdisplay", ChatBlockDisplayMode.Collapsed);
     public static readonly Setting<ChatBlockDisplayMode> ToolCallDisplay = Def(SectionAppearance, "toolcalldisplay", ChatBlockDisplayMode.Collapsed);
     public static readonly Setting<ChatBlockDisplayMode> ToolOutputDisplay = Def(SectionAppearance, "tooloutputdisplay", ChatBlockDisplayMode.Shown);

@@ -289,6 +289,8 @@ namespace SimpleLLMChatGUI
             ToolCallDisplayModeText = config.Get(AppSettings.ToolCallDisplay).ToString();
             ToolOutputDisplayModeText = config.Get(AppSettings.ToolOutputDisplay).ToString();
             MarkdownParsing = config.Get(AppSettings.MarkdownParsing);
+            ShowDocStatus = config.Get(AppSettings.ShowDocStatus);
+            ShowChatStatus = config.Get(AppSettings.ShowChatStatus);
             CodeFontFamily = config.Get(AppSettings.CodeBlockFontFamily);
             CustomFontFamily = config.Get(AppSettings.CustomFontFamily);
             ChatFontSize = config.Get(AppSettings.FontSize);
