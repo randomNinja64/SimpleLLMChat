@@ -508,7 +508,9 @@ namespace SimpleLLMChatCLI.Tests
                             }
                             System.Threading.Thread.Sleep(50);
                         }
-                        JArray messages = JArray.Parse(md);
+                        JObject saved = JObject.Parse(md);
+                        TestAssert.Equal("hello save", (string)saved["title"], "title");
+                        JArray messages = (JArray)saved["messages"];
                         TestAssert.Equal(4, messages.Count, "user, tool call, tool result, reply");
 
                         TestAssert.Equal("user", (string)messages[0]["role"], "user role");
@@ -580,6 +582,65 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.Contains(history, "call_old", "history tool call");
                         TestAssert.Contains(history, "loaded-answer", "history reply");
                         TestAssert.Contains((string)sent[sent.Count - 1]["content"], "next question", "new message last");
+
+                        // An untitled (bare array) file takes its title from the first user message.
+                        string resavedPath = Path.Combine(ws.Path, "resaved.json");
+                        cli.WriteLine("/save \"" + resavedPath + "\"");
+                        TestAssert.Equal("loaded-question", (string)WaitForSavedChat(resavedPath)["title"], "legacy title");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.chat_title", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("title-reply-ok");
+                    server.EnqueueContent("second-reply-ok");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string firstPath = Path.Combine(ws.Path, "first.json");
+                    string titledPath = Path.Combine(ws.Path, "titled.json");
+                    string resavedPath = Path.Combine(ws.Path, "resaved.json");
+                    File.WriteAllText(titledPath, new JObject
+                    {
+                        ["title"] = "kept title",
+                        ["messages"] = new JArray
+                        {
+                            new JObject { ["role"] = "user", ["content"] = "[Previous conversation summary]\nolder stuff" },
+                            new JObject { ["role"] = "assistant", ["content"] = "titled-answer" }
+                        }
+                    }.ToString(), Encoding.UTF8);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "ready");
+
+                        // Whitespace collapses and a long prompt is cut at a word boundary.
+                        cli.WriteLine("how   do I<<NEWLINE>>configure the knowledge index so that it skips the build folder entirely");
+                        TestAssert.True(WaitStdoutContains(cli, "title-reply-ok", 20000), "reply");
+                        cli.WriteLine("/save \"" + firstPath + "\"");
+                        TestAssert.Equal(
+                            "how do I configure the knowledge index so that it skips the...",
+                            (string)WaitForSavedChat(firstPath)["title"],
+                            "truncated title");
+
+                        // A stored title survives load, later turns, and re-save.
+                        cli.WriteLine("/load \"" + titledPath + "\"");
+                        TestAssert.True(WaitStdoutContains(cli, "titled-answer", 10000), "replayed");
+                        cli.WriteLine("another question");
+                        TestAssert.True(WaitStdoutContains(cli, "second-reply-ok", 20000), "second reply");
+                        cli.WriteLine("/save \"" + resavedPath + "\"");
+                        TestAssert.Equal("kept title", (string)WaitForSavedChat(resavedPath)["title"], "kept title");
+
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }
@@ -1289,6 +1350,28 @@ namespace SimpleLLMChatCLI.Tests
                 System.Threading.Thread.Sleep(50);
             }
             return false;
+        }
+
+        // Retries the parse: the CLI may still be writing the file.
+        internal static JObject WaitForSavedChat(string path)
+        {
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(10000);
+            while (true)
+            {
+                try
+                {
+                    if (File.Exists(path))
+                        return JObject.Parse(File.ReadAllText(path, Encoding.UTF8));
+                }
+                catch (Exception)
+                {
+                    if (DateTime.UtcNow >= deadline)
+                        throw;
+                }
+                if (DateTime.UtcNow >= deadline)
+                    throw new Exception("Saved chat not written: " + path);
+                System.Threading.Thread.Sleep(50);
+            }
         }
     }
 }

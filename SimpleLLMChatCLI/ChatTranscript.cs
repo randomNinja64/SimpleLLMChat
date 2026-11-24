@@ -1,31 +1,51 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace SimpleLLMChatCLI
 {
     /// <summary>
-    /// The saved-chat file format. It records the conversation exactly as it is
-    /// sent to the model (roles, tool calls, tool results, images), so a later
-    /// loader can rebuild the ChatMessage list and continue the session.
+    /// The saved-chat file format: { "title": ..., "messages": [...] }. The
+    /// messages record the conversation exactly as it is sent to the model
+    /// (roles, tool calls, tool results, images), so a later loader can rebuild
+    /// the ChatMessage list and continue the session.
     /// </summary>
     internal static class ChatTranscript
     {
-        public static void Save(string path, List<LLMClient.ChatMessage> conversation)
+        private const int TitleMaxLength = 60;
+
+        public static void Save(string path, string title, List<LLMClient.ChatMessage> conversation)
         {
             JArray messages = new JArray();
             foreach (LLMClient.ChatMessage message in conversation)
                 messages.Add(ToJson(message));
 
-            File.WriteAllText(path, messages.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
+            JObject root = new JObject();
+            if (!string.IsNullOrEmpty(title))
+                root["title"] = title;
+            root["messages"] = messages;
+
+            File.WriteAllText(path, root.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
         }
 
-        public static List<LLMClient.ChatMessage> Load(string path)
+        public static List<LLMClient.ChatMessage> Load(string path, out string title)
         {
+            JToken root = JToken.Parse(File.ReadAllText(path, Encoding.UTF8));
+
+            // Early saves were a bare message array with no title.
+            JArray messages = root as JArray;
+            title = null;
+            if (messages == null)
+            {
+                title = (string)root["title"];
+                messages = root["messages"] as JArray ?? new JArray();
+            }
+
             List<LLMClient.ChatMessage> conversation = new List<LLMClient.ChatMessage>();
-            foreach (JObject obj in JArray.Parse(File.ReadAllText(path, Encoding.UTF8)))
+            foreach (JObject obj in messages)
             {
                 LLMClient.ChatMessage message = new LLMClient.ChatMessage(
                     (string)obj["role"] ?? string.Empty, (string)obj["content"] ?? string.Empty);
@@ -48,7 +68,40 @@ namespace SimpleLLMChatCLI
                 }
                 conversation.Add(message);
             }
+
+            if (string.IsNullOrEmpty(title))
+                title = TitleFromConversation(conversation);
             return conversation;
+        }
+
+        /// <summary>
+        /// A one-line title from the prompt the user typed: whitespace collapsed,
+        /// cut at a word boundary. Null when there is no text (an image-only message).
+        /// </summary>
+        public static string MakeTitle(string prompt)
+        {
+            string text = Regex.Replace(prompt ?? string.Empty, @"\s+", " ").Trim();
+            if (text.Length == 0)
+                return null;
+            if (text.Length <= TitleMaxLength)
+                return text;
+
+            int cut = text.LastIndexOf(' ', TitleMaxLength);
+            if (cut < TitleMaxLength / 2)
+                cut = TitleMaxLength;
+            return text.Substring(0, cut).TrimEnd() + "...";
+        }
+
+        // For files without a title: the first user message. RAG context or a
+        // summary may have been merged into it, but it is the best there is.
+        private static string TitleFromConversation(List<LLMClient.ChatMessage> conversation)
+        {
+            foreach (LLMClient.ChatMessage message in conversation)
+            {
+                if (message.Role == "user")
+                    return MakeTitle(message.Content);
+            }
+            return null;
         }
 
         private static JObject ToJson(LLMClient.ChatMessage message)

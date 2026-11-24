@@ -18,6 +18,10 @@ namespace SimpleLLMChatCLI
         private readonly List<LLMClient.ChatMessage> _conversation = new List<LLMClient.ChatMessage>();
         private TurnSettings _settings;
 
+        // Taken from the prompt as typed: the first user message in _conversation
+        // can carry merged RAG context, or be replaced by a summary.
+        private string _title;
+
         // A handler gets the text after the command name, or null when there is none.
         // It returns false to have the line sent to the model as a message instead.
         private readonly Dictionary<string, Func<string, bool>> _commands =
@@ -119,6 +123,10 @@ namespace SimpleLLMChatCLI
                 textPrompt = userInput;
             }
 
+            // Image-only messages have no text, so the next one with text names the chat.
+            if (_title == null)
+                _title = ChatTranscript.MakeTitle(textPrompt);
+
             Cancel.Begin();
             _client.ProcessConversation(_conversation, textPrompt, imageBase64, imageMime, _settings);
             Cancel.End();
@@ -127,6 +135,7 @@ namespace SimpleLLMChatCLI
         private void Clear()
         {
             _conversation.Clear();
+            _title = null;
             _client.PublishStatusTokens(_client.GetBaseCharacterOverhead());
             if (_showBanners)
             {
@@ -160,7 +169,7 @@ namespace SimpleLLMChatCLI
 
             try
             {
-                ChatTranscript.Save(arguments.Trim().Trim('"'), _conversation);
+                ChatTranscript.Save(arguments.Trim().Trim('"'), _title, _conversation);
             }
             catch (Exception ex)
             {
@@ -176,9 +185,10 @@ namespace SimpleLLMChatCLI
                 return false;
 
             List<LLMClient.ChatMessage> loaded;
+            string title;
             try
             {
-                loaded = ChatTranscript.Load(arguments.Trim().Trim('"'));
+                loaded = ChatTranscript.Load(arguments.Trim().Trim('"'), out title);
             }
             catch (Exception ex)
             {
@@ -189,6 +199,7 @@ namespace SimpleLLMChatCLI
 
             _conversation.Clear();
             _conversation.AddRange(loaded);
+            _title = title;
             _client.PublishStatusTokens(
                 LLMClient.GetConversationCharacterCount(_conversation) + _client.GetBaseCharacterOverhead());
 
