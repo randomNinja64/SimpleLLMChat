@@ -1,0 +1,76 @@
+<Window x:Class="SimpleLLMChatGUI.ApprovalDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tool Call"
+        AutomationProperties.AutomationId="ApprovalDialog"
+        SizeToContent="WidthAndHeight"
+        MinWidth="360"
+        MinHeight="180"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackgroundColorBrush}"
+        Loaded="Window_Loaded">
+
+    <!-- Header and buttons are Auto rows, so they stay visible; only the
+         arguments box (the * row) shrinks and scrolls when the call is large. -->
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
+            <TextBlock x:Name="ToolNameText"
+                       AutomationProperties.AutomationId="ToolNameText"
+                       FontWeight="Bold"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource LabelTextColorBrush}"/>
+            <TextBlock x:Name="ConfidenceText"
+                       AutomationProperties.AutomationId="ConfidenceText"
+                       Margin="0,2,0,0"
+                       Visibility="Collapsed"
+                       Foreground="{DynamicResource LabelTextColorBrush}"/>
+        </StackPanel>
+
+        <TextBox x:Name="ArgumentsText"
+                 Grid.Row="1"
+                 AutomationProperties.AutomationId="ArgumentsText"
+                 IsReadOnly="True"
+                 IsReadOnlyCaretVisible="True"
+                 TextWrapping="NoWrap"
+                 AcceptsReturn="True"
+                 HorizontalScrollBarVisibility="Auto"
+                 VerticalScrollBarVisibility="Auto"
+                 Padding="4"/>
+
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="Allow this tool call?"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource LabelTextColorBrush}"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button x:Name="YesButton"
+                        AutomationProperties.AutomationId="ApproveButton"
+                        Content="_Yes"
+                        Width="75"
+                        Height="23"
+                        Margin="8,0,8,0"
+                        Click="YesButton_Click"/>
+                <!-- No is the default and the cancel button: Enter or Esc denies. -->
+                <Button x:Name="NoButton"
+                        AutomationProperties.AutomationId="DenyButton"
+                        Content="_No"
+                        Width="75"
+                        Height="23"
+                        IsDefault="True"
+                        IsCancel="True"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

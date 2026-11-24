@@ -154,6 +154,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="ApprovalDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChatTurn.cs" />
@@ -176,6 +180,10 @@
     <Compile Include="ModelChooserDialog.xaml.cs">
       <DependentUpon>ModelChooserDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ApprovalDialog.xaml.cs">
+      <DependentUpon>ApprovalDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ToolArgumentsFormatter.cs" />
     <Compile Include="ProcessHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>

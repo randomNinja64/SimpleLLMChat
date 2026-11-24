@@ -161,14 +161,28 @@ namespace SimpleLLMChatGUI.Tests
             return false;
         }
 
+        /// <summary>What the tool approval dialog showed, captured before it was answered.</summary>
+        public sealed class ApprovalPrompt
+        {
+            public string Header;
+            public string Arguments;
+            public System.Windows.Rect Dialog;
+            public System.Windows.Rect ApproveButton;
+            public System.Windows.Rect DenyButton;
+            public bool ButtonsOffscreen;
+
+            public string Text { get { return Header + Arguments; } }
+        }
+
         /// <summary>
-        /// Waits for the GUI's message box, presses Yes or No, and returns its text.
+        /// Waits for the GUI's tool approval dialog, presses Yes or No, and returns
+        /// what it showed and where.
         /// </summary>
-        public string AnswerMessageBox(bool yes, int timeoutMs)
+        public ApprovalPrompt AnswerApproval(bool yes, int timeoutMs)
         {
             Condition isDialog = new AndCondition(
                 new PropertyCondition(AutomationElement.ProcessIdProperty, _gui.Id),
-                new PropertyCondition(AutomationElement.ClassNameProperty, "#32770"));
+                new PropertyCondition(AutomationElement.AutomationIdProperty, "ApprovalDialog"));
 
             Stopwatch sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < timeoutMs)
@@ -176,24 +190,63 @@ namespace SimpleLLMChatGUI.Tests
                 AutomationElement dialog =
                     AutomationElement.RootElement.FindFirst(TreeScope.Children, isDialog)
                     ?? _window.FindFirst(TreeScope.Descendants, isDialog);
-                // IDYES = 6, IDNO = 7
-                AutomationElement button = dialog == null ? null : dialog.FindFirst(
-                    TreeScope.Descendants,
-                    new PropertyCondition(AutomationElement.AutomationIdProperty, yes ? "6" : "7"));
-                if (button != null)
+                AutomationElement approve = FindIn(dialog, "ApproveButton");
+                AutomationElement deny = FindIn(dialog, "DenyButton");
+                AutomationElement arguments = FindIn(dialog, "ArgumentsText");
+                if (approve != null && deny != null && arguments != null)
                 {
-                    StringBuilder text = new StringBuilder();
+                    StringBuilder header = new StringBuilder();
                     foreach (AutomationElement label in dialog.FindAll(
                         TreeScope.Descendants,
                         new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)))
-                        text.AppendLine(label.Current.Name);
+                        header.AppendLine(label.Current.Name);
 
+                    ApprovalPrompt prompt = new ApprovalPrompt
+                    {
+                        Header = header.ToString(),
+                        Arguments = ((ValuePattern)arguments.GetCurrentPattern(ValuePattern.Pattern)).Current.Value,
+                        Dialog = dialog.Current.BoundingRectangle,
+                        ApproveButton = approve.Current.BoundingRectangle,
+                        DenyButton = deny.Current.BoundingRectangle,
+                        ButtonsOffscreen = approve.Current.IsOffscreen || deny.Current.IsOffscreen
+                    };
+
+                    AutomationElement button = yes ? approve : deny;
                     ((InvokePattern)button.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
-                    return text.ToString();
+                    return prompt;
                 }
                 Thread.Sleep(100);
             }
-            throw new TestFailureException("Message box did not appear within " + timeoutMs + " ms");
+            throw new TestFailureException("Approval dialog did not appear within " + timeoutMs + " ms");
+        }
+
+        private static AutomationElement FindIn(AutomationElement root, string automationId)
+        {
+            return root == null ? null : root.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.AutomationIdProperty, automationId));
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetProcessDPIAware();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SystemParametersInfo(int action, int param, ref NativeRect rect, int winIni);
+
+        private struct NativeRect { public int Left, Top, Right, Bottom; }
+
+        /// <summary>
+        /// The primary screen's work area in device pixels, the same units as UI
+        /// Automation's bounding rectangles.
+        /// </summary>
+        public static System.Windows.Rect PrimaryWorkArea()
+        {
+            // Unaware processes get scaled values at high DPI; UIA reports real pixels.
+            SetProcessDPIAware();
+            const int SPI_GETWORKAREA = 0x0030;
+            NativeRect r = new NativeRect();
+            SystemParametersInfo(SPI_GETWORKAREA, 0, ref r, 0);
+            return new System.Windows.Rect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
         }
 
         public Process FindCliProcess()

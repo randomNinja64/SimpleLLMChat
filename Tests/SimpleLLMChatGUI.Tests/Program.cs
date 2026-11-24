@@ -66,6 +66,32 @@ namespace SimpleLLMChatGUI.Tests
                 }
             });
 
+            TestRunner.Run("ToolArgumentsFormatter.fields_and_blocks", () =>
+            {
+                string text = ToolArgumentsFormatter.Format(
+                    "{\"path\":\"C:\\\\temp\\\\new.cs\",\"content\":\"line one\\nline two\",\"overwrite\":true,\"count\":3}");
+                TestAssert.Contains(text, "path: C:\\temp\\new.cs", "single-line field, backslashes kept");
+                TestAssert.Contains(text, "content:\r\n    line one\r\n    line two", "multi-line field indented as a block");
+                TestAssert.Contains(text, "overwrite: true", "boolean");
+                TestAssert.Contains(text, "count: 3", "number");
+            });
+
+            TestRunner.Run("ToolArgumentsFormatter.nested_edits", () =>
+            {
+                string text = ToolArgumentsFormatter.Format(
+                    "{\"path\":\"a.txt\",\"edits\":[{\"old_string\":\"x\",\"new_string\":\"y\\nz\"}]}");
+                TestAssert.Contains(text, "edits:\r\n    [1]:\r\n        old_string: x", "array items numbered and indented");
+                TestAssert.Contains(text, "        new_string:\r\n            y\r\n            z", "nested block");
+            });
+
+            TestRunner.Run("ToolArgumentsFormatter.fallbacks", () =>
+            {
+                TestAssert.Equal("(no arguments)", ToolArgumentsFormatter.Format(""), "empty");
+                TestAssert.Equal("(no arguments)", ToolArgumentsFormatter.Format("{}"), "empty object");
+                TestAssert.Equal("{\"command\": \"echo\n", ToolArgumentsFormatter.Format("{\"command\": \"echo\\n"),
+                    "invalid JSON shown raw, unescaped as before");
+            });
+
             TestRunner.Run("ModelsClient.list_models", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
@@ -192,15 +218,7 @@ namespace SimpleLLMChatGUI.Tests
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
                 using (TempWorkspace ws = PackageGuiWorkspace())
                 {
-                    // The GUI test host has no tools of its own; borrow the CLI suite's copy.
-                    string shellTools = Path.Combine(
-                        AppDomain.CurrentDomain.BaseDirectory, "..", "SimpleLLMChatCLI.Tests", "tools", "ShellTools");
-                    if (!File.Exists(Path.Combine(shellTools, "ShellTools.exe")))
-                        TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
-                    string toolsDst = Path.Combine(ws.Path, "tools", "ShellTools");
-                    Directory.CreateDirectory(toolsDst);
-                    foreach (string file in Directory.GetFiles(shellTools))
-                        File.Copy(file, Path.Combine(toolsDst, Path.GetFileName(file)), true);
+                    InstallShellToolsRequiringApproval(ws);
 
                     server.StreamDelayMs = 0;
                     server.EnqueueToolCall(
@@ -209,19 +227,16 @@ namespace SimpleLLMChatGUI.Tests
                         "{\"command\":\"echo GUI_APPROVE_OK\"}");
                     server.EnqueueContent("gui-approve-final");
                     WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
-                    // Later keys win, so this overrides the empty defaults above.
-                    File.AppendAllText(
-                        Path.Combine(ws.Path, "LLMSettings.ini"),
-                        "\r\ntools=run_shell_command\r\ntoolsrequiringapproval=run_shell_command\r\n");
+                    RequireApprovalForShell(ws);
 
                     using (GuiDriver gui = new GuiDriver(ws.Path))
                     {
                         gui.WaitUntilReady(30000);
                         gui.Submit("please run the command");
 
-                        string dialog = gui.AnswerMessageBox(true, 30000);
-                        TestAssert.Contains(dialog, "run_shell_command", "dialog names tool");
-                        TestAssert.Contains(dialog, "GUI_APPROVE_OK", "dialog shows arguments");
+                        GuiDriver.ApprovalPrompt dialog = gui.AnswerApproval(true, 30000);
+                        TestAssert.Contains(dialog.Header, "run_shell_command", "dialog names tool");
+                        TestAssert.Contains(dialog.Arguments, "command: echo GUI_APPROVE_OK", "dialog shows arguments");
 
                         gui.WaitForTurnComplete(60000);
                         TestAssert.True(gui.WaitForChatText("gui-approve-final", 10000), "final reply shown");
@@ -232,6 +247,55 @@ namespace SimpleLLMChatGUI.Tests
                         TestAssert.True(
                             gui.ReadChatText().IndexOf("Approve?", StringComparison.Ordinal) < 0,
                             "no approval prompt in transcript");
+                    }
+                }
+            });
+
+            TestRunner.Run("gui.approval_dialog_large_call_fits_screen", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageGuiWorkspace())
+                {
+                    InstallShellToolsRequiringApproval(ws);
+
+                    // Far taller and wider than any screen: 400 lines, one of them 3,000 characters.
+                    StringBuilder command = new StringBuilder();
+                    for (int i = 1; i <= 400; i++)
+                        command.Append("echo LINE_").Append(i).Append('\n');
+                    command.Append("echo ").Append(new string('W', 3000)).Append(" WIDE_END");
+
+                    server.StreamDelayMs = 0;
+                    server.EnqueueToolCall(
+                        "run_shell_command",
+                        "call_gui_large",
+                        new Newtonsoft.Json.Linq.JObject { ["command"] = command.ToString() }
+                            .ToString(Newtonsoft.Json.Formatting.None));
+                    server.EnqueueContent("gui-large-final");
+                    WriteGuiIni(ws.Path, server.BaseUrl + "/v1");
+                    RequireApprovalForShell(ws);
+
+                    using (GuiDriver gui = new GuiDriver(ws.Path))
+                    {
+                        gui.WaitUntilReady(30000);
+                        gui.Submit("please run the long command");
+
+                        GuiDriver.ApprovalPrompt dialog = gui.AnswerApproval(false, 30000);
+                        System.Windows.Rect screen = GuiDriver.PrimaryWorkArea();
+                        TestLog.Detail("work area " + screen + ", dialog " + dialog.Dialog
+                            + ", yes " + dialog.ApproveButton + ", no " + dialog.DenyButton);
+
+                        TestAssert.Contains(dialog.Arguments, "    echo LINE_1\r\n", "first line, as a block");
+                        TestAssert.Contains(dialog.Arguments, "echo LINE_400", "last line: nothing cut");
+                        TestAssert.Contains(dialog.Arguments, "WIDE_END", "long line not cut");
+                        TestAssert.True(!dialog.ButtonsOffscreen, "buttons reported on screen");
+                        TestAssert.True(screen.Contains(dialog.ApproveButton), "Yes inside the work area");
+                        TestAssert.True(screen.Contains(dialog.DenyButton), "No inside the work area");
+                        TestAssert.True(dialog.Dialog.Height <= screen.Height, "dialog no taller than the screen");
+                        TestAssert.True(dialog.Dialog.Width <= screen.Width, "dialog no wider than the screen");
+
+                        gui.WaitForTurnComplete(60000);
+                        TestAssert.True(gui.WaitForChatText("gui-large-final", 10000), "final reply shown");
+                        TestAssert.Contains(server.LastBody, "cancelled by the user", "No denied the call");
                     }
                 }
             });
@@ -316,6 +380,30 @@ namespace SimpleLLMChatGUI.Tests
                     File.Copy(src, Path.Combine(ws.Path, f), true);
             }
             return ws;
+        }
+
+        /// <summary>
+        /// The GUI test host has no tools of its own; borrow the CLI suite's ShellTools.
+        /// Skips the test when that copy is missing.
+        /// </summary>
+        static void InstallShellToolsRequiringApproval(TempWorkspace ws)
+        {
+            string shellTools = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "..", "SimpleLLMChatCLI.Tests", "tools", "ShellTools");
+            if (!File.Exists(Path.Combine(shellTools, "ShellTools.exe")))
+                TestRunner.Skip("tools/ShellTools not packaged beside CLI test host");
+            string toolsDst = Path.Combine(ws.Path, "tools", "ShellTools");
+            Directory.CreateDirectory(toolsDst);
+            foreach (string file in Directory.GetFiles(shellTools))
+                File.Copy(file, Path.Combine(toolsDst, Path.GetFileName(file)), true);
+        }
+
+        /// <summary>Call after <see cref="WriteGuiIni"/>: later keys win over its empty defaults.</summary>
+        static void RequireApprovalForShell(TempWorkspace ws)
+        {
+            File.AppendAllText(
+                Path.Combine(ws.Path, "LLMSettings.ini"),
+                "\r\ntools=run_shell_command\r\ntoolsrequiringapproval=run_shell_command\r\n");
         }
 
         static void WriteGuiIni(string dir, string llmServer)

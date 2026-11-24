@@ -289,16 +289,7 @@ namespace SimpleLLMChatGUI
                     _streamingTurn.AppendText("\r\n");
                 }
 
-                string message = string.IsNullOrEmpty(confidence)
-                    ? ToolApproval.FormatApprovalMessage(toolName, arguments)
-                    : ToolApproval.FormatApprovalMessage(toolName, arguments, confidence);
-                MessageBoxResult result = MessageBox.Show(
-                    message,
-                    "Tool Call",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question,
-                    MessageBoxResult.No);
-                approved = result == MessageBoxResult.Yes;
+                approved = ApprovalDialog.Ask(this, toolName, arguments, confidence);
             }));
             return approved;
         }

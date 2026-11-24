@@ -72,6 +72,9 @@
     <Compile Include="..\..\SimpleLLMChatGUI\ChatHistoryStore.cs">
       <Link>GUI\ChatHistoryStore.cs</Link>
     </Compile>
+    <Compile Include="..\..\SimpleLLMChatGUI\ToolArgumentsFormatter.cs">
+      <Link>GUI\ToolArgumentsFormatter.cs</Link>
+    </Compile>
     <Compile Include="..\..\Shared\IniFileHandler.cs">
       <Link>Shared\IniFileHandler.cs</Link>
     </Compile>
