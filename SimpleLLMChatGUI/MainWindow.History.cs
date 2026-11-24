@@ -302,8 +302,8 @@ namespace SimpleLLMChatGUI
                 return;
 
             // Stop the CLI first, or its next auto-save would write the chat back.
-            if (entry.IsCurrent)
-                RestartChat(null, null);
+            if (entry.IsCurrent && !RestartChat(null, null))
+                return;
 
             try
             {

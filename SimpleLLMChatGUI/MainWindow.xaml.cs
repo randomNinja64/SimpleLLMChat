@@ -20,6 +20,7 @@ namespace SimpleLLMChatGUI
         private readonly ObservableCollection<ChatTurn> _chatTurns = new ObservableCollection<ChatTurn>();
         private ChatTurn _streamingTurn;
         private string _pendingCommand;
+        private bool _generating;
 
         private const double ChatTurnGapMin = 8;
         private const double ChatTurnGapMax = 24;
@@ -307,6 +308,7 @@ namespace SimpleLLMChatGUI
             // Background so any already-queued output updates (Normal) run first.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
             {
+                _generating = false;
                 EndStreamingTurn();
                 if (IsMarkdownParsingEnabled())
                     ApplyMarkdown();
@@ -510,6 +512,7 @@ namespace SimpleLLMChatGUI
                     }
                 }
 
+                _generating = true;
                 chatInput.Clear();
             }
             else
@@ -589,9 +592,20 @@ namespace SimpleLLMChatGUI
         /// <summary>
         /// Starts a fresh CLI, then sends <paramref name="command"/> once it is ready:
         /// chat output published before the GUI connects to the pipe is lost.
+        /// Returns false if the user chose to keep a reply that is still generating.
         /// </summary>
-        private void RestartChat(string command, string chatPath)
+        private bool RestartChat(string command, string chatPath)
         {
+            if (_generating)
+            {
+                MessageBoxResult answer = MessageBox.Show(this,
+                    "Generation is still in progress; switching chats will lose the current reply. Switch anyway?",
+                    "Generation in Progress", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                if (answer != MessageBoxResult.Yes)
+                    return false;
+                _generating = false;
+            }
+
             // Kill running process first to stop any new output
             if (processHandler != null)
             {
@@ -605,6 +619,7 @@ namespace SimpleLLMChatGUI
                 SelectCurrentChat();
 
             ClearChatAndRestart();
+            return true;
         }
 
         private void optionsButton_Click(object sender, RoutedEventArgs e)
