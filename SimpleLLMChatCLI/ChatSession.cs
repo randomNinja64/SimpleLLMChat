@@ -152,6 +152,10 @@ namespace SimpleLLMChatCLI
                 TitleFromFirstReply(textPrompt);
             Cancel.End();
 
+            // A first prompt stopped before any reply is dropped; the next one names the chat.
+            if (_conversation.Count == 0)
+                _title = null;
+
             // After every turn, finished or stopped.
             AutoSave(historyLimit);
         }

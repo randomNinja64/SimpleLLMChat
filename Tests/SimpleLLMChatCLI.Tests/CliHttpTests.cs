@@ -123,6 +123,15 @@ namespace SimpleLLMChatCLI.Tests
 
                         cli.WriteLine("again");
                         TestAssert.True(Program.WaitStdoutContains(cli, "recovered-ok", 20000), "next turn works");
+
+                        // The failed prompt got no reply, so it was dropped: no two user messages in a row.
+                        JArray sent = (JArray)JObject.Parse(server.LastBody)["messages"];
+                        for (int i = 1; i < sent.Count; i++)
+                            TestAssert.True((string)sent[i]["role"] != "user" || (string)sent[i - 1]["role"] != "user",
+                                "no two user messages in a row");
+                        TestAssert.True(server.LastBody.IndexOf("\"hello\"", StringComparison.Ordinal) < 0,
+                            "unanswered prompt dropped");
+                        TestAssert.Contains((string)sent[sent.Count - 1]["content"], "again", "new prompt sent");
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }

@@ -122,14 +122,19 @@ public partial class LLMClient
             }
         }
 
+        ChatMessage? summaryMessage = conversation.Count > 0 ? conversation[conversation.Count - 1] : (ChatMessage?)null;
         string summary = TakeTrailingSummary(conversation);
         if (summary != null)
             retrieved = string.IsNullOrEmpty(retrieved) ? summary : summary + "\n\n" + retrieved;
+        else
+            summaryMessage = null;
 
+        int promptIndex = conversation.Count;
+        string promptContent = userMessage ?? string.Empty;
         conversation.Add(new ChatMessage
         {
             Role = "user",
-            Content = userMessage ?? string.Empty,
+            Content = promptContent,
             Context = retrieved,
             Image = image,
             ImageMime = string.IsNullOrEmpty(imageMime) ? null : imageMime
@@ -186,6 +191,20 @@ public partial class LLMClient
 
             sink.EndLine();
             break;
+        }
+
+        // Stopped or failed before any reply: drop the unanswered prompt, so the chat
+        // (and its saved file) never has two user messages in a row. A summary the
+        // prompt had taken goes back as it was. (Same string instance: a mid-turn
+        // summary message at that index is not the prompt.)
+        if (conversation.Count == promptIndex + 1
+            && IsRole(conversation[promptIndex], "user")
+            && ReferenceEquals(conversation[promptIndex].Content, promptContent))
+        {
+            conversation.RemoveAt(promptIndex);
+            if (summaryMessage.HasValue)
+                conversation.Add(summaryMessage.Value);
+            PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
         }
 
         if (Cancel.Requested)
