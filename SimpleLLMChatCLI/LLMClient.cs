@@ -337,13 +337,16 @@ public partial class LLMClient
         if (!TokenEstimator.ShouldSummarize(statusChars, contextWindow))
             return;
 
-        // Clearing alone is silent: the token counter shows it.
+        // Usage was at 90% or more, so getting under the clearing target means something was cleared.
         bool enough;
         ClearOldToolOutputs(conversation, statusChars, false, out enough);
         if (enough)
+        {
+            sink.Notice(CompactedNotice);
             return;
+        }
 
-        sink.Notice("[Context usage high - summarizing conversation...]");
+        sink.Notice("[Context usage high - compacting conversation...]");
 
         int keepFrom = RecentKeepStart(conversation, TokenEstimator.KeepRecentChars(contextWindow));
         string summary = SummarizeConversation(conversation.GetRange(0, keepFrom));
@@ -354,7 +357,7 @@ public partial class LLMClient
             int dropped = DropOldestMessagesUntilFit(conversation, contextWindow);
             int chars = CurrentCharacterCount(conversation);
             if (dropped > 0)
-                sink.Notice("[Summarization failed - dropped older messages]");
+                sink.Notice("[Compaction failed - dropped older messages]");
 
             // Last resort: this turn's own tool output, all but the newest result.
             if (TokenEstimator.ShouldSummarize(chars, contextWindow)
@@ -363,21 +366,21 @@ public partial class LLMClient
 
             PublishStatusTokens(chars);
             if (TokenEstimator.ShouldSummarize(chars, contextWindow))
-                sink.Notice("[Summarization failed - current turn still exceeds the context window]");
+                sink.Notice("[Compaction failed - current turn still exceeds the context window]");
             return;
         }
 
         ReplaceWithSummary(conversation, keepFrom, summary, continueHint);
-        sink.Notice("[Conversation summarized - continuing...]");
+        sink.Notice(CompactedNotice);
     }
 
     /// <summary>
     /// The /compact command: the same rule as automatic summarization, at any usage.
     /// All old tool output is cleared; if usage is then at or under the clearing
     /// target, that is all, otherwise the conversation is summarized. A failed
-    /// summary keeps the conversation, less any cleared output. Only a summary prints
-    /// anything; otherwise the token counter shows the change. Returns true when the
-    /// conversation changed.
+    /// summary keeps the conversation, less any cleared output. Ending under the target
+    /// prints "[Conversation compacted]" even when nothing needed clearing. Returns true
+    /// when the conversation changed.
     /// </summary>
     public bool CompactConversation(List<ChatMessage> conversation, TurnSettings settings)
     {
@@ -393,11 +396,11 @@ public partial class LLMClient
         int cleared = ClearOldToolOutputs(conversation, CurrentCharacterCount(conversation), true, out enough);
         if (enough)
         {
-            ChatOutput.MarkSeparated();
+            sink.Notice("[Conversation compacted]");
             return cleared > 0;
         }
 
-        sink.Notice("[Summarizing conversation...]");
+        sink.Notice("[Compacting conversation...]");
 
         int keepFrom = RecentKeepStart(
             conversation, TokenEstimator.KeepRecentChars(config.Get(AppSettings.ContextWindowSize)));
@@ -406,16 +409,18 @@ public partial class LLMClient
         {
             PublishStatusTokens(CurrentCharacterCount(conversation));
             if (!Cancel.Requested)
-                sink.Error("[Summarization failed]");
+                sink.Error("[Compaction failed]");
             return cleared > 0;
         }
 
         ReplaceWithSummary(conversation, keepFrom, summary, NextMessageHint);
-        sink.Notice("[Conversation summarized]");
+        sink.Notice("[Conversation compacted]");
         return true;
     }
 
-    private const string NextMessageHint = "\n\n[Continue from this context. The user's next message follows.]";
+    private const string CompactedNotice = "[Conversation compacted - continuing...]";
+
+    private const string NextMessageHint ="\n\n[Continue from this context. The user's next message follows.]";
 
     private const string ToolOutputHeaderEnd = "\nOutput:\n";
     private const string ClearedToolOutput = "[Output cleared to save context]";

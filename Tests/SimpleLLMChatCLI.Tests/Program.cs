@@ -301,7 +301,7 @@ namespace SimpleLLMChatCLI.Tests
 
                         cli.WriteLine("please trim");
                         TestAssert.True(WaitStdoutContains(cli, "after-trim", 20000), "follow-up");
-                        TestAssert.True(WaitStdoutContains(cli, "[Summarization failed - dropped older messages]", 5000), "dropped note");
+                        TestAssert.True(WaitStdoutContains(cli, "[Compaction failed - dropped older messages]", 5000), "dropped note");
                         TestAssert.True(
                             cli.Stdout.IndexOf("current turn still exceeds", StringComparison.Ordinal) < 0,
                             "current turn fits");
@@ -356,7 +356,7 @@ namespace SimpleLLMChatCLI.Tests
 
                         cli.WriteLine("third question");
                         TestAssert.True(WaitStdoutContains(cli, "after-summary", 20000), "reply after summary");
-                        TestAssert.True(WaitStdoutContains(cli, "[Conversation summarized - continuing...]", 5000), "summarized note");
+                        TestAssert.True(WaitStdoutContains(cli, "[Conversation compacted - continuing...]", 5000), "summarized note");
                         TestAssert.Equal(4, server.ChatBodies.Count, "one summary request");
 
                         string summaryRequest = server.ChatBodies[2];
@@ -406,10 +406,10 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.Equal(1, server.ChatBodies.Count, "no request for an empty chat");
 
                         cli.WriteLine("/compact");
-                        TestAssert.True(WaitStdoutContains(cli, "[Summarization failed]", 20000), "failure note");
+                        TestAssert.True(WaitStdoutContains(cli, "[Compaction failed]", 20000), "failure note");
 
                         cli.WriteLine("/compact");
-                        TestAssert.True(WaitStdoutContains(cli, "[Conversation summarized]", 20000), "summarized note");
+                        TestAssert.True(WaitStdoutContains(cli, "[Conversation compacted]", 20000), "summarized note");
                         TestAssert.True(cli.Stdout.IndexOf("COMPACT-SUMMARY", StringComparison.Ordinal) < 0, "summary not shown");
                         TestAssert.Contains(server.LastBody, oldMarker, "failed compaction kept history");
 
@@ -506,7 +506,12 @@ namespace SimpleLLMChatCLI.Tests
                         cli.WriteLine("next question");
                         TestAssert.True(WaitStdoutContains(cli, "after-clear", 20000), "reply");
                         TestAssert.Equal(1, server.ChatBodies.Count, "no summary request");
-                        TestAssert.True(cli.Stdout.IndexOf("[Summarizing", StringComparison.Ordinal) < 0, "silent");
+                        TestAssert.True(cli.Stdout.IndexOf("[Compacting", StringComparison.Ordinal) < 0, "no summary note");
+                        string clearedNote = "[Conversation compacted]";
+                        int firstNote = cli.Stdout.IndexOf(clearedNote, StringComparison.Ordinal);
+                        TestAssert.True(firstNote >= 0, "cleared note");
+                        TestAssert.True(cli.Stdout.IndexOf(clearedNote, firstNote + 1, StringComparison.Ordinal) > firstNote,
+                            "note for the already-compact compact");
                         string body = server.LastBody;
                         TestAssert.True(body.IndexOf("OLD-TOOL-", StringComparison.Ordinal) < 0, "old output cleared");
                         TestAssert.Contains(body, "[Output cleared to save context]", "placeholder sent");
@@ -547,7 +552,8 @@ namespace SimpleLLMChatCLI.Tests
 
                         cli.WriteLine("next question");
                         TestAssert.True(WaitStdoutContains(cli, "after-auto-clear", 20000), "reply");
-                        TestAssert.True(cli.Stdout.IndexOf("summarizing", StringComparison.Ordinal) < 0, "silent");
+                        TestAssert.True(cli.Stdout.IndexOf("compacting", StringComparison.Ordinal) < 0, "no summary note");
+                        TestAssert.Contains(cli.Stdout, "[Conversation compacted - continuing...]", "cleared note");
                         TestAssert.Equal(1, server.ChatBodies.Count, "no summary request");
                         string body = server.LastBody;
                         TestAssert.True(body.IndexOf("OLD-TOOL-", StringComparison.Ordinal) < 0, "old output cleared");
