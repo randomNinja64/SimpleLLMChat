@@ -319,19 +319,20 @@ namespace SimpleLLMChatCLI.RAG
         }
 
         // Knowledge files: chunkLines-line windows with overlap, labelled with the file.
+        // The label counts against maxSnippet, so the embedded text (label and lines) stays
+        // within it; a label as long as the limit leaves no room, and the file has no chunks.
         private static IEnumerable<IndexChunk> LineChunks(
             string displayPath, string content, int chunkLines, int overlap, int maxSnippet)
         {
-            foreach (IndexChunk chunk in Chunk(content, chunkLines, overlap, maxSnippet))
+            string label = "File: " + displayPath + "\n";
+            int budget = maxSnippet > 0 ? Math.Max(1, maxSnippet - label.Length) : 0;
+            foreach (IndexChunk chunk in Chunk(content, chunkLines, overlap, budget))
             {
-                string text = Truncate(chunk.Text, maxSnippet);
-                if (string.IsNullOrWhiteSpace(text))
-                    continue;
                 yield return new IndexChunk
                 {
                     Start = chunk.Start,
                     End = chunk.End,
-                    Text = "File: " + displayPath + "\n" + text
+                    Text = label + chunk.Text
                 };
             }
         }

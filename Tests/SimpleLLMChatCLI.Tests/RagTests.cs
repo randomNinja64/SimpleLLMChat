@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using SimpleLLMChatCLI.RAG;
 using System;
 using System.Collections.Generic;
@@ -449,9 +450,10 @@ namespace SimpleLLMChatCLI.Tests
             {
                 using (RagFixture rag = new RagFixture())
                 {
-                    // 10-character lines cost 16 each against a 100-character cap; line 6 alone
-                    // (156) exceeds it, so it fits in no chunk and is left out. Lines 7-11 plus
-                    // the empty line after the final break (6) fit in one chunk.
+                    // A 115-character cap less the 15-character "File: blob.txt" label leaves 100
+                    // for lines. 10-character lines cost 16 each; line 6 alone (156) exceeds it,
+                    // so it fits in no chunk and is left out. Lines 7-11 plus the empty line
+                    // after the final break (6) fit in one chunk.
                     StringBuilder content = new StringBuilder();
                     for (int i = 1; i <= 11; i++)
                     {
@@ -463,7 +465,7 @@ namespace SimpleLLMChatCLI.Tests
                     rag.WriteFile("blob.txt", content.ToString());
                     rag.WriteFile("oneline.txt", new string('Q', 300));
 
-                    TestAssert.Equal("done", rag.Reconcile("ragmaxsnippetlength=100\r\nindexchunkoverlap=2\r\n"), "pass");
+                    TestAssert.Equal("done", rag.Reconcile("ragmaxsnippetlength=115\r\nindexchunkoverlap=2\r\n"), "pass");
                     // 1-5 stops before line 6; no overlap step-back into a 2-line repeat (4-5).
                     TestAssert.Equal("1,7", Join(rag.ChunkStarts("blob.txt")), "overlong line skipped");
                     foreach (ChunkHit hit in rag.OnDisk().Vectors.Search(new float[] { 1f, 0f }, 0))
@@ -472,6 +474,29 @@ namespace SimpleLLMChatCLI.Tests
                             TestAssert.True(hit.Chunk.StartLine > 6 || hit.Chunk.EndLine < 6, "no chunk covers line 6");
                     }
                     TestAssert.Equal(0, rag.ChunkStarts("oneline.txt").Count, "a single overlong line has no chunks");
+                }
+            });
+
+            TestRunner.Run("rag.indexer_label_counts_against_snippet_cap", () =>
+            {
+                using (RagFixture rag = new RagFixture())
+                {
+                    // A 64-character file name makes a 71-character "File: ..." label. 90-character
+                    // lines cost 96 each against a 200-character cap: two would fit without the
+                    // label, but label + two lines would be embedded as 255 characters.
+                    string name = new string('n', 60) + ".txt";
+                    StringBuilder content = new StringBuilder();
+                    for (int i = 1; i <= 4; i++)
+                        content.Append(new string((char)('a' + i), 90) + "\r\n");
+                    rag.WriteFile(name, content.ToString());
+
+                    TestAssert.Equal("done", rag.Reconcile("ragmaxsnippetlength=200\r\n"), "pass");
+                    TestAssert.Equal("1,2,3,4", Join(rag.ChunkStarts(name)), "one line per chunk");
+                    foreach (JToken input in (JArray)JObject.Parse(rag.Server.LastBody)["input"])
+                    {
+                        int length = ((string)input).Length;
+                        TestAssert.True(length <= 200, "embedded text within the cap (" + length + ")");
+                    }
                 }
             });
 
