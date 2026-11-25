@@ -74,7 +74,7 @@ On first use, if `LLMSettings.ini` does not exist, the GUI setup wizard creates 
 - `tooloutputdisplay`: Tool result appearance (`shown`, `collapsed`, or `hidden`; default `shown`). Hidden shows `[tool output]` with the exit code only.
 
 **RAG**
-- `ragchathistory`: Enables retrieivng context from previous chat sessions within the current directory (`1` or `0`, default off).
+- `ragchathistory`: Enables retrieiving context from previous chat sessions within the current directory (`1` or `0`, default off).
 - `ragenabled`: Enables RAG (`1` or `0`, default off)
 - `ragallowedextensions`: Comma-separated file extensions to index (blank = built-in defaults, provided below)
   - Allowed formats: `.md`, `.markdown`, `.txt`, `.rst`, `.csv`, `.json`, `.xml`, `.yaml`, `.yml`, `.toml`, `.ini`, `.html`, `.htm`, `.css`, `.cs`, `.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.java`, `.go`, `.rs`, `.c`, `.h`, `.cpp`, `.hpp`, `.rb`, `.php`, `.sql`, `.sh`, `.ps1`, `.bat`
