@@ -281,9 +281,12 @@ namespace SimpleLLMChatCLI.Tests
                     server.EnqueueContent("second-reply");
                     server.EnqueueApiError("summary-down");
                     server.EnqueueContent("after-trim");
+                    // Window 200 tokens: summarize at 540 chars (25-char system prompt included).
+                    // Turn 2 stays under it (~396); the long third prompt goes over (~620).
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 200);
-                    string oldMarker = new string('A', 400);
-                    string keptMarker = new string('B', 200);
+                    string oldMarker = new string('A', 300);
+                    string keptMarker = new string('B', 60);
+                    string thirdPrompt = "please trim " + new string('C', 200);
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
@@ -299,7 +302,7 @@ namespace SimpleLLMChatCLI.Tests
                         cli.WriteLine(keptMarker);
                         TestAssert.True(WaitStdoutContains(cli, "second-reply", 20000), "second reply");
 
-                        cli.WriteLine("please trim");
+                        cli.WriteLine(thirdPrompt);
                         TestAssert.True(WaitStdoutContains(cli, "after-trim", 20000), "follow-up");
                         TestAssert.True(WaitStdoutContains(cli, "[Compaction failed - dropped older messages]", 5000), "dropped note");
                         TestAssert.True(
@@ -336,9 +339,12 @@ namespace SimpleLLMChatCLI.Tests
                     server.EnqueueContent("SUMMARY-TEXT");
                     server.EnqueueContent("after-summary");
                     // Window 1000 tokens: summarize at 2700 chars, keep the last 300 chars.
+                    // Turn 2 stays under (~2656 with the system prompt); turn 3 goes over (~2748).
                     WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 1000);
-                    string oldMarker = new string('A', 2540);
+                    string oldMarker = new string('A', 2420);
                     string keptMarker = "KEEP-" + new string('B', 195);
+                    // With the kept turn, still within the 300-char keep budget.
+                    string thirdPrompt = "third question " + new string('C', 65);
 
                     using (CliProcess cli = new CliProcess(
                         Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
@@ -354,7 +360,7 @@ namespace SimpleLLMChatCLI.Tests
                         cli.WriteLine(keptMarker);
                         TestAssert.True(WaitStdoutContains(cli, "second-reply", 20000), "second reply");
 
-                        cli.WriteLine("third question");
+                        cli.WriteLine(thirdPrompt);
                         TestAssert.True(WaitStdoutContains(cli, "after-summary", 20000), "reply after summary");
                         TestAssert.True(WaitStdoutContains(cli, "[Conversation compacted - continuing...]", 5000), "summarized note");
                         TestAssert.Equal(4, server.ChatBodies.Count, "one summary request");
@@ -372,6 +378,72 @@ namespace SimpleLLMChatCLI.Tests
                         int summaryAt = last.IndexOf("SUMMARY-TEXT", StringComparison.Ordinal);
                         TestAssert.True(summaryAt >= 0 && summaryAt < last.IndexOf(keptMarker, StringComparison.Ordinal),
                             "summary ahead of kept messages");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            // Compaction runs with the new prompt already in the conversation, so a large
+            // prompt counts toward the window; the prompt itself is never summarized.
+            TestRunner.Run("cli.auto_compaction_counts_and_keeps_new_prompt", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply");
+                    server.EnqueueContent("SUMMARY-TEXT");
+                    server.EnqueueHttpError(401, "{\"error\":{\"message\":\"turn-failed\"}}");
+                    server.EnqueueContent("after-retry");
+                    // Window 1000 tokens: summarize at 2700 chars, keep the last 300 chars.
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 1000);
+                    string oldMarker = "OLD-" + new string('A', 1496);
+                    // Under the trigger before it is added, over it after; larger than the keep budget.
+                    string bigPrompt = "BIG-" + new string('B', 1196);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+                        cli.WriteLine(oldMarker);
+                        TestAssert.True(WaitStdoutContains(cli, "first-reply", 20000), "first reply");
+
+                        cli.WriteLine(bigPrompt);
+                        TestAssert.True(WaitStdoutContains(cli, "Request to LLM Failed (HTTP 401", 20000), "turn failed");
+                        TestAssert.Contains(cli.Stdout, "[Conversation compacted - continuing...]", "compacted for the new prompt");
+
+                        string summaryRequest = server.ChatBodies[1];
+                        TestAssert.Contains(summaryRequest, "OLD-", "old turn summarized");
+                        TestAssert.True(summaryRequest.IndexOf("BIG-", StringComparison.Ordinal) < 0, "new prompt not summarized");
+
+                        JArray failed = (JArray)JObject.Parse(server.ChatBodies[2])["messages"];
+                        string failedPrompt = (string)failed[failed.Count - 1]["content"];
+                        TestAssert.Contains(failedPrompt, bigPrompt, "new prompt sent verbatim");
+                        TestAssert.True(failedPrompt.IndexOf("SUMMARY-TEXT", StringComparison.Ordinal) >= 0
+                            && failedPrompt.IndexOf("SUMMARY-TEXT", StringComparison.Ordinal)
+                                < failedPrompt.IndexOf(bigPrompt, StringComparison.Ordinal),
+                            "summary ahead of the prompt");
+                        TestAssert.True(server.ChatBodies[2].IndexOf("OLD-", StringComparison.Ordinal) < 0, "old turn replaced");
+
+                        // The failed prompt is dropped; the summary it carried is not.
+                        cli.WriteLine("again");
+                        TestAssert.True(WaitStdoutContains(cli, "after-retry", 20000), "next turn works");
+                        TestAssert.Equal(4, server.ChatBodies.Count, "one summary request");
+                        string last = server.LastBody;
+                        TestAssert.Contains(last, "SUMMARY-TEXT", "summary kept after the failed turn");
+                        TestAssert.True(last.IndexOf("BIG-", StringComparison.Ordinal) < 0, "failed prompt dropped");
+                        TestAssert.True(last.IndexOf("OLD-", StringComparison.Ordinal) < 0, "old turn stays replaced");
+                        JArray sent = (JArray)JObject.Parse(last)["messages"];
+                        for (int i = 1; i < sent.Count; i++)
+                            TestAssert.True((string)sent[i]["role"] != "user" || (string)sent[i - 1]["role"] != "user",
+                                "no two user messages in a row");
+                        TestAssert.Contains((string)sent[sent.Count - 1]["content"], "again", "new prompt last");
+
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }

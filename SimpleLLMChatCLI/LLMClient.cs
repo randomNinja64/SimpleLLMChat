@@ -97,8 +97,6 @@ public partial class LLMClient
         StreamSink sink = StreamSink.For(settings);
         Turn turn = new Turn { Conversation = conversation, Settings = settings, Sink = sink };
 
-        MaybeSummarizeInBackground(turn, NextMessageHint);
-
         RagHost.FlushPendingErrorOnce();
         RagHost.WaitIfIndexing();
 
@@ -122,19 +120,14 @@ public partial class LLMClient
             }
         }
 
-        ChatMessage? summaryMessage = conversation.Count > 0 ? conversation[conversation.Count - 1] : (ChatMessage?)null;
         string summary = TakeTrailingSummary(conversation);
         if (summary != null)
             retrieved = string.IsNullOrEmpty(retrieved) ? summary : summary + "\n\n" + retrieved;
-        else
-            summaryMessage = null;
 
-        int promptIndex = conversation.Count;
-        string promptContent = userMessage ?? string.Empty;
         conversation.Add(new ChatMessage
         {
             Role = "user",
-            Content = promptContent,
+            Content = userMessage ?? string.Empty,
             Context = retrieved,
             Image = image,
             ImageMime = string.IsNullOrEmpty(imageMime) ? null : imageMime
@@ -142,6 +135,12 @@ public partial class LLMClient
 
         while (true)
         {
+            // Before every request, so the new prompt, its retrieved context and this
+            // turn's tool output all count toward the context window.
+            MaybeSummarizeInBackground(turn);
+            if (Cancel.Requested)
+                break;
+
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
             LLMCompletionResponse response = SendMessages(
@@ -177,8 +176,6 @@ public partial class LLMClient
                     break;
                 }
 
-                MaybeSummarizeInBackground(
-                    turn, "\n\n[Continue from this context. The user's original request is being processed.]");
                 continue;
             }
 
@@ -194,18 +191,9 @@ public partial class LLMClient
         }
 
         // Stopped or failed before any reply: drop the unanswered prompt, so the chat
-        // (and its saved file) never has two user messages in a row. A summary the
-        // prompt had taken goes back as it was. (Same string instance: a mid-turn
-        // summary message at that index is not the prompt.)
-        if (conversation.Count == promptIndex + 1
-            && IsRole(conversation[promptIndex], "user")
-            && ReferenceEquals(conversation[promptIndex].Content, promptContent))
-        {
-            conversation.RemoveAt(promptIndex);
-            if (summaryMessage.HasValue)
-                conversation.Add(summaryMessage.Value);
+        // (and its saved file) never has two user messages in a row.
+        if (DropUnansweredPrompt(conversation))
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
-        }
 
         if (Cancel.Requested)
             sink.Notice("[Stopped]");
@@ -348,7 +336,7 @@ public partial class LLMClient
     /// if that is not enough, summarizes on this thread and replaces the conversation
     /// with a compact summary message. The summary text itself is not shown.
     /// </summary>
-    private void MaybeSummarizeInBackground(Turn turn, string continueHint)
+    private void MaybeSummarizeInBackground(Turn turn)
     {
         List<ChatMessage> conversation = turn.Conversation;
         StreamSink sink = turn.Sink;
@@ -371,8 +359,11 @@ public partial class LLMClient
 
         sink.Notice("[Context usage high - compacting conversation...]");
 
-        int keepFrom = RecentKeepStart(conversation, TokenEstimator.KeepRecentChars(contextWindow));
-        string summary = SummarizeConversation(conversation.GetRange(0, keepFrom));
+        // The latest user message is never summarized: the model gets what was typed.
+        int keepFrom = Math.Min(
+            RecentKeepStart(conversation, TokenEstimator.KeepRecentChars(contextWindow)),
+            LatestUserIndex(conversation));
+        string summary = keepFrom > 0 ? SummarizeConversation(conversation.GetRange(0, keepFrom)) : null;
         if (Cancel.Requested)
             return;
         if (string.IsNullOrEmpty(summary))
@@ -393,8 +384,43 @@ public partial class LLMClient
             return;
         }
 
-        ReplaceWithSummary(conversation, keepFrom, summary, continueHint);
+        ReplaceWithSummary(conversation, keepFrom, summary, NextMessageHint);
         sink.Notice(CompactedNotice);
+
+        // The summary covers only what came before the latest user message, so a
+        // long turn can still be over: clear its tool output too, all but the newest.
+        int after = CurrentCharacterCount(conversation);
+        if (TokenEstimator.ShouldSummarize(after, contextWindow) && ClearCurrentTurnToolOutputs(conversation) > 0)
+        {
+            after = CurrentCharacterCount(conversation);
+            PublishStatusTokens(after);
+        }
+        if (TokenEstimator.ShouldSummarize(after, contextWindow))
+            sink.Notice("[Compaction failed - current turn still exceeds the context window]");
+    }
+
+    /// <summary>
+    /// Drops a trailing user message that got no reply (the turn was stopped or failed
+    /// first). A summary message stays: it holds the earlier conversation. So does a
+    /// summary riding on the dropped prompt's hidden context: it goes back as a summary
+    /// message, which the next prompt takes (TakeTrailingSummary). Returns true when
+    /// the conversation changed.
+    /// </summary>
+    private static bool DropUnansweredPrompt(List<ChatMessage> conversation)
+    {
+        int last = conversation.Count - 1;
+        if (last < 0 || !IsRole(conversation[last], "user")
+            || (conversation[last].Content ?? string.Empty).StartsWith(SummaryHeader, StringComparison.Ordinal))
+            return false;
+
+        string context = conversation[last].Context ?? string.Empty;
+        conversation.RemoveAt(last);
+
+        int end = context.StartsWith(SummaryHeader, StringComparison.Ordinal)
+            ? context.IndexOf(SummaryEnd, StringComparison.Ordinal) : -1;
+        if (end > 0)
+            conversation.Add(new ChatMessage("user", context.Substring(0, end) + NextMessageHint));
+        return true;
     }
 
     /// <summary>
@@ -560,12 +586,12 @@ public partial class LLMClient
     private const string RecentFollowHint = "\n\n[Continue from this context. The most recent messages follow.]";
 
     /// <summary>
-    /// When a summary kept no messages (/compact, or compaction before a prompt with
-    /// no context window set), the conversation ends with the summary as its own user
-    /// message. That message is removed and returned as hidden context for the new
-    /// prompt, since some chat templates reject two user messages in a row. It stays
-    /// in the conversation until then, so a chat saved in between keeps it. Null when
-    /// the conversation does not end with a summary.
+    /// When a summary kept no messages (/compact), or a stopped turn's prompt was
+    /// dropped with the summary it carried (DropUnansweredPrompt), the conversation
+    /// ends with the summary as its own user message. That message is removed and
+    /// returned as hidden context for the new prompt, since some chat templates reject
+    /// two user messages in a row. It stays in the conversation until then, so a chat
+    /// saved in between keeps it. Null when the conversation does not end with a summary.
     /// </summary>
     private static string TakeTrailingSummary(List<ChatMessage> conversation)
     {
