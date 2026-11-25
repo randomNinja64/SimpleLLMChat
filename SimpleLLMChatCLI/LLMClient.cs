@@ -359,10 +359,15 @@ public partial class LLMClient
 
         sink.Notice("[Context usage high - compacting conversation...]");
 
-        // The latest user message is never summarized: the model gets what was typed.
-        int keepFrom = Math.Min(
-            RecentKeepStart(conversation, TokenEstimator.KeepRecentChars(contextWindow)),
-            LatestUserIndex(conversation));
+        // The latest user message is never summarized away: the model gets what was
+        // typed. A cut past it (one long agent turn) summarizes the turn's work too,
+        // and the prompt goes back on top with the summary as its hidden context.
+        int promptIndex = LatestPromptIndex(conversation);
+        int keepFrom = RecentKeepStart(conversation, TokenEstimator.KeepRecentChars(contextWindow));
+        // Only with work after the prompt to summarize; a new prompt alone stays as it is.
+        bool keepPrompt = promptIndex >= 0 && keepFrom > promptIndex + 1;
+        if (promptIndex >= 0 && !keepPrompt)
+            keepFrom = Math.Min(keepFrom, promptIndex);
         string summary = keepFrom > 0 ? SummarizeConversation(conversation.GetRange(0, keepFrom)) : null;
         if (Cancel.Requested)
             return;
@@ -384,11 +389,14 @@ public partial class LLMClient
             return;
         }
 
-        ReplaceWithSummary(conversation, keepFrom, summary, NextMessageHint);
+        if (keepPrompt)
+            ReplaceWithSummaryKeepingPrompt(conversation, promptIndex, keepFrom, summary);
+        else
+            ReplaceWithSummary(conversation, keepFrom, summary, NextMessageHint);
         sink.Notice(CompactedNotice);
 
-        // The summary covers only what came before the latest user message, so a
-        // long turn can still be over: clear its tool output too, all but the newest.
+        // The kept messages can still be over (a huge newest tool result): clear this
+        // turn's tool output too, all but the newest.
         int after = CurrentCharacterCount(conversation);
         if (TokenEstimator.ShouldSummarize(after, contextWindow) && ClearCurrentTurnToolOutputs(conversation) > 0)
         {
@@ -671,21 +679,59 @@ public partial class LLMClient
     }
 
     /// <summary>
+    /// Replaces everything before <paramref name="keepFrom"/> with the summary, except
+    /// the prompt at <paramref name="promptIndex"/>, which comes first again exactly as
+    /// typed. The summary covers the prompt's earlier hidden context (it was sent with
+    /// it), so it replaces that context. The kept messages start with an assistant
+    /// message (RecentKeepStart), which follows the prompt cleanly; with none kept,
+    /// the prompt alone is sent and the model carries on from the summary.
+    /// </summary>
+    private void ReplaceWithSummaryKeepingPrompt(List<ChatMessage> conversation, int promptIndex, int keepFrom, string summary)
+    {
+        ResetContextInjections();
+        ChatMessage prompt = conversation[promptIndex];
+        List<ChatMessage> recent = conversation.GetRange(keepFrom, conversation.Count - keepFrom);
+        conversation.Clear();
+
+        prompt.Context = SummaryHeader + summary + SummaryEnd;
+        conversation.Add(prompt);
+        conversation.AddRange(recent);
+
+        PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+    }
+
+    /// <summary>
+    /// Index of the latest user message the user typed (a summary message doesn't
+    /// count), or -1 when there is none.
+    /// </summary>
+    private static int LatestPromptIndex(List<ChatMessage> conversation)
+    {
+        for (int i = conversation.Count - 1; i >= 0; i--)
+        {
+            if (IsRole(conversation[i], "user"))
+                return (conversation[i].Content ?? string.Empty).StartsWith(SummaryHeader, StringComparison.Ordinal) ? -1 : i;
+        }
+        return -1;
+    }
+
+    /// <summary>
     /// Drops messages older than the latest user turn until usage is under the
     /// summarize threshold. The latest user message and everything after it stay.
+    /// The result always starts with a user message.
     /// </summary>
     private int DropOldestMessagesUntilFit(List<ChatMessage> conversation, int contextWindowSize)
     {
         int keepFrom = LatestUserIndex(conversation);
 
-        // Keep dropping past any tool results at the front: a tool result whose
-        // assistant tool call was dropped is rejected by strict servers.
+        // Keep dropping until a user message is at the front: an orphaned tool result
+        // or a leading assistant message is rejected by strict servers and chat
+        // templates. The latest user message (at keepFrom) always stops this.
         int dropped = 0;
         while (keepFrom > 0
             && (TokenEstimator.ShouldSummarize(
                     GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead(),
                     contextWindowSize)
-                || string.Equals(conversation[0].Role, "tool", StringComparison.OrdinalIgnoreCase)))
+                || !string.Equals(conversation[0].Role, "user", StringComparison.OrdinalIgnoreCase)))
         {
             conversation.RemoveAt(0);
             keepFrom--;

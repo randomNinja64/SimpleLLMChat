@@ -450,6 +450,66 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.auto_compaction_summarizes_long_single_prompt_turn", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    // One prompt, then tool calls whose arguments can't be cleared. The tool
+                    // is disabled, so each result is a short fixed error (~108 chars).
+                    // Window 2000 tokens: summarize at 5400 chars, keep the last 600.
+                    // After call_b (~5100) it is under; call_c (~425) takes it over and fits the keep budget.
+                    string bigA = "AAA-" + new string('a', 2377);
+                    string bigB = "BBB-" + new string('b', 2377);
+                    string tailC = "CCC-" + new string('c', 277);
+                    server.EnqueueToolCall("run_shell_command", "call_a", "{\"command\":\"echo " + bigA + "\"}");
+                    server.EnqueueToolCall("run_shell_command", "call_b", "{\"command\":\"echo " + bigB + "\"}");
+                    server.EnqueueToolCall("run_shell_command", "call_c", "{\"command\":\"echo " + tailC + "\"}");
+                    server.EnqueueContent("SUMMARY-TEXT");
+                    server.EnqueueContent("final-reply");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 2000);
+                    const string prompt = "start the long task";
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+                        cli.WriteLine(prompt);
+                        TestAssert.True(WaitStdoutContains(cli, "final-reply", 20000), "turn finished");
+                        TestAssert.Contains(cli.Stdout, "[Conversation compacted - continuing...]", "compacted mid-turn");
+                        TestAssert.True(cli.Stdout.IndexOf("Compaction failed", StringComparison.Ordinal) < 0, "no failure");
+
+                        List<string> bodies = server.ChatBodies;
+                        TestAssert.Equal(5, bodies.Count, "three tool rounds, one summary, one final request");
+                        TestAssert.Contains(bodies[3], "AAA-", "turn's work summarized");
+                        TestAssert.Contains(bodies[3], "BBB-", "turn's work summarized (b)");
+
+                        JArray sent = (JArray)JObject.Parse(bodies[4])["messages"];
+                        TestAssert.Equal(4, sent.Count, "system, prompt, kept call, kept result");
+                        TestAssert.Equal("user", (string)sent[1]["role"], "prompt first");
+                        string sentPrompt = (string)sent[1]["content"];
+                        TestAssert.Contains(sentPrompt, prompt, "prompt sent verbatim");
+                        TestAssert.True(sentPrompt.IndexOf("SUMMARY-TEXT", StringComparison.Ordinal) >= 0
+                            && sentPrompt.IndexOf("SUMMARY-TEXT", StringComparison.Ordinal)
+                                < sentPrompt.IndexOf(prompt, StringComparison.Ordinal),
+                            "summary ahead of the prompt");
+                        TestAssert.Equal("assistant", (string)sent[2]["role"], "kept call");
+                        TestAssert.Equal("tool", (string)sent[3]["role"], "kept result");
+                        TestAssert.Contains(bodies[4], "CCC-", "latest call kept verbatim");
+                        TestAssert.True(bodies[4].IndexOf("AAA-", StringComparison.Ordinal) < 0, "older call replaced");
+                        TestAssert.True(bodies[4].IndexOf("BBB-", StringComparison.Ordinal) < 0, "older call replaced (b)");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.compact_command", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
