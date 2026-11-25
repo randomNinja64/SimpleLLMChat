@@ -31,6 +31,14 @@ namespace SimpleLLMChatCLI.Tests
                 TestAssert.True(!TokenEstimator.ShouldSummarize(100, 1000), "no summarize");
             });
 
+            TestRunner.Run("TokenEstimator.tool_clearing_threshold", () =>
+            {
+                // 60% of a 1000-token window is 600 tokens, 1800 characters.
+                TestAssert.True(TokenEstimator.IsUnderClearTarget(1800, 1000), "at 60%");
+                TestAssert.True(!TokenEstimator.IsUnderClearTarget(1803, 1000), "just over 60%");
+                TestAssert.True(!TokenEstimator.IsUnderClearTarget(0, 0), "no window size");
+            });
+
             TestRunner.Run("ConsecutiveToolFailures.streak", () =>
             {
                 int streak = 0;
@@ -340,17 +348,15 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(probe.WaitForReady(15000), "startup ready");
 
                         cli.WriteLine("/compact");
-                        TestAssert.True(WaitStdoutContains(cli, "[Nothing to compact]", 10000), "empty chat");
-                        TestAssert.Equal(0, server.ChatBodies.Count, "no request for an empty chat");
-
                         cli.WriteLine(oldMarker);
                         TestAssert.True(WaitStdoutContains(cli, "first-reply", 20000), "first reply");
+                        TestAssert.Equal(1, server.ChatBodies.Count, "no request for an empty chat");
 
                         cli.WriteLine("/compact");
-                        TestAssert.True(WaitStdoutContains(cli, "[Compaction failed - conversation unchanged]", 20000), "failure note");
+                        TestAssert.True(WaitStdoutContains(cli, "[Summarization failed]", 20000), "failure note");
 
                         cli.WriteLine("/compact");
-                        TestAssert.True(WaitStdoutContains(cli, "[Conversation compacted:", 20000), "compacted note");
+                        TestAssert.True(WaitStdoutContains(cli, "[Conversation summarized]", 20000), "summarized note");
                         TestAssert.True(cli.Stdout.IndexOf("COMPACT-SUMMARY", StringComparison.Ordinal) < 0, "summary not shown");
                         TestAssert.Contains(server.LastBody, oldMarker, "failed compaction kept history");
 
@@ -358,6 +364,95 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.True(WaitStdoutContains(cli, "after-compact", 20000), "reply after compaction");
                         TestAssert.Contains(server.LastBody, "COMPACT-SUMMARY", "summary sent");
                         TestAssert.True(server.LastBody.IndexOf(oldMarker, StringComparison.Ordinal) < 0, "old history replaced");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.compact_clears_old_tool_output", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("after-clear");
+                    // ~1,300 tokens in a 2,000-token window; clearing the old output gets under 60%.
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 2000);
+                    string oldOutput = "OLD-TOOL-" + new string('A', 2400);
+                    string turnOutput = "TURN-TOOL-" + new string('B', 1200);
+                    string chatPath = Path.Combine(ws.Path, "tools-chat.json");
+                    WriteToolChat(chatPath, ws.Path, oldOutput, turnOutput);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+                        cli.WriteLine("/load \"" + chatPath + "\"");
+                        TestAssert.True(WaitStdoutContains(cli, "second-answer", 10000), "replayed");
+
+                        cli.WriteLine("/compact");
+                        TestAssert.True(WaitTokensBelow(probe, 700, 10000), "token counter dropped");
+
+                        // Under 60% with nothing left before the latest user message: no-op.
+                        cli.WriteLine("/compact");
+
+                        cli.WriteLine("next question");
+                        TestAssert.True(WaitStdoutContains(cli, "after-clear", 20000), "reply");
+                        TestAssert.Equal(1, server.ChatBodies.Count, "no summary request");
+                        TestAssert.True(cli.Stdout.IndexOf("[Summarizing", StringComparison.Ordinal) < 0, "silent");
+                        string body = server.LastBody;
+                        TestAssert.True(body.IndexOf("OLD-TOOL-", StringComparison.Ordinal) < 0, "old output cleared");
+                        TestAssert.Contains(body, "[Output cleared to save context]", "placeholder sent");
+                        TestAssert.Contains(body, "Exit Code: 0", "result header kept");
+                        TestAssert.Contains(body, "old_call", "old tool call kept");
+                        TestAssert.Contains(body, "TURN-TOOL-", "latest turn's output kept");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
+            TestRunner.Run("cli.auto_compaction_clears_tool_output_first", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("after-auto-clear");
+                    // ~1,270 tokens in a 1,300-token window: over the 90% trigger.
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 1300);
+                    string oldOutput = "OLD-TOOL-" + new string('A', 3300);
+                    string turnOutput = "TURN-TOOL-" + new string('B', 300);
+                    string chatPath = Path.Combine(ws.Path, "tools-chat.json");
+                    WriteToolChat(chatPath, ws.Path, oldOutput, turnOutput);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+                        cli.WriteLine("/load \"" + chatPath + "\"");
+                        TestAssert.True(WaitStdoutContains(cli, "second-answer", 10000), "replayed");
+
+                        cli.WriteLine("next question");
+                        TestAssert.True(WaitStdoutContains(cli, "after-auto-clear", 20000), "reply");
+                        TestAssert.True(cli.Stdout.IndexOf("summarizing", StringComparison.Ordinal) < 0, "silent");
+                        TestAssert.Equal(1, server.ChatBodies.Count, "no summary request");
+                        string body = server.LastBody;
+                        TestAssert.True(body.IndexOf("OLD-TOOL-", StringComparison.Ordinal) < 0, "old output cleared");
+                        TestAssert.Contains(body, "TURN-TOOL-", "stops once enough is freed");
+                        TestAssert.Contains(body, "old_call", "tool calls kept");
+                        TestAssert.Contains(body, "next question", "new message kept");
 
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
@@ -1892,6 +1987,45 @@ namespace SimpleLLMChatCLI.Tests
                 System.Threading.Thread.Sleep(50);
             }
             return false;
+        }
+
+        /// <summary>Waits for the published token count to fall below <paramref name="tokens"/>.</summary>
+        internal static bool WaitTokensBelow(ChatPipeProbe probe, int tokens, int timeoutMs)
+        {
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < deadline)
+            {
+                int last = probe.LastTokens();
+                if (last > 0 && last < tokens)
+                    return true;
+                System.Threading.Thread.Sleep(25);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Saves a two-turn chat where each turn runs a tool: "old_call" (output
+        /// <paramref name="oldOutput"/>) before the latest user message, and
+        /// "turn_call" (output <paramref name="turnOutput"/>) after it.
+        /// </summary>
+        internal static void WriteToolChat(string path, string workingDirectory, string oldOutput, string turnOutput)
+        {
+            var conversation = new List<LLMClient.ChatMessage>();
+            string[][] turns =
+            {
+                new[] { "first-question", "old_call", "c1", oldOutput, "first-answer" },
+                new[] { "second-question", "turn_call", "c2", turnOutput, "second-answer" }
+            };
+            foreach (string[] t in turns)
+            {
+                conversation.Add(new LLMClient.ChatMessage("user", t[0]));
+                var call = new LLMClient.ChatMessage("assistant", "");
+                call.ToolCalls.Add(new ToolRegistry.ToolCall { Id = t[2], Name = t[1], Arguments = "{}" });
+                conversation.Add(call);
+                conversation.Add(new LLMClient.ChatMessage("tool", ToolRegistry.FormatCommandResult(t[1], t[3], 0)) { ToolCallId = t[2] });
+                conversation.Add(new LLMClient.ChatMessage("assistant", t[4]));
+            }
+            ChatTranscript.Save(path, "tool chat", workingDirectory, conversation);
         }
 
         /// <summary>

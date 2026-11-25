@@ -326,18 +326,26 @@ public partial class LLMClient
     }
 
     /// <summary>
-    /// If context usage is high, summarize on this thread and replace the conversation
+    /// If context usage is high, first clears old tool output (see ClearOldToolOutputs);
+    /// if that is not enough, summarizes on this thread and replaces the conversation
     /// with a compact summary message. The summary text itself is not shown.
     /// </summary>
     private void MaybeSummarizeInBackground(Turn turn, string continueHint)
     {
         List<ChatMessage> conversation = turn.Conversation;
         StreamSink sink = turn.Sink;
+        int contextWindow = config.Get(AppSettings.ContextWindowSize);
 
-        int statusChars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
+        int statusChars = CurrentCharacterCount(conversation);
         PublishStatusTokens(statusChars);
 
-        if (!TokenEstimator.ShouldSummarize(statusChars, config.Get(AppSettings.ContextWindowSize)))
+        if (!TokenEstimator.ShouldSummarize(statusChars, contextWindow))
+            return;
+
+        // Clearing alone is silent: the token counter shows it.
+        bool enough;
+        ClearOldToolOutputs(conversation, statusChars, false, out enough);
+        if (enough)
             return;
 
         sink.Notice("[Context usage high - summarizing conversation...]");
@@ -347,12 +355,17 @@ public partial class LLMClient
             return;
         if (string.IsNullOrEmpty(summary))
         {
-            int contextWindow = config.Get(AppSettings.ContextWindowSize);
             int dropped = DropOldestMessagesUntilFit(conversation, contextWindow);
-            int chars = GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
-            PublishStatusTokens(chars);
+            int chars = CurrentCharacterCount(conversation);
             if (dropped > 0)
                 sink.Notice("[Summarization failed - dropped older messages]");
+
+            // Last resort: this turn's own tool output, all but the newest result.
+            if (TokenEstimator.ShouldSummarize(chars, contextWindow)
+                && ClearCurrentTurnToolOutputs(conversation) > 0)
+                chars = CurrentCharacterCount(conversation);
+
+            PublishStatusTokens(chars);
             if (TokenEstimator.ShouldSummarize(chars, contextWindow))
                 sink.Notice("[Summarization failed - current turn still exceeds the context window]");
             return;
@@ -363,9 +376,12 @@ public partial class LLMClient
     }
 
     /// <summary>
-    /// The /compact command: summarizes the whole conversation now, whatever its
-    /// size. Unlike automatic summarization, a failure leaves the conversation
-    /// as it was. Returns true when it was replaced.
+    /// The /compact command: the same rule as automatic summarization, at any usage.
+    /// All old tool output is cleared; if usage is then at or under the clearing
+    /// target, that is all, otherwise the conversation is summarized. A failed
+    /// summary keeps the conversation, less any cleared output. Only a summary prints
+    /// anything; otherwise the token counter shows the change. Returns true when the
+    /// conversation changed.
     /// </summary>
     public bool CompactConversation(List<ChatMessage> conversation, TurnSettings settings)
     {
@@ -373,35 +389,145 @@ public partial class LLMClient
 
         if (conversation == null || conversation.Count == 0)
         {
-            sink.Notice("[Nothing to compact]");
+            ChatOutput.MarkSeparated();
             return false;
         }
 
-        int before = TokenEstimator.ApproximateTokens(
-            GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
-        sink.Notice("[Compacting conversation...]");
+        bool enough;
+        int cleared = ClearOldToolOutputs(conversation, CurrentCharacterCount(conversation), true, out enough);
+        if (enough)
+        {
+            ChatOutput.MarkSeparated();
+            return cleared > 0;
+        }
+
+        sink.Notice("[Summarizing conversation...]");
 
         string summary = SummarizeConversation(conversation);
-        if (Cancel.Requested)
+        if (Cancel.Requested || string.IsNullOrEmpty(summary))
         {
-            sink.Notice("[Compaction stopped - conversation unchanged]");
-            return false;
-        }
-        if (string.IsNullOrEmpty(summary))
-        {
-            sink.Error("[Compaction failed - conversation unchanged]");
-            return false;
+            PublishStatusTokens(CurrentCharacterCount(conversation));
+            if (!Cancel.Requested)
+                sink.Error("[Summarization failed]");
+            return cleared > 0;
         }
 
         ReplaceWithSummary(conversation, summary, NextMessageHint);
-        int after = TokenEstimator.ApproximateTokens(
-            GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
-        sink.Notice(string.Format(CultureInfo.InvariantCulture,
-            "[Conversation compacted: ~{0:N0} -> ~{1:N0} tokens]", before, after));
+        sink.Notice("[Conversation summarized]");
         return true;
     }
 
     private const string NextMessageHint = "\n\n[Continue from this context. The user's next message follows.]";
+
+    private const string ToolOutputHeaderEnd = "\nOutput:\n";
+    private const string ClearedToolOutput = "[Output cleared to save context]";
+
+    private int CurrentCharacterCount(List<ChatMessage> conversation)
+    {
+        return GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead();
+    }
+
+    /// <summary>
+    /// Clears tool results before the latest user message, oldest first. The tool
+    /// calls stay, so the model still sees what it ran; results already cleared are
+    /// skipped. Automatic compaction stops as soon as usage is under the target
+    /// (TokenEstimator.IsUnderClearTarget); with <paramref name="clearAll"/> (/compact)
+    /// every old result is cleared. Returns the number cleared; <paramref name="enough"/>
+    /// says whether usage ended under the target.
+    /// </summary>
+    private int ClearOldToolOutputs(List<ChatMessage> conversation, int beforeChars, bool clearAll, out bool enough)
+    {
+        int contextWindow = config.Get(AppSettings.ContextWindowSize);
+        int end = LatestUserIndex(conversation);
+        int chars = beforeChars;
+        int cleared = 0;
+
+        for (int i = 0; i < end; i++)
+        {
+            if (!clearAll && TokenEstimator.IsUnderClearTarget(chars, contextWindow))
+                break;
+            int saved;
+            if (!TryClearToolOutput(conversation, i, out saved))
+                continue;
+            chars -= saved;
+            cleared++;
+        }
+        enough = TokenEstimator.IsUnderClearTarget(chars, contextWindow);
+
+        if (cleared > 0)
+            PublishStatusTokens(chars);
+        return cleared;
+    }
+
+    /// <summary>
+    /// Clears this turn's tool results (after the latest user message), all but the
+    /// newest, which the model is acting on. Returns the number cleared.
+    /// </summary>
+    private static int ClearCurrentTurnToolOutputs(List<ChatMessage> conversation)
+    {
+        int newest = -1;
+        for (int i = conversation.Count - 1; i >= 0 && newest < 0; i--)
+        {
+            if (IsRole(conversation[i], "tool"))
+                newest = i;
+        }
+
+        int cleared = 0;
+        int saved;
+        for (int i = LatestUserIndex(conversation) + 1; i < newest; i++)
+        {
+            if (TryClearToolOutput(conversation, i, out saved))
+                cleared++;
+        }
+        return cleared;
+    }
+
+    /// <summary>
+    /// Replaces a tool result's output (and any image) with a short note, keeping the
+    /// "Command: / Exit Code:" header. False when it is not a tool result or would
+    /// not get smaller. ChatMessage is a struct, so the change is stored back.
+    /// </summary>
+    private static bool TryClearToolOutput(List<ChatMessage> conversation, int index, out int savedChars)
+    {
+        savedChars = 0;
+        ChatMessage message = conversation[index];
+        if (!IsRole(message, "tool"))
+            return false;
+
+        string content = message.Content ?? string.Empty;
+        int header = content.IndexOf(ToolOutputHeaderEnd, StringComparison.Ordinal);
+        string replacement = header >= 0
+            ? content.Substring(0, header + ToolOutputHeaderEnd.Length) + ClearedToolOutput
+            : ClearedToolOutput;
+
+        int before = GetMessageCharacterCount(message);
+        int after = replacement.Length;
+        if (after >= before)
+            return false;
+
+        message.Content = replacement;
+        message.Image = null;
+        message.ImageMime = null;
+        conversation[index] = message;
+        savedChars = before - after;
+        return true;
+    }
+
+    private static bool IsRole(ChatMessage message, string role)
+    {
+        return string.Equals(message.Role, role, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Index of the latest user message, or 0 when there is none.</summary>
+    private static int LatestUserIndex(List<ChatMessage> conversation)
+    {
+        for (int i = conversation.Count - 1; i >= 0; i--)
+        {
+            if (IsRole(conversation[i], "user"))
+                return i;
+        }
+        return 0;
+    }
 
     private void ReplaceWithSummary(List<ChatMessage> conversation, string summary, string continueHint)
     {
@@ -419,15 +545,7 @@ public partial class LLMClient
     /// </summary>
     private int DropOldestMessagesUntilFit(List<ChatMessage> conversation, int contextWindowSize)
     {
-        int keepFrom = 0;
-        for (int i = conversation.Count - 1; i >= 0; i--)
-        {
-            if (string.Equals(conversation[i].Role, "user", StringComparison.OrdinalIgnoreCase))
-            {
-                keepFrom = i;
-                break;
-            }
-        }
+        int keepFrom = LatestUserIndex(conversation);
 
         // Keep dropping past any tool results at the front: a tool result whose
         // assistant tool call was dropped is rejected by strict servers.
@@ -501,27 +619,32 @@ public partial class LLMClient
             return count;
 
         foreach (var msg in conversation)
+            count += GetMessageCharacterCount(msg);
+
+        return count;
+    }
+
+    private static int GetMessageCharacterCount(ChatMessage msg)
+    {
+        int count = 0;
+        if (!string.IsNullOrEmpty(msg.Content))
+            count += msg.Content.Length;
+        if (!string.IsNullOrEmpty(msg.Context))
+            count += msg.Context.Length;
+
+        if (!string.IsNullOrEmpty(msg.Image))
+            count += TokenEstimator.ImageCharEstimate;
+
+        if (msg.ToolCalls != null)
         {
-            if (!string.IsNullOrEmpty(msg.Content))
-                count += msg.Content.Length;
-            if (!string.IsNullOrEmpty(msg.Context))
-                count += msg.Context.Length;
-
-            if (!string.IsNullOrEmpty(msg.Image))
-                count += TokenEstimator.ImageCharEstimate;
-
-            if (msg.ToolCalls != null)
+            foreach (var toolCall in msg.ToolCalls)
             {
-                foreach (var toolCall in msg.ToolCalls)
-                {
-                    if (!string.IsNullOrEmpty(toolCall.Name))
-                        count += toolCall.Name.Length;
-                    if (!string.IsNullOrEmpty(toolCall.Arguments))
-                        count += toolCall.Arguments.Length;
-                }
+                if (!string.IsNullOrEmpty(toolCall.Name))
+                    count += toolCall.Name.Length;
+                if (!string.IsNullOrEmpty(toolCall.Arguments))
+                    count += toolCall.Arguments.Length;
             }
         }
-
         return count;
     }
 

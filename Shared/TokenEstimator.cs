@@ -9,6 +9,12 @@ public static class TokenEstimator
     public const int CharsPerToken = 3;
 
     /// <summary>
+    /// Clearing old tool output is enough to skip summarizing once usage is at or
+    /// under this share of the context window.
+    /// </summary>
+    public const double ClearToolOutputTarget = 0.60;
+
+    /// <summary>
     /// Flat cost of one attached image. Providers bill images by resolution, not by
     /// file size: a full-size screenshot is about 1,100-1,600 tokens on the standard
     /// tiers of the major APIs, so the base64 length would overstate it many times over.
@@ -33,6 +39,18 @@ public static class TokenEstimator
         int approximateTokens = ApproximateTokens(characterCount);
         double usage = (double)approximateTokens / contextWindowSize;
         return usage >= SummarizeThreshold;
+    }
+
+    /// <summary>
+    /// True when usage is at or under the tool-clearing target, so summarizing can be
+    /// skipped. Never true with no window size set: usage cannot be judged.
+    /// </summary>
+    public static bool IsUnderClearTarget(int characterCount, int contextWindowSize)
+    {
+        if (contextWindowSize <= 0)
+            return false;
+
+        return ApproximateTokens(characterCount) <= contextWindowSize * ClearToolOutputTarget;
     }
 
     /// <summary>
