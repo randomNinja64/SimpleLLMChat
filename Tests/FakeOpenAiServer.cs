@@ -85,6 +85,38 @@ public sealed class FakeOpenAiServer : IDisposable
 
     public int EmbeddingsRequestCount { get; private set; }
 
+    /// <summary>Texts sent for embedding across all requests (the "input" array entries).</summary>
+    public int EmbeddingsInputCount { get; private set; }
+
+    /// <summary>Strings in the request's "input" array; no JSON library in this shared file.</summary>
+    private static int CountInputStrings(string body)
+    {
+        int i = body.IndexOf("\"input\":[", StringComparison.Ordinal);
+        if (i < 0)
+            return 0;
+        int count = 0;
+        bool inString = false;
+        for (i += "\"input\":[".Length; i < body.Length; i++)
+        {
+            char c = body[i];
+            if (inString)
+            {
+                if (c == '\\')
+                    i++;
+                else if (c == '"')
+                    inString = false;
+            }
+            else if (c == '"')
+            {
+                inString = true;
+                count++;
+            }
+            else if (c == ']')
+                break;
+        }
+        return count;
+    }
+
     /// <summary>Status for /v1/embeddings; anything but 200 fails the request.</summary>
     public int EmbeddingsStatusCode { get; set; }
 
@@ -356,6 +388,7 @@ public sealed class FakeOpenAiServer : IDisposable
         if (path.IndexOf("/v1/embeddings", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             EmbeddingsRequestCount++;
+            EmbeddingsInputCount += CountInputStrings(body);
             if (EmbeddingsStatusCode != 200)
             {
                 WriteJson(ctx, EmbeddingsStatusCode, "{\"error\":{\"message\":\"forced\"}}");

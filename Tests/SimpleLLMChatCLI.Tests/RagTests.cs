@@ -198,7 +198,9 @@ namespace SimpleLLMChatCLI.Tests
                     VectorStore store = new VectorStore();
                     store.Add(Vector(@"C:\k\a.txt", 1, 1f, 0f));
                     store.Add(Vector(@"C:\k\a.txt", 51, 0.5f, 0.5f));
-                    store.Add(Vector(@"C:\k\b.txt", 1, 0f, 1f));
+                    ChunkVector b = Vector(@"C:\k\b.txt", 1, 0f, 1f);
+                    b.Hash = "hash-b";
+                    store.Add(b);
 
                     string path = ws.Combine("sub", "vectors.bin");
                     store.Save(path);
@@ -208,6 +210,8 @@ namespace SimpleLLMChatCLI.Tests
                     TestAssert.Equal(@"C:\k\b.txt", hits[0].Chunk.File, "file survives");
                     TestAssert.Equal(1, hits[0].Chunk.StartLine, "start line survives");
                     TestAssert.Equal(10, hits[0].Chunk.EndLine, "end line survives");
+                    TestAssert.Equal("hash-b", hits[0].Chunk.Hash, "text hash survives");
+                    TestAssert.Equal(1, loaded.GetByFile(@"c:\K\B.TXT").Count, "get by file ignores case");
 
                     TestAssert.Equal(2, loaded.RemoveByFile(@"c:\K\A.TXT"), "remove ignores case");
                     TestAssert.Equal(1, loaded.Count, "one left");
@@ -468,6 +472,25 @@ namespace SimpleLLMChatCLI.Tests
                             TestAssert.True(hit.Chunk.StartLine > 6 || hit.Chunk.EndLine < 6, "no chunk covers line 6");
                     }
                     TestAssert.Equal(0, rag.ChunkStarts("oneline.txt").Count, "a single overlong line has no chunks");
+                }
+            });
+
+            TestRunner.Run("rag.indexer_reuses_unchanged_chunks", () =>
+            {
+                using (RagFixture rag = new RagFixture())
+                {
+                    // 150 lines: chunks start at 1, 51 and 101 (60 lines, overlap 10).
+                    string notes = rag.WriteFile("notes.txt", RagFixture.Lines("LINE-", 150));
+                    TestAssert.Equal("done", rag.Reconcile(), "first pass");
+                    TestAssert.Equal(3, rag.Server.EmbeddingsInputCount, "three chunks embedded");
+
+                    // Appending a line changes only the last chunk's text.
+                    File.AppendAllText(notes, "LINE-151\r\n");
+                    File.SetLastWriteTimeUtc(notes, DateTime.UtcNow.AddMinutes(5));
+                    TestAssert.Equal("done", rag.Reconcile(), "changed pass");
+                    TestAssert.Equal(4, rag.Server.EmbeddingsInputCount, "only the changed chunk is embedded");
+                    TestAssert.Equal("1,51,101", Join(rag.ChunkStarts("notes.txt")), "same chunks");
+                    TestAssert.Equal(3, rag.OnDisk().Vectors.Count, "no duplicate vectors");
                 }
             });
 

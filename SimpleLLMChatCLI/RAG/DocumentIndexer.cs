@@ -173,6 +173,15 @@ namespace SimpleLLMChatCLI.RAG
                     continue;
                 }
 
+                // The previous version's vectors by text hash: a chunk whose text is
+                // unchanged keeps its embedding instead of being sent again.
+                var previous = new Dictionary<string, float[]>(StringComparer.Ordinal);
+                foreach (ChunkVector old in index.GetFileVectors(file))
+                {
+                    if (!string.IsNullOrEmpty(old.Hash))
+                        previous[old.Hash] = old.Embedding;
+                }
+
                 // A blank file was never stored, so dropping it changes nothing.
                 if (index.Manifest.Files.ContainsKey(file))
                     changed = true;
@@ -186,12 +195,21 @@ namespace SimpleLLMChatCLI.RAG
                     if (string.IsNullOrWhiteSpace(chunk.Text))
                         continue;
 
-                    pendingChunks.Add(new ChunkVector
+                    ChunkVector vector = new ChunkVector
                     {
                         File = file,
                         StartLine = chunk.Start,
-                        EndLine = chunk.End
-                    });
+                        EndLine = chunk.End,
+                        Hash = DocumentIndex.HashMd5Hex(chunk.Text, lowercase: false)
+                    };
+                    float[] embedding;
+                    if (previous.TryGetValue(vector.Hash, out embedding))
+                    {
+                        vector.Embedding = embedding;
+                        index.Vectors.Add(vector);
+                        continue;
+                    }
+                    pendingChunks.Add(vector);
                     pendingTexts.Add(chunk.Text);
                 }
 

@@ -165,6 +165,11 @@ namespace SimpleLLMChatCLI.RAG
             catch { }
         }
 
+        public List<ChunkVector> GetFileVectors(string filePath)
+        {
+            return Vectors.GetByFile(DocumentScanFilter.NormalizePath(filePath));
+        }
+
         public void RemoveFileData(string filePath)
         {
             string key = DocumentScanFilter.NormalizePath(filePath);

@@ -10,6 +10,8 @@ namespace SimpleLLMChatCLI.RAG
         public string File;
         public int StartLine;
         public int EndLine;
+        /// <summary>Hash of the embedded text: a re-chunked file reuses the vector of an unchanged chunk.</summary>
+        public string Hash;
         public float[] Embedding;
         public double Norm;
 
@@ -57,6 +59,15 @@ namespace SimpleLLMChatCLI.RAG
         {
             _vectors.Clear();
             _dimension = 0;
+        }
+
+        /// <summary>The chunks of one file (case-insensitive path match, like <see cref="RemoveByFile"/>).</summary>
+        public List<ChunkVector> GetByFile(string file)
+        {
+            if (string.IsNullOrEmpty(file))
+                return new List<ChunkVector>();
+            return _vectors.FindAll(v =>
+                string.Equals(v.File, file, StringComparison.OrdinalIgnoreCase));
         }
 
         public int RemoveByFile(string file)
@@ -166,6 +177,7 @@ namespace SimpleLLMChatCLI.RAG
                     writer.Write(v.File ?? string.Empty);
                     writer.Write(v.StartLine);
                     writer.Write(v.EndLine);
+                    writer.Write(v.Hash ?? string.Empty);
                     int len = v.Embedding != null ? v.Embedding.Length : 0;
                     writer.Write(len);
                     for (int i = 0; i < len; i++)
@@ -196,6 +208,7 @@ namespace SimpleLLMChatCLI.RAG
                         v.File = reader.ReadString();
                         v.StartLine = reader.ReadInt32();
                         v.EndLine = reader.ReadInt32();
+                        v.Hash = reader.ReadString();
                         int len = reader.ReadInt32();
                         float[] embedding = new float[len];
                         for (int i = 0; i < len; i++)
