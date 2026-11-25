@@ -154,9 +154,10 @@ namespace SimpleLLMChatCLI.RAG
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write))
-            using (BinaryWriter writer = new BinaryWriter(fs, Encoding.UTF8))
+            AtomicFile.Write(path, stream =>
             {
+                // Not disposed: that would close the stream before AtomicFile flushes it.
+                BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8);
                 writer.Write(_dimension);
                 writer.Write(_vectors.Count);
 
@@ -170,7 +171,8 @@ namespace SimpleLLMChatCLI.RAG
                     for (int i = 0; i < len; i++)
                         writer.Write(v.Embedding[i]);
                 }
-            }
+                writer.Flush();
+            });
         }
 
         public static VectorStore Load(string path)

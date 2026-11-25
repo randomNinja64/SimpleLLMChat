@@ -12,12 +12,21 @@ public static class AtomicFile
 {
     public static void WriteAllBytes(string path, byte[] contents)
     {
+        Write(path, stream => stream.Write(contents, 0, contents.Length));
+    }
+
+    /// <summary>
+    /// As <see cref="WriteAllBytes"/>, for content written straight to the stream, so a
+    /// large file is not first built in memory. <paramref name="write"/> must not close it.
+    /// </summary>
+    public static void Write(string path, Action<Stream> write)
+    {
         string target = Path.GetFullPath(path);
         string temp = target + ".tmp";
 
         using (FileStream stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
-            stream.Write(contents, 0, contents.Length);
+            write(stream);
             stream.Flush(true);
         }
 

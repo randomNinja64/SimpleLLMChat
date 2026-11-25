@@ -85,7 +85,8 @@ namespace SimpleLLMChatCLI.RAG
 
             Func<string, string, IEnumerable<IndexChunk>> chunker = (file, content) =>
                 LineChunks(index.ToDisplayPath(file), content, chunkLines, overlap, maxSnippet);
-            if (!ReconcileFiles(index, files, embeddings, fullRebuild, chunker, Report))
+            bool changed;
+            if (!ReconcileFiles(index, files, embeddings, fullRebuild, chunker, Report, out changed))
                 return;
 
             index.Manifest.EmbeddingsModel = _config.Get(AppSettings.EmbeddingsModel);
@@ -107,6 +108,8 @@ namespace SimpleLLMChatCLI.RAG
         /// embeds new or changed files (by mtime, then content hash), drops files no longer
         /// listed. Shared by the knowledge folder and chat history, which differ only in
         /// how a file is chunked. False (index left unsaved) when embedding fails.
+        /// <paramref name="changed"/> is false when the index was already up to date, so
+        /// there is nothing to save.
         /// </summary>
         public static bool ReconcileFiles(
             DocumentIndex index,
@@ -114,8 +117,10 @@ namespace SimpleLLMChatCLI.RAG
             EmbeddingsClient embeddings,
             bool fullRebuild,
             Func<string, string, IEnumerable<IndexChunk>> chunker,
-            Action<IndexProgress> report)
+            Action<IndexProgress> report,
+            out bool changed)
         {
+            changed = fullRebuild;
             Action<IndexProgress> send = p => { if (report != null) report(p); };
             send(new IndexProgress { Phase = "start", Total = files.Count });
 
@@ -161,10 +166,16 @@ namespace SimpleLLMChatCLI.RAG
                 {
                     // Content identical; refresh stored mtime so the next reconcile can skip the read.
                     if (existing.Mtime != mtime)
+                    {
                         existing.Mtime = mtime;
+                        changed = true;
+                    }
                     continue;
                 }
 
+                // A blank file was never stored, so dropping it changes nothing.
+                if (index.Manifest.Files.ContainsKey(file))
+                    changed = true;
                 index.RemoveFileData(file);
 
                 if (string.IsNullOrWhiteSpace(content))
@@ -189,6 +200,7 @@ namespace SimpleLLMChatCLI.RAG
                     Hash = hash,
                     Mtime = mtime
                 };
+                changed = true;
             }
 
             // Prune removed files
@@ -200,6 +212,8 @@ namespace SimpleLLMChatCLI.RAG
             }
             foreach (string key in toRemove)
                 index.RemoveFileData(key);
+            if (toRemove.Count > 0)
+                changed = true;
 
             if (pendingTexts.Count > 0)
             {

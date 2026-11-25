@@ -143,9 +143,12 @@ namespace SimpleLLMChatCLI.RAG
 
             Manifest.KnowledgePath = KnowledgePath;
 
-            string json = JsonConvert.SerializeObject(Manifest, Formatting.Indented);
-            File.WriteAllText(ManifestPath, json, new UTF8Encoding(false));
+            // Each file is swapped in whole, vectors first: if the manifest write then fails,
+            // the old manifest only makes the next reconcile re-embed what changed, whereas
+            // a new manifest over old vectors would mark files indexed that have no vectors.
             Vectors.Save(VectorsPath);
+            string json = JsonConvert.SerializeObject(Manifest, Formatting.Indented);
+            AtomicFile.WriteAllBytes(ManifestPath, new UTF8Encoding(false).GetBytes(json));
         }
 
         public void Clear()

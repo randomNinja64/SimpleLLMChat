@@ -645,6 +645,13 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.Equal("[recalling 2 earlier chats]", result.ChatStatusLine, "3 exchanges from 2 chats");
                         TestAssert.True(result.UserStatusLine == null, "no knowledge status");
 
+                        // Nothing changed: the next recall does not rewrite the index.
+                        string vectorsPath = DocumentIndex.LoadFor(ChatWorkspace.Normalize(chats)).VectorsPath;
+                        DateTime stamp = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                        File.SetLastWriteTimeUtc(vectorsPath, stamp);
+                        AutoRagContext.TryRetrieve(config, "q", scope);
+                        TestAssert.True(File.GetLastWriteTimeUtc(vectorsPath) == stamp, "unchanged chats: index not saved");
+
                         // Both on: top results of each, each with its own status line.
                         rag.WriteFile("notes.txt", RagFixture.Lines("LINE-", 10));
                         TestAssert.Equal("done", rag.Reconcile("ragchathistory=1\r\n"), "knowledge indexed");
@@ -664,6 +671,8 @@ namespace SimpleLLMChatCLI.Tests
                         AutoRagResult afterDelete = AutoRagContext.TryRetrieve(config, "q", scope);
                         TestAssert.True(afterDelete.Context.IndexOf("OTHER-ANSWER", StringComparison.Ordinal) < 0, "deleted chat gone");
                         TestAssert.Equal("[recalling 1 earlier chat]", afterDelete.ChatStatusLine, "one chat left");
+                        TestAssert.True(File.GetLastWriteTimeUtc(vectorsPath) != stamp, "deleted chat: index saved");
+                        TestAssert.Equal(0, Directory.GetFiles(Path.GetDirectoryName(vectorsPath), "*.tmp").Length, "no temp file left");
                     }
                     finally
                     {

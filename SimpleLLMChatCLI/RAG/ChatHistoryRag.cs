@@ -65,19 +65,25 @@ namespace SimpleLLMChatCLI.RAG
                         files.Add(path);
                 }
 
+                bool changed;
                 if (!DocumentIndexer.ReconcileFiles(index, files, embeddings, fullRebuild,
-                        (file, content) => ExchangeChunks(content, maxSnippet), null))
+                        (file, content) => ExchangeChunks(content, maxSnippet), null, out changed))
                 {
                     _cached = null;   // Unsaved and part-updated: reload next time.
                     return null;
                 }
 
-                index.Manifest.EmbeddingsModel = config.Get(AppSettings.EmbeddingsModel);
-                index.Manifest.IndexChunkLines = config.Get(AppSettings.IndexChunkLines);
-                index.Manifest.IndexChunkOverlap = config.Get(AppSettings.IndexChunkOverlap);
-                index.Manifest.RagMaxSnippetLength = maxSnippet;
-                try { index.Save(); }
-                catch (IOException) { }   // Searchable now; saved next time.
+                // Save only when this pass changed the index: most recalls find every chat
+                // unchanged.
+                if (changed)
+                {
+                    index.Manifest.EmbeddingsModel = config.Get(AppSettings.EmbeddingsModel);
+                    index.Manifest.IndexChunkLines = config.Get(AppSettings.IndexChunkLines);
+                    index.Manifest.IndexChunkOverlap = config.Get(AppSettings.IndexChunkOverlap);
+                    index.Manifest.RagMaxSnippetLength = maxSnippet;
+                    try { index.Save(); }
+                    catch (IOException) { }   // Searchable now; saved with the next change.
+                }
                 _cached = index;
             }
 
