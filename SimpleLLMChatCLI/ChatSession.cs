@@ -41,6 +41,7 @@ namespace SimpleLLMChatCLI
             _showBanners = showBanners;
 
             _commands["/clear"] = NoArguments(Clear);
+            _commands["/compact"] = NoArguments(Compact);
             _commands["/reload"] = NoArguments(Reload);
             _commands["/buildindex"] = NoArguments(() => { RagHost.BuildIndex(); ChatOutput.MarkSeparated(); });
             _commands["/clearindex"] = NoArguments(() => { RagHost.ClearIndex(); ChatOutput.MarkSeparated(); });
@@ -205,6 +206,20 @@ namespace SimpleLLMChatCLI
                 ChatOutput.WriteLine("Context cleared.\n");
                 PrintInstructions();
             }
+        }
+
+        /// <summary>
+        /// /compact: replaces the conversation with a model-written summary.
+        /// Ctrl+C stops it.
+        /// </summary>
+        private void Compact()
+        {
+            Cancel.Begin();
+            bool compacted = _client.CompactConversation(_conversation, _settings);
+            Cancel.End();
+
+            if (compacted)
+                AutoSave(Program.Config.Get(AppSettings.ChatHistoryLimit));
         }
 
         private void Reload()
@@ -450,6 +465,7 @@ namespace SimpleLLMChatCLI
             ChatOutput.WriteLine("| /buildindex: Reconcile knowledge index          |");
             ChatOutput.WriteLine("| /clear: Clear chat context                      |");
             ChatOutput.WriteLine("| /clearindex: Clear knowledge index              |");
+            ChatOutput.WriteLine("| /compact: Summarize chat to free up context     |");
             ChatOutput.WriteLine("| /exit: Exit the application                     |");
             ChatOutput.WriteLine("| /image \"path\" prompt: Send an image             |");
             ChatOutput.WriteLine("| /import <path>: Copy a chat into this workspace |");

@@ -98,8 +98,7 @@ public partial class LLMClient
         StreamSink sink = StreamSink.For(settings);
         Turn turn = new Turn { Conversation = conversation, Settings = settings, Sink = sink };
 
-        MaybeSummarizeInBackground(
-            turn, "\n\n[Continue from this context. The user's next message follows.]");
+        MaybeSummarizeInBackground(turn, NextMessageHint);
 
         RagHost.FlushPendingErrorOnce();
         RagHost.WaitIfIndexing();
@@ -359,12 +358,57 @@ public partial class LLMClient
             return;
         }
 
+        ReplaceWithSummary(conversation, summary, continueHint);
+        sink.Notice("[Conversation summarized - continuing...]");
+    }
+
+    /// <summary>
+    /// The /compact command: summarizes the whole conversation now, whatever its
+    /// size. Unlike automatic summarization, a failure leaves the conversation
+    /// as it was. Returns true when it was replaced.
+    /// </summary>
+    public bool CompactConversation(List<ChatMessage> conversation, TurnSettings settings)
+    {
+        StreamSink sink = StreamSink.For(settings);
+
+        if (conversation == null || conversation.Count == 0)
+        {
+            sink.Notice("[Nothing to compact]");
+            return false;
+        }
+
+        int before = TokenEstimator.ApproximateTokens(
+            GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+        sink.Notice("[Compacting conversation...]");
+
+        string summary = SummarizeConversation(conversation);
+        if (Cancel.Requested)
+        {
+            sink.Notice("[Compaction stopped - conversation unchanged]");
+            return false;
+        }
+        if (string.IsNullOrEmpty(summary))
+        {
+            sink.Error("[Compaction failed - conversation unchanged]");
+            return false;
+        }
+
+        ReplaceWithSummary(conversation, summary, NextMessageHint);
+        int after = TokenEstimator.ApproximateTokens(
+            GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
+        sink.Notice(string.Format(CultureInfo.InvariantCulture,
+            "[Conversation compacted: ~{0:N0} -> ~{1:N0} tokens]", before, after));
+        return true;
+    }
+
+    private const string NextMessageHint = "\n\n[Continue from this context. The user's next message follows.]";
+
+    private void ReplaceWithSummary(List<ChatMessage> conversation, string summary, string continueHint)
+    {
         conversation.Clear();
         conversation.Add(new ChatMessage(
             "user",
             "[Previous conversation summary]\n" + summary + continueHint));
-
-        sink.Notice("[Conversation summarized - continuing...]");
 
         PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
     }

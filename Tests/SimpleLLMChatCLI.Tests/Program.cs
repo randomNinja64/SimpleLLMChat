@@ -317,6 +317,54 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.compact_command", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply");
+                    server.EnqueueApiError("compact-down");
+                    server.EnqueueContent("COMPACT-SUMMARY");
+                    server.EnqueueContent("after-compact");
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "");
+                    string oldMarker = "OLD-MARKER-" + new string('A', 50);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+
+                        cli.WriteLine("/compact");
+                        TestAssert.True(WaitStdoutContains(cli, "[Nothing to compact]", 10000), "empty chat");
+                        TestAssert.Equal(0, server.ChatBodies.Count, "no request for an empty chat");
+
+                        cli.WriteLine(oldMarker);
+                        TestAssert.True(WaitStdoutContains(cli, "first-reply", 20000), "first reply");
+
+                        cli.WriteLine("/compact");
+                        TestAssert.True(WaitStdoutContains(cli, "[Compaction failed - conversation unchanged]", 20000), "failure note");
+
+                        cli.WriteLine("/compact");
+                        TestAssert.True(WaitStdoutContains(cli, "[Conversation compacted:", 20000), "compacted note");
+                        TestAssert.True(cli.Stdout.IndexOf("COMPACT-SUMMARY", StringComparison.Ordinal) < 0, "summary not shown");
+                        TestAssert.Contains(server.LastBody, oldMarker, "failed compaction kept history");
+
+                        cli.WriteLine("next question");
+                        TestAssert.True(WaitStdoutContains(cli, "after-compact", 20000), "reply after compaction");
+                        TestAssert.Contains(server.LastBody, "COMPACT-SUMMARY", "summary sent");
+                        TestAssert.True(server.LastBody.IndexOf(oldMarker, StringComparison.Ordinal) < 0, "old history replaced");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.rag_injects_whole_chunk", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())

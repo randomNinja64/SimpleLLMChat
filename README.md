@@ -127,6 +127,7 @@ Interactive mode provides the following commands:
 - `/buildindex`: Reconciles the knowledge index (adds/updates/removes changed files)
 - `/clear`: Clears chat context
 - `/clearindex`: Clears the on-disk knowledge index
+- `/compact`: Compacts the conversation to reduce context usage.
 - `/exit`: Exits the application
 - `/image`: Sends an image to the model alongside the next message, used as `/image "path" prompt`
 - `/import <path>`: Loads a chat, copying it into your current working directory.
