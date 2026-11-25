@@ -418,6 +418,20 @@ namespace SimpleLLMChatCLI.Tests
                         TestAssert.Contains(server.LastBody, "COMPACT-SUMMARY", "summary sent");
                         TestAssert.True(server.LastBody.IndexOf(oldMarker, StringComparison.Ordinal) < 0, "old history replaced");
 
+                        // Nothing was kept, so the summary rides on the next prompt
+                        // instead of being a user message of its own.
+                        JArray sent = (JArray)JObject.Parse(server.LastBody)["messages"];
+                        JToken lastSent = sent[sent.Count - 1];
+                        TestAssert.Equal("user", (string)lastSent["role"], "prompt last");
+                        string prompt = (string)lastSent["content"];
+                        TestAssert.Contains(prompt, "COMPACT-SUMMARY", "summary merged into the prompt");
+                        TestAssert.Contains(prompt, "next question", "prompt text kept");
+                        TestAssert.True(prompt.IndexOf("COMPACT-SUMMARY", StringComparison.Ordinal)
+                            < prompt.IndexOf("next question", StringComparison.Ordinal), "summary ahead of the prompt");
+                        for (int i = 1; i < sent.Count; i++)
+                            TestAssert.True((string)sent[i]["role"] != "user" || (string)sent[i - 1]["role"] != "user",
+                                "no two user messages in a row");
+
                         cli.WriteLine("/exit");
                         TestAssert.True(cli.WaitForExit(10000), "exit");
                     }

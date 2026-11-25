@@ -122,6 +122,10 @@ public partial class LLMClient
             }
         }
 
+        string summary = TakeTrailingSummary(conversation);
+        if (summary != null)
+            retrieved = string.IsNullOrEmpty(retrieved) ? summary : summary + "\n\n" + retrieved;
+
         conversation.Add(new ChatMessage
         {
             Role = "user",
@@ -533,7 +537,34 @@ public partial class LLMClient
     }
 
     private const string SummaryHeader = "[Previous conversation summary]\n";
+    private const string SummaryEnd = "\n\n[End of summary. The conversation continues from here.]";
     private const string RecentFollowHint = "\n\n[Continue from this context. The most recent messages follow.]";
+
+    /// <summary>
+    /// When a summary kept no messages (/compact, or compaction before a prompt with
+    /// no context window set), the conversation ends with the summary as its own user
+    /// message. That message is removed and returned as hidden context for the new
+    /// prompt, since some chat templates reject two user messages in a row. It stays
+    /// in the conversation until then, so a chat saved in between keeps it. Null when
+    /// the conversation does not end with a summary.
+    /// </summary>
+    private static string TakeTrailingSummary(List<ChatMessage> conversation)
+    {
+        if (conversation == null || conversation.Count == 0)
+            return null;
+
+        ChatMessage last = conversation[conversation.Count - 1];
+        string content = last.Content ?? string.Empty;
+        if (!IsRole(last, "user") || !content.StartsWith(SummaryHeader, StringComparison.Ordinal))
+            return null;
+
+        if (content.EndsWith(NextMessageHint, StringComparison.Ordinal))
+            content = content.Substring(0, content.Length - NextMessageHint.Length);
+        conversation.RemoveAt(conversation.Count - 1);
+
+        string block = content + SummaryEnd;
+        return string.IsNullOrEmpty(last.Context) ? block : block + "\n\n" + last.Context;
+    }
 
     /// <summary>
     /// Where the messages kept verbatim after summarizing start: the earliest index
@@ -566,7 +597,8 @@ public partial class LLMClient
     /// Replaces the messages before <paramref name="keepFrom"/> with the summary. When
     /// the kept messages start with a user message, the summary goes ahead of that
     /// message's hidden context, so what the user typed stays as it was; otherwise a
-    /// summary message comes first.
+    /// summary message comes first. With nothing kept, the next prompt takes that
+    /// message as its hidden context (TakeTrailingSummary).
     /// </summary>
     private void ReplaceWithSummary(List<ChatMessage> conversation, int keepFrom, string summary, string continueHint)
     {
@@ -578,7 +610,7 @@ public partial class LLMClient
         if (recent.Count > 0 && IsRole(recent[0], "user"))
         {
             ChatMessage first = recent[0];
-            string block = SummaryHeader + summary + "\n\n[End of summary. The conversation continues from here.]";
+            string block = SummaryHeader + summary + SummaryEnd;
             first.Context = string.IsNullOrEmpty(first.Context) ? block : block + "\n\n" + first.Context;
             recent[0] = first;
         }
