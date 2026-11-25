@@ -4,6 +4,16 @@
 <h3 align="center">SimpleLLMChat</h3>
 <p align="center"><em>AI Chatbot/Agent for Windows XP+</em></p>
 
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/gui.png" alt="SimpleLLMChat GUI"><br><sub>The GUI application</sub></td>
+    <td align="center"><img src="screenshots/toolapproval.png" alt="SimpleLLMChat tool call approval prompt"><br><sub>Tool approval prompt</sub></td>
+    <td align="center"><img src="screenshots/cli.png" alt="SimpleLLMChat CLI"><br><sub>The CLI application</sub></td>
+  </tr>
+</table>
+</div>
+
 ## About
 
 SimpleLLMChat is a lightweight C# CLI and GUI application that makes LLMs accessible on both legacy and modern Windows systems. The software is designed to work with OpenAI-compatible endpoints and can be extended via a tool system.
