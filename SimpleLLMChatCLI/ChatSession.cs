@@ -197,6 +197,7 @@ namespace SimpleLLMChatCLI
         private void Clear()
         {
             _conversation.Clear();
+            _client.ResetContextInjections();
             _title = null;
             _sessionPath = null;
             _registry.WorkingDirectoryOverride = null;
@@ -230,6 +231,7 @@ namespace SimpleLLMChatCLI
             _registry.LoadToolsFromDirectory(_toolsDir);
             _settings = TurnSettings.FromConfig(Program.Config, false);
             RagHost.OnConfigReloaded(Program.Config);
+            _client.ResetContextInjections();
             _client.RefreshBaseCharacterOverhead(_settings.EnabledTools);
             _client.PublishStatusTokens(
                 LLMClient.GetConversationCharacterCount(_conversation) + _client.GetBaseCharacterOverhead());
@@ -353,6 +355,7 @@ namespace SimpleLLMChatCLI
         {
             _conversation.Clear();
             _conversation.AddRange(loaded);
+            _client.ResetContextInjections();
             _title = title;
             _sessionPath = sessionPath;
             _client.PublishStatusTokens(

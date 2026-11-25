@@ -78,7 +78,6 @@ public partial class LLMClient
         public List<ChatMessage> Conversation;
         public TurnSettings Settings;
         public StreamSink Sink;
-        public List<string> ContextInjections;
         public int ConsecutiveFailedToolCalls;
     }
 
@@ -132,16 +131,12 @@ public partial class LLMClient
             ImageMime = string.IsNullOrEmpty(imageMime) ? null : imageMime
         });
 
-        turn.ContextInjections = registry != null
-            ? registry.GetContextInjections(settings.EnabledTools)
-            : new List<string>();
-
         while (true)
         {
             PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
 
             LLMCompletionResponse response = SendMessages(
-                conversation, settings.EnabledTools, sink, turn.ContextInjections);
+                conversation, settings.EnabledTools, sink);
             sink.EndResponse();
 
             if (Cancel.Requested)
@@ -531,6 +526,8 @@ public partial class LLMClient
 
     private void ReplaceWithSummary(List<ChatMessage> conversation, string summary, string continueHint)
     {
+        // The summary replaces the whole prefix, so a fresh snapshot costs no cache.
+        ResetContextInjections();
         conversation.Clear();
         conversation.Add(new ChatMessage(
             "user",

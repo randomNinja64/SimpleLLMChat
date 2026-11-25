@@ -14,10 +14,9 @@ public partial class LLMClient
     private LLMCompletionResponse SendMessages(
         List<ChatMessage> conversation,
         List<string> enabledTools,
-        StreamSink sink,
-        List<string> contextInjections = null)
+        StreamSink sink)
     {
-        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools, contextInjections), sink);
+        return SendHttpRequest(BuildRequestPayload(conversation, enabledTools), sink);
     }
 
     private LLMCompletionResponse SendHttpRequest(JObject payload, StreamSink sink)

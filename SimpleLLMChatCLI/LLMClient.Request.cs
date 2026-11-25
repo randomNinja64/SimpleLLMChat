@@ -12,12 +12,40 @@ public partial class LLMClient
         return BaseOverheadChars.HasValue ? BaseOverheadChars.Value : 0;
     }
 
+    // Context injector output, taken once per chat. A live snapshot on every turn
+    // would change the system prompt each time and invalidate the provider's cached
+    // prompt prefix; tools like list_windows give the model the current state instead.
+    private List<string> contextSnapshot;
+    private string contextSnapshotKey;
+
+    /// <summary>
+    /// Drops the context injector snapshot so the next request takes a fresh one.
+    /// Called when a chat starts, is loaded, or is replaced by a summary.
+    /// </summary>
+    public void ResetContextInjections()
+    {
+        contextSnapshot = null;
+        contextSnapshotKey = null;
+    }
+
+    private List<string> GetContextInjections(List<string> enabledTools)
+    {
+        if (registry == null || enabledTools == null || enabledTools.Count == 0)
+            return new List<string>();
+
+        // A different tool set changes the tools array (and the cache) anyway.
+        string key = string.Join("\n", enabledTools.ToArray());
+        if (contextSnapshot == null || contextSnapshotKey != key)
+        {
+            contextSnapshot = registry.GetContextInjections(enabledTools);
+            contextSnapshotKey = key;
+        }
+        return contextSnapshot;
+    }
+
     public void RefreshBaseCharacterOverhead(List<string> enabledTools)
     {
-        List<string> contextInjections = registry != null
-            ? registry.GetContextInjections(enabledTools)
-            : new List<string>();
-        string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
+        string systemPrompt = BuildSystemPrompt(enabledTools);
         int toolsChars = 0;
         if (enabledTools != null && enabledTools.Count > 0 && registry != null)
         {
@@ -28,16 +56,12 @@ public partial class LLMClient
         BaseOverheadChars = systemPrompt.Length + toolsChars;
     }
 
-    private string BuildSystemPrompt(List<string> enabledTools, List<string> contextInjections = null)
+    private string BuildSystemPrompt(List<string> enabledTools)
     {
         string sysprompt = ConfigHandler.DecodeStoredPrompt(config.Get(AppSettings.SysPrompt)) ?? "";
 
-        if (registry != null)
-        {
-            List<string> injections = contextInjections ?? registry.GetContextInjections(enabledTools);
-            foreach (string injection in injections)
-                sysprompt += "\n\n" + injection;
-        }
+        foreach (string injection in GetContextInjections(enabledTools))
+            sysprompt += "\n\n" + injection;
 
         string ragHint = RagHost.GetKnowledgePathHint(config);
         if (!string.IsNullOrEmpty(ragHint))
@@ -50,14 +74,14 @@ public partial class LLMClient
         return sysprompt;
     }
 
-    private JObject BuildRequestPayload(List<ChatMessage> conversation, List<string> enabledTools, List<string> contextInjections = null)
+    private JObject BuildRequestPayload(List<ChatMessage> conversation, List<string> enabledTools)
     {
         JObject payload = new JObject
         {
             ["model"] = config.Get(AppSettings.Model)
         };
 
-        string systemPrompt = BuildSystemPrompt(enabledTools, contextInjections);
+        string systemPrompt = BuildSystemPrompt(enabledTools);
 
         JArray messages = new JArray();
         messages.Add(new JObject

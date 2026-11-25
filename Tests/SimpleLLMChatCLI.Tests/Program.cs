@@ -371,6 +371,54 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            // The injector's output is taken once per chat so the system prompt (the start
+            // of every request) stays byte-identical and the provider's prompt cache holds.
+            TestRunner.Run("cli.context_injection_once_per_chat", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("reply-one");
+                    server.EnqueueContent("reply-two");
+                    server.EnqueueContent("reply-three");
+                    WriteCounterInjectorPackage(ws);
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "snap_noop", "");
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+
+                        cli.WriteLine("first question");
+                        TestAssert.True(WaitStdoutContains(cli, "reply-one", 20000), "first reply");
+                        cli.WriteLine("second question");
+                        TestAssert.True(WaitStdoutContains(cli, "reply-two", 20000), "second reply");
+
+                        List<string> bodies = server.ChatBodies;
+                        TestAssert.Equal(2, bodies.Count, "two requests");
+                        string sys1 = SystemPromptOf(bodies[0]);
+                        string sys2 = SystemPromptOf(bodies[1]);
+                        TestAssert.Contains(sys1, "SNAP-", "injection in the system prompt");
+                        TestAssert.Equal(sys1, sys2, "system prompt identical across turns");
+
+                        cli.WriteLine("/clear");
+                        cli.WriteLine("third question");
+                        TestAssert.True(WaitStdoutContains(cli, "reply-three", 20000), "third reply");
+                        string sys3 = SystemPromptOf(server.ChatBodies[2]);
+                        TestAssert.Contains(sys3, "SNAP-", "injection after /clear");
+                        TestAssert.True(sys3 != sys1, "new chat takes a fresh snapshot");
+
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.compact_clears_old_tool_output", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
@@ -1905,6 +1953,41 @@ namespace SimpleLLMChatCLI.Tests
                 CopyDirectory(toolsSrc, Path.Combine(ws.Path, "tools"));
 
             return ws;
+        }
+
+        // A package whose context injector returns SNAP-<n>, counting up on every call.
+        static void WriteCounterInjectorPackage(TempWorkspace ws)
+        {
+            string dir = Path.Combine(ws.Path, "tools", "Snap");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "snap.cmd"), string.Join("\r\n", new[]
+            {
+                "@echo off",
+                "if not \"%~1\"==\"inject\" goto noop",
+                "set N=0",
+                "if exist \"%~dp0count.txt\" set /p N=<\"%~dp0count.txt\"",
+                "set /a N=N+1",
+                ">\"%~dp0count.txt\" echo %N%",
+                "echo {\"text\":\"SNAP-%N%\"}",
+                "exit 0",
+                ":noop",
+                "echo {\"text\":\"ok\"}",
+                "exit 0",
+                ""
+            }), Encoding.ASCII);
+
+            JObject manifest = new JObject
+            {
+                ["executable"] = "snap.cmd",
+                ["context_injector"] = "inject",
+                ["tools"] = new JArray(new JObject { ["name"] = "snap_noop", ["description"] = "noop" })
+            };
+            File.WriteAllText(Path.Combine(dir, "Snap.json"), manifest.ToString(), Encoding.UTF8);
+        }
+
+        static string SystemPromptOf(string body)
+        {
+            return (string)JObject.Parse(body)["messages"][0]["content"];
         }
 
         static void CopyDirectory(string sourceDir, string destDir)

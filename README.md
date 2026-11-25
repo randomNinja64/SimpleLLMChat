@@ -152,6 +152,8 @@ CLI mode provides the following additional flags:
 
 SimpleLLMChat includes the following 7 tool packages:
 
+Context injectors run once when a chat starts (and again after it is cleared, loaded, compacted, or its enabled tools change), so the system prompt stays the same between turns and the server's prompt cache is reused.
+
 - File Tools
   - Tools
     - `copy_file`: Copies a file from one location to another
