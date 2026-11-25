@@ -184,6 +184,10 @@ namespace SimpleLLMChatCLI.RAG
                 Program.Pipe.PublishLine(ChatPipe.FormatIndexingProgress(
                     progress.Current, progress.Total, progress.File));
             }
+            else if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseEmbedding, StringComparison.OrdinalIgnoreCase))
+            {
+                Program.Pipe.PublishLine(ChatPipe.FormatIndexingEmbedding(progress.Current, progress.Total));
+            }
             else if (string.Equals(progress.Phase, ChatPipe.IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))
             {
                 Program.Pipe.PublishLine(ChatPipe.FormatIndexingDone(progress.FileCount));

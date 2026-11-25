@@ -64,6 +64,13 @@ namespace SimpleLLMChatGUI
                     : "Current file: " + status.File;
                 busy = true;
             }
+            else if (string.Equals(status.Phase, ChatPipe.IndexingPhaseEmbedding, StringComparison.OrdinalIgnoreCase))
+            {
+                brief = string.Format(CultureInfo.CurrentCulture, "Embedding... {0}/{1}",
+                    status.Current, status.Total);
+                detail = "Embedding new and changed chunks.";
+                busy = true;
+            }
             else if (string.Equals(status.Phase, ChatPipe.IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))
             {
                 brief = status.FileCount > 0 ? "Index: Ready" : "Index: Empty";

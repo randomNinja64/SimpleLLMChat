@@ -514,6 +514,10 @@ namespace SimpleLLMChatCLI.Tests
                     File.SetLastWriteTimeUtc(notes, DateTime.UtcNow.AddMinutes(5));
                     TestAssert.Equal("done", rag.Reconcile(), "changed pass");
                     TestAssert.Equal(4, rag.Server.EmbeddingsInputCount, "only the changed chunk is embedded");
+                    List<IndexProgress> embedding = rag.Progress.FindAll(p => p.Phase == "embedding");
+                    TestAssert.Equal(2, embedding.Count, "embedding progress: before and after the request");
+                    TestAssert.Equal("0/1", embedding[0].Current + "/" + embedding[0].Total, "counts chunks, from zero");
+                    TestAssert.Equal("1/1", embedding[1].Current + "/" + embedding[1].Total, "then each request");
                     TestAssert.Equal("1,51,101", Join(rag.ChunkStarts("notes.txt")), "same chunks");
                     TestAssert.Equal(3, rag.OnDisk().Vectors.Count, "no duplicate vectors");
                 }
@@ -663,6 +667,14 @@ namespace SimpleLLMChatCLI.Tests
 
                     TestAssert.Equal(0, new List<IndexChunk>(ChatHistoryRag.ExchangeChunks("[1,2]", 2000)).Count, "not a chat file");
                 }
+            });
+
+            TestRunner.Run("rag.embedding_progress_reported", () =>
+            {
+                IndexingStatusEvent ev;
+                TestAssert.True(ChatPipe.TryParseIndexingLine(ChatPipe.FormatIndexingEmbedding(64, 1200), out ev), "parses");
+                TestAssert.Equal(ChatPipe.IndexingPhaseEmbedding, ev.Phase, "phase");
+                TestAssert.Equal("64/1200", ev.Current + "/" + ev.Total, "counts");
             });
 
             TestRunner.Run("rag.chat_recall", () =>

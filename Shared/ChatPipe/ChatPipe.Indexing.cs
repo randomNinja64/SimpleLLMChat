@@ -7,6 +7,7 @@ public static partial class ChatPipe
 
     public const string IndexingPhaseStart = "start";
     public const string IndexingPhaseProgress = "progress";
+    public const string IndexingPhaseEmbedding = "embedding";
     public const string IndexingPhaseDone = "done";
     public const string IndexingPhaseCleared = "cleared";
     public const string IndexingPhaseError = "error";
@@ -22,6 +23,12 @@ public static partial class ChatPipe
         return IndexingPrefix + IndexingPhaseProgress + " current=" + current.ToString(CultureInfo.InvariantCulture)
             + " total=" + total.ToString(CultureInfo.InvariantCulture)
             + " file=" + file;
+    }
+
+    public static string FormatIndexingEmbedding(int current, int total)
+    {
+        return IndexingPrefix + IndexingPhaseEmbedding + " current=" + current.ToString(CultureInfo.InvariantCulture)
+            + " total=" + total.ToString(CultureInfo.InvariantCulture);
     }
 
     public static string FormatIndexingDone(int fileCount)
@@ -64,6 +71,12 @@ public static partial class ChatPipe
             status.Current = ParseIntArg(args, "current");
             status.Total = ParseIntArg(args, "total");
             status.File = ParseStringArg(args, "file");
+            return true;
+        }
+        if (string.Equals(phase, IndexingPhaseEmbedding, StringComparison.OrdinalIgnoreCase))
+        {
+            status.Current = ParseIntArg(args, "current");
+            status.Total = ParseIntArg(args, "total");
             return true;
         }
         if (string.Equals(phase, IndexingPhaseDone, StringComparison.OrdinalIgnoreCase))

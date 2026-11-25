@@ -237,7 +237,9 @@ namespace SimpleLLMChatCLI.RAG
             {
                 try
                 {
-                    List<float[]> vectors = embeddings.EmbedBatch(pendingTexts);
+                    send(new IndexProgress { Phase = "embedding", Current = 0, Total = pendingTexts.Count });
+                    List<float[]> vectors = embeddings.EmbedBatch(pendingTexts, (done, total) =>
+                        send(new IndexProgress { Phase = "embedding", Current = done, Total = total }));
                     for (int i = 0; i < pendingChunks.Count; i++)
                     {
                         pendingChunks[i].Embedding = vectors[i];

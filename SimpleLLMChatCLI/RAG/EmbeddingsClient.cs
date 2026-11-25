@@ -52,6 +52,15 @@ namespace SimpleLLMChatCLI.RAG
 
         public List<float[]> EmbedBatch(IList<string> texts)
         {
+            return EmbedBatch(texts, null);
+        }
+
+        /// <summary>
+        /// As <see cref="EmbedBatch(IList{string})"/>, calling <paramref name="onProgress"/>
+        /// (texts embedded so far, total) after each request.
+        /// </summary>
+        public List<float[]> EmbedBatch(IList<string> texts, Action<int, int> onProgress)
+        {
             List<float[]> results = new List<float[]>();
             if (texts == null || texts.Count == 0)
                 return results;
@@ -76,6 +85,9 @@ namespace SimpleLLMChatCLI.RAG
                 float[][] batch = ParseBatch(json, count);
                 for (int i = 0; i < count; i++)
                     results.Add(batch[i]);
+
+                if (onProgress != null)
+                    onProgress(results.Count, texts.Count);
             }
 
             return results;
