@@ -315,6 +315,14 @@ namespace SimpleLLMChatCLI.RAG
             int start = 0;
             while (start < lines.Length)
             {
+                // A line that alone exceeds maxChars fits in no chunk (chunks are line ranges),
+                // so it is left out of the index; this keeps maxChars a hard limit on every chunk.
+                if (maxChars > 0 && lines[start].Length + 6 > maxChars)
+                {
+                    start++;
+                    continue;
+                }
+
                 // Close the chunk at chunkLines or at maxChars, whichever comes first, so the
                 // snippet cap never cuts off lines that the next chunk does not cover.
                 // Each line costs 6 extra: the indent and line break added when it is injected.
@@ -325,7 +333,7 @@ namespace SimpleLLMChatCLI.RAG
                 while (end < limit)
                 {
                     used += lines[end].Length + 6;
-                    if (maxChars > 0 && used > maxChars && end > start)
+                    if (maxChars > 0 && used > maxChars)
                         break;
                     sb.AppendLine(lines[end]);
                     end++;
@@ -343,8 +351,10 @@ namespace SimpleLLMChatCLI.RAG
                 if (end >= lines.Length)
                     break;
 
-                // Step back by the overlap, unless the chunk was too short to allow it.
-                start = end - overlap > start ? end - overlap : end;
+                // Step back by the overlap, unless the chunk was too short to allow it or it
+                // stopped at an overlong line (stepping back would only repeat the overlap).
+                bool nextIsOverlong = maxChars > 0 && lines[end].Length + 6 > maxChars;
+                start = end - overlap > start && !nextIsOverlong ? end - overlap : end;
             }
         }
     }

@@ -441,6 +441,36 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("rag.indexer_leaves_out_overlong_lines", () =>
+            {
+                using (RagFixture rag = new RagFixture())
+                {
+                    // 10-character lines cost 16 each against a 100-character cap; line 6 alone
+                    // (156) exceeds it, so it fits in no chunk and is left out. Lines 7-11 plus
+                    // the empty line after the final break (6) fit in one chunk.
+                    StringBuilder content = new StringBuilder();
+                    for (int i = 1; i <= 11; i++)
+                    {
+                        content.Append(i == 6
+                            ? new string('B', 150)
+                            : "L" + i.ToString("00", CultureInfo.InvariantCulture) + new string('x', 7));
+                        content.Append("\r\n");
+                    }
+                    rag.WriteFile("blob.txt", content.ToString());
+                    rag.WriteFile("oneline.txt", new string('Q', 300));
+
+                    TestAssert.Equal("done", rag.Reconcile("ragmaxsnippetlength=100\r\nindexchunkoverlap=2\r\n"), "pass");
+                    // 1-5 stops before line 6; no overlap step-back into a 2-line repeat (4-5).
+                    TestAssert.Equal("1,7", Join(rag.ChunkStarts("blob.txt")), "overlong line skipped");
+                    foreach (ChunkHit hit in rag.OnDisk().Vectors.Search(new float[] { 1f, 0f }, 0))
+                    {
+                        if (Path.GetFileName(hit.Chunk.File) == "blob.txt")
+                            TestAssert.True(hit.Chunk.StartLine > 6 || hit.Chunk.EndLine < 6, "no chunk covers line 6");
+                    }
+                    TestAssert.Equal(0, rag.ChunkStarts("oneline.txt").Count, "a single overlong line has no chunks");
+                }
+            });
+
             TestRunner.Run("rag.indexer_refuses_without_settings", () =>
             {
                 using (RagFixture rag = new RagFixture())
