@@ -15,6 +15,20 @@ public static class TokenEstimator
     public const double ClearToolOutputTarget = 0.60;
 
     /// <summary>
+    /// Share of the context window kept verbatim after summarizing: the most recent
+    /// messages up to this size stay, and only the older ones are summarized.
+    /// </summary>
+    public const double KeepRecentShare = 0.10;
+
+    /// <summary>The kept-recent budget in characters; 0 with no window size set.</summary>
+    public static int KeepRecentChars(int contextWindowSize)
+    {
+        if (contextWindowSize <= 0)
+            return 0;
+        return (int)(contextWindowSize * KeepRecentShare) * CharsPerToken;
+    }
+
+    /// <summary>
     /// Flat cost of one attached image. Providers bill images by resolution, not by
     /// file size: a full-size screenshot is about 1,100-1,600 tokens on the standard
     /// tiers of the major APIs, so the base64 length would overstate it many times over.

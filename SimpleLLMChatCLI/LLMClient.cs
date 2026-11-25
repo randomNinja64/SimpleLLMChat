@@ -345,7 +345,8 @@ public partial class LLMClient
 
         sink.Notice("[Context usage high - summarizing conversation...]");
 
-        string summary = SummarizeConversation(conversation);
+        int keepFrom = RecentKeepStart(conversation, TokenEstimator.KeepRecentChars(contextWindow));
+        string summary = SummarizeConversation(conversation.GetRange(0, keepFrom));
         if (Cancel.Requested)
             return;
         if (string.IsNullOrEmpty(summary))
@@ -366,7 +367,7 @@ public partial class LLMClient
             return;
         }
 
-        ReplaceWithSummary(conversation, summary, continueHint);
+        ReplaceWithSummary(conversation, keepFrom, summary, continueHint);
         sink.Notice("[Conversation summarized - continuing...]");
     }
 
@@ -398,7 +399,9 @@ public partial class LLMClient
 
         sink.Notice("[Summarizing conversation...]");
 
-        string summary = SummarizeConversation(conversation);
+        int keepFrom = RecentKeepStart(
+            conversation, TokenEstimator.KeepRecentChars(config.Get(AppSettings.ContextWindowSize)));
+        string summary = SummarizeConversation(conversation.GetRange(0, keepFrom));
         if (Cancel.Requested || string.IsNullOrEmpty(summary))
         {
             PublishStatusTokens(CurrentCharacterCount(conversation));
@@ -407,7 +410,7 @@ public partial class LLMClient
             return cleared > 0;
         }
 
-        ReplaceWithSummary(conversation, summary, NextMessageHint);
+        ReplaceWithSummary(conversation, keepFrom, summary, NextMessageHint);
         sink.Notice("[Conversation summarized]");
         return true;
     }
@@ -524,14 +527,63 @@ public partial class LLMClient
         return 0;
     }
 
-    private void ReplaceWithSummary(List<ChatMessage> conversation, string summary, string continueHint)
+    private const string SummaryHeader = "[Previous conversation summary]\n";
+    private const string RecentFollowHint = "\n\n[Continue from this context. The most recent messages follow.]";
+
+    /// <summary>
+    /// Where the messages kept verbatim after summarizing start: the earliest index
+    /// whose messages from there to the end fit in <paramref name="budgetChars"/>, at
+    /// a boundary the summary joins cleanly. A user message takes the summary as its
+    /// hidden context; an assistant message after a tool result or another assistant
+    /// message (mid-turn) follows a summary message. An assistant message right after
+    /// a user message is not a boundary: the summary request would then follow that
+    /// user message, and some chat templates reject two user messages in a row.
+    /// Index 0 is never chosen, so something is always summarized. Returns
+    /// conversation.Count when nothing fits, which summarizes everything.
+    /// </summary>
+    private static int RecentKeepStart(List<ChatMessage> conversation, int budgetChars)
+    {
+        int keepFrom = conversation.Count;
+        int tail = 0;
+        for (int i = conversation.Count - 1; i > 0; i--)
+        {
+            tail += GetMessageCharacterCount(conversation[i]);
+            if (tail > budgetChars)
+                break;
+            if (IsRole(conversation[i], "user")
+                || (IsRole(conversation[i], "assistant") && !IsRole(conversation[i - 1], "user")))
+                keepFrom = i;
+        }
+        return keepFrom;
+    }
+
+    /// <summary>
+    /// Replaces the messages before <paramref name="keepFrom"/> with the summary. When
+    /// the kept messages start with a user message, the summary goes ahead of that
+    /// message's hidden context, so what the user typed stays as it was; otherwise a
+    /// summary message comes first.
+    /// </summary>
+    private void ReplaceWithSummary(List<ChatMessage> conversation, int keepFrom, string summary, string continueHint)
     {
         // The summary replaces the whole prefix, so a fresh snapshot costs no cache.
         ResetContextInjections();
+        List<ChatMessage> recent = conversation.GetRange(keepFrom, conversation.Count - keepFrom);
         conversation.Clear();
-        conversation.Add(new ChatMessage(
-            "user",
-            "[Previous conversation summary]\n" + summary + continueHint));
+
+        if (recent.Count > 0 && IsRole(recent[0], "user"))
+        {
+            ChatMessage first = recent[0];
+            string block = SummaryHeader + summary + "\n\n[End of summary. The conversation continues from here.]";
+            first.Context = string.IsNullOrEmpty(first.Context) ? block : block + "\n\n" + first.Context;
+            recent[0] = first;
+        }
+        else
+        {
+            conversation.Add(new ChatMessage(
+                "user",
+                SummaryHeader + summary + (recent.Count > 0 ? RecentFollowHint : continueHint)));
+        }
+        conversation.AddRange(recent);
 
         PublishStatusTokens(GetConversationCharacterCount(conversation) + GetBaseCharacterOverhead());
     }
