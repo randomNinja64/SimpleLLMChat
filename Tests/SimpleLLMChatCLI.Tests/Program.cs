@@ -325,6 +325,59 @@ namespace SimpleLLMChatCLI.Tests
                 }
             });
 
+            TestRunner.Run("cli.summary_keeps_recent_messages", () =>
+            {
+                using (FakeOpenAiServer server = new FakeOpenAiServer())
+                using (TempWorkspace ws = PackageCliWorkspace())
+                {
+                    server.StreamDelayMs = 0;
+                    server.EnqueueContent("first-reply");
+                    server.EnqueueContent("second-reply");
+                    server.EnqueueContent("SUMMARY-TEXT");
+                    server.EnqueueContent("after-summary");
+                    // Window 1000 tokens: summarize at 2700 chars, keep the last 300 chars.
+                    WriteCliIni(ws.Path, server.BaseUrl + "/v1", "", "", null, null, null, null, null, 1000);
+                    string oldMarker = new string('A', 2540);
+                    string keptMarker = "KEEP-" + new string('B', 195);
+
+                    using (CliProcess cli = new CliProcess(
+                        Path.Combine(ws.Path, "SimpleLLMChatCLI.exe"),
+                        "--no-banners",
+                        ws.Path))
+                    using (ChatPipeProbe probe = new ChatPipeProbe(cli.Id))
+                    {
+                        probe.Start();
+                        TestAssert.True(probe.WaitForReady(15000), "startup ready");
+                        cli.WriteLine(oldMarker);
+                        TestAssert.True(WaitStdoutContains(cli, "first-reply", 20000), "first reply");
+
+                        cli.WriteLine(keptMarker);
+                        TestAssert.True(WaitStdoutContains(cli, "second-reply", 20000), "second reply");
+
+                        cli.WriteLine("third question");
+                        TestAssert.True(WaitStdoutContains(cli, "after-summary", 20000), "reply after summary");
+                        TestAssert.True(WaitStdoutContains(cli, "[Conversation summarized - continuing...]", 5000), "summarized note");
+                        TestAssert.Equal(4, server.ChatBodies.Count, "one summary request");
+
+                        string summaryRequest = server.ChatBodies[2];
+                        TestAssert.Contains(summaryRequest, oldMarker, "old turn summarized");
+                        TestAssert.True(summaryRequest.IndexOf("KEEP-", StringComparison.Ordinal) < 0, "kept turn not summarized");
+
+                        string last = server.LastBody;
+                        TestAssert.True(last.IndexOf(oldMarker, StringComparison.Ordinal) < 0, "old turn replaced");
+                        TestAssert.Contains(last, "[End of summary", "summary merged into kept user message");
+                        TestAssert.Contains(last, keptMarker, "kept user message verbatim");
+                        TestAssert.Contains(last, "second-reply", "kept reply");
+                        TestAssert.Contains(last, "third question", "new message");
+                        int summaryAt = last.IndexOf("SUMMARY-TEXT", StringComparison.Ordinal);
+                        TestAssert.True(summaryAt >= 0 && summaryAt < last.IndexOf(keptMarker, StringComparison.Ordinal),
+                            "summary ahead of kept messages");
+                        cli.WriteLine("/exit");
+                        TestAssert.True(cli.WaitForExit(10000), "exit");
+                    }
+                }
+            });
+
             TestRunner.Run("cli.compact_command", () =>
             {
                 using (FakeOpenAiServer server = new FakeOpenAiServer())
